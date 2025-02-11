@@ -14,7 +14,7 @@
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="100dp"
+            android:layout_height="wrap_content"
             android:orientation="horizontal">
 
             <Button
@@ -23,7 +23,12 @@
                 android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:contentDescription="@string/shuffle_btn"
-                android:drawableTop="@drawable/shuffle_icon"/>
+                android:drawableTop="@drawable/shuffle_icon"
+                android:drawableTint="@color/icon_tint_color"
+                android:text="@string/shuffle_btn"
+                android:textColor="@color/black"
+                android:textAllCaps="false"
+                />
 
             <Button
                 style="@style/Widget.AppCompat.Button.Borderless"
@@ -31,7 +36,11 @@
                 android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:contentDescription="@string/favourites_btn"
-                android:drawableTop="@drawable/favourite_icon"/>
+                android:drawableTop="@drawable/favourite_icon"
+                android:drawableTint="@color/icon_tint_color"
+                android:text="@string/favourites_btn"
+                android:textColor="@color/black"
+                android:textAllCaps="false"/>
 
             <Button
                 style="@style/Widget.AppCompat.Button.Borderless"
@@ -39,10 +48,26 @@
                 android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:contentDescription="@string/playlist_btn"
-                android:drawableTop="@drawable/playlist_icon"/>
+                android:drawableTop="@drawable/playlist_icon"
+                android:drawableTint="@color/icon_tint_color"
+                android:text="@string/playlist_btn"
+                android:textColor="@color/black"
+                android:textAllCaps="false"/>
 
 
         </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/total_songs"
+            android:textColor="@color/black"
+            android:layout_margin="10dp">
+        </TextView>
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"/>
 
     </LinearLayout>
 
