@@ -5,16 +5,16 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import com.raulburgosmurray.musicplayer.databinding.ActivityPlayerBinding
+import com.raulburgosmurray.musicplayer.databinding.ActivityPlaylistBinding
 
-class PlayerActivity : AppCompatActivity() {
+class PlaylistActivity : AppCompatActivity() {
 
-    private lateinit var binding: ActivityPlayerBinding
+    private lateinit var binding: ActivityPlaylistBinding
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setTheme(R.style.Theme_MusicPlayer)
-        binding = ActivityPlayerBinding.inflate(layoutInflater)
+        binding = ActivityPlaylistBinding.inflate(layoutInflater)
         enableEdgeToEdge()
         setContentView(binding.root)
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
