@@ -1,12 +1,15 @@
 package com.raulburgosmurray.musicplayer
 
 import android.content.Intent
-import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.raulburgosmurray.musicplayer.databinding.ActivityMainBinding
@@ -15,14 +18,15 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
 
+
     companion object {
         private const val REQUEST_CODE_WRITE_STORAGE_PERMISSION = 13
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        requestRuntimePermission()
         setTheme(R.style.Theme_MusicPlayer)
+        checkAndRequestPermissions()
         enableEdgeToEdge()
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -48,29 +52,58 @@ class MainActivity : AppCompatActivity() {
 
     }
 
-    //For request permission
-    private fun requestRuntimePermission(){
-        if(ActivityCompat.checkSelfPermission(this,android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
-            != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, arrayOf(android.Manifest.permission.WRITE_EXTERNAL_STORAGE), REQUEST_CODE_WRITE_STORAGE_PERMISSION)
+    private val requestPermission = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+        val granted = permissions.entries.all { it.value == true }
+
+        if (granted) {
+            Toast.makeText(this@MainActivity, "Permisos concedidos", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this@MainActivity, "Permisos denegados", Toast.LENGTH_SHORT).show()
+            showPermissionDialog()
         }
     }
 
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray,
-        deviceId: Int
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults, deviceId)
-        when (requestCode) {
-            REQUEST_CODE_WRITE_STORAGE_PERMISSION -> {
-                if(grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED){
-                    Toast.makeText(this,"Permission Granted", Toast.LENGTH_SHORT).show()
-                } else {
-                    ActivityCompat.requestPermissions(this, arrayOf(android.Manifest.permission.WRITE_EXTERNAL_STORAGE), REQUEST_CODE_WRITE_STORAGE_PERMISSION)
-                }
+    private fun showPermissionDialog() {
+        val builder = AlertDialog.Builder(this@MainActivity)
+        builder.setMessage("Anteriormente se han rechazado los permisos\nDesea ir a la configuración para concederlos ahora?")
+            .setCancelable(false)
+            .setPositiveButton("Yes") { dialog, id ->
+                openSettings()
             }
-        }
+            .setNegativeButton("No") { dialog, id ->
+                dialog.dismiss()
+            }
+        val alert = builder.create()
+        alert.show()
     }
+
+    private fun openSettings() {
+        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            addCategory(Intent.CATEGORY_DEFAULT)
+            data = Uri.parse("package:$packageName")
+        }.run(::startActivity)
+    }
+
+    private fun checkAndRequestPermissions() {
+        val permissions = mutableListOf<String>()
+
+        // Permiso de cámara (siempre necesario en todas las versiones)
+        permissions.add(android.Manifest.permission.CAMERA)
+
+        // Permisos de almacenamiento según la versión de Android
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            // Android 12 o inferior usa READ_EXTERNAL_STORAGE
+            permissions.add(android.Manifest.permission.READ_EXTERNAL_STORAGE)
+        } else {
+            // Android 13+ usa los nuevos permisos específicos por tipo de archivo
+            permissions.add(android.Manifest.permission.READ_MEDIA_IMAGES)
+            permissions.add(android.Manifest.permission.READ_MEDIA_VIDEO)
+            permissions.add(android.Manifest.permission.READ_MEDIA_AUDIO)
+
+        }
+
+        requestPermission.launch(permissions.toTypedArray())
+    }
+
+
 }
