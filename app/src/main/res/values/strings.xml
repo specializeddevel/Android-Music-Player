@@ -17,5 +17,12 @@
     <string name="previous_btn">Previous</string>
     <string name="pause_play_btn">Pause/Play</string>
     <string name="next_btn">Next</string>
+    <string name="open">Open</string>
+    <string name="close">Close</string>
+
+<!--    titles, messages or dialogs texts-->
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+    <string name="text_dialog_permissions">Previously some permissions have been rejected. Do you want to go to open configuration to grant them now?</string>
 
 </resources>
