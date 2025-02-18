@@ -1,0 +1,10 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/nav_home"
+        android:title="Inicio"
+        android:icon="@drawable/add_icon"/>
+    <item
+        android:id="@+id/nav_settings"
+        android:title="Configuraciones"
+        android:icon="@drawable/shuffle_icon"/>
+</menu>

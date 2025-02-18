@@ -19,6 +19,8 @@
     <string name="next_btn">Next</string>
     <string name="open">Open</string>
     <string name="close">Close</string>
+    <string name="app_icon">Icon</string>
+    <string name="text_nav">Welcome to\nWorld of Music</string>
 
 <!--    titles, messages or dialogs texts-->
     <string name="yes">Yes</string>
