@@ -87,6 +87,7 @@
             </LinearLayout>
 
             <TextView
+                android:id="@+id/totalSongs"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/total_songs"
@@ -95,18 +96,19 @@
             </TextView>
 
             <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/musicRV"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent" />
         </LinearLayout>
     </androidx.coordinatorlayout.widget.CoordinatorLayout>
 
     <com.google.android.material.navigation.NavigationView
-        android:id="@+id/navigation_view"
+        android:id="@+id/navView"
         android:layout_width="wrap_content"
         android:layout_height="match_parent"
         android:layout_gravity="start"
         android:fitsSystemWindows="true"
-        app:menu="@menu/drawer_menu"
+        app:menu="@menu/nav_menu"
         app:headerLayout="@layout/nav_header"
         android:elevation="0dp"
         android:layout_marginTop="80dp"

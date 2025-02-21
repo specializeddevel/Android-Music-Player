@@ -14,7 +14,8 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        android:background="@color/cool_pink">
+        android:background="@color/cool_pink"
+        android:layout_marginTop="2dp">
 
         <ImageButton
             android:layout_width="wrap_content"
@@ -22,7 +23,8 @@
             android:src="@drawable/back_icon"
             android:contentDescription="@string/back_btn"
             android:backgroundTint="@android:color/transparent"
-            app:tint="@color/white" />
+            app:tint="@color/white"
+            android:padding="5dp"/>
 
         <TextView
             android:layout_width="match_parent"
