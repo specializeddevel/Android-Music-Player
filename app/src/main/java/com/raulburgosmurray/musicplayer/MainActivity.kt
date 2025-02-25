@@ -1,8 +1,9 @@
 package com.raulburgosmurray.musicplayer
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.Bundle
-import android.view.MenuItem
+import android.provider.MediaStore
 import android.widget.Toast
 import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AppCompatActivity
@@ -16,6 +17,7 @@ import androidx.drawerlayout.widget.DrawerLayout
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.navigation.NavigationView
 import com.raulburgosmurray.musicplayer.databinding.ActivityMainBinding
+import java.io.File
 import kotlin.system.exitProcess
 
 class MainActivity : AppCompatActivity() {
@@ -27,6 +29,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var navigationView: NavigationView
     private lateinit var toolbar: Toolbar
     private lateinit var musicAdapter: MusicAdapter
+
+companion object{
+    lateinit var MusicListMA : ArrayList<Music>
+}
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,14 +64,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        if(toogle.onOptionsItemSelected(item))
-            return true
-        return super.onOptionsItemSelected(item)
-    }
-
     private fun initializeLayout() {
         setTheme(R.style.coolPinkNav)
 
@@ -91,17 +89,12 @@ class MainActivity : AppCompatActivity() {
         toogle.syncState()
 
         //For ReciclerView
-        val musicList = ArrayList<String>()
-        musicList.add("1 Song")
-        musicList.add("2 Song")
-        musicList.add("3 Song")
-        musicList.add("4 Song")
-        musicList.add("5 Song")
+        MusicListMA = getAllAudio()
 
         binding.musicRV.setHasFixedSize(true)
         binding.musicRV.setItemViewCacheSize(13)
         binding.musicRV.layoutManager = LinearLayoutManager(this@MainActivity)
-        musicAdapter = MusicAdapter(this@MainActivity, musicList)
+        musicAdapter = MusicAdapter(this@MainActivity, MusicListMA)
         binding.musicRV.adapter = musicAdapter
         binding.totalSongs.text = "Total Songs: " + musicAdapter.itemCount
 
@@ -110,6 +103,55 @@ class MainActivity : AppCompatActivity() {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
+    }
 
+    @SuppressLint("Recycle", "Range")
+    private fun getAllAudio(): ArrayList<Music>{
+        val tempList = ArrayList<Music>()
+        val selection = MediaStore.Audio.Media.IS_MUSIC + " != 0 AND " + MediaStore.Audio.Media.MIME_TYPE + " LIKE 'audio/%'"
+        val projection = arrayOf(
+            MediaStore.Audio.Media._ID,
+            MediaStore.Audio.Media.TITLE,
+            MediaStore.Audio.Media.ALBUM,
+            MediaStore.Audio.Media.ARTIST,
+            MediaStore.Audio.Media.DURATION,
+            MediaStore.Audio.Media.DATE_ADDED,
+            MediaStore.Audio.Media.DATA
+        )
+        val cursor = this.contentResolver.query(
+            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+            projection,
+            selection,
+            null,
+            MediaStore.Audio.Media.DATE_ADDED + " DESC",
+            null)
+        if(cursor != null) {
+            if (cursor.moveToFirst()) {
+                do {
+                    val titleC = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.TITLE)) ?: "Unknown"
+                    val idC = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media._ID)) ?: "Unknown"
+                    val albumC = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.ALBUM)) ?: "Unknown"
+                    val artistC = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.ARTIST)) ?: "Unknown"
+                    val durationC = cursor.getLong(cursor.getColumnIndex(MediaStore.Audio.Media.DURATION))
+                    val pathC = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.DATA))
+
+                    if (durationC > 0) {
+                        val music = Music(
+                        id = idC,
+                        title = titleC,
+                        album = albumC,
+                        artist = artistC,
+                        duration = durationC,
+                        path = pathC
+                        )
+
+                        if(File(music.path).exists())
+                            tempList.add(music)
+                    }
+                } while (cursor.moveToNext())
+            }
+            cursor.close()
+        }
+        return tempList
     }
 }
