@@ -41,7 +41,11 @@ companion object{
         initializeLayout()
 
         binding.shuffleBtn.setOnClickListener {
-            startActivity(Intent(this, PlayerActivity::class.java))
+            val intent = Intent(this, PlayerActivity::class.java)
+            intent.putExtra("index", 0)
+            intent.putExtra("class", "MainActivity")
+            startActivity(intent)
+
         }
 
         binding.favoritesBtn.setOnClickListener {

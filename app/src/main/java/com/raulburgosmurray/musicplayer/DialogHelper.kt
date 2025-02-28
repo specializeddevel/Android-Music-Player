@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import androidx.appcompat.app.AlertDialog
+import kotlin.system.exitProcess
 
 object DialogHelper {
 
@@ -16,7 +17,7 @@ object DialogHelper {
                 openSettings(activity)
             }
             .setNegativeButton(activity.getString(R.string.no)) { dialog, _ ->
-                dialog.dismiss()
+                exitProcess(1)
             }
             .show()
     }
