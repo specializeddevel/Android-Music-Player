@@ -95,7 +95,6 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection {
                 setLayout()
                 createMediaPlayer()
             }
-
         }
     }
 
