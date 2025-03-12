@@ -80,7 +80,7 @@ companion object{
 
 
         //For Nav drawer
-        // Hace la barra de estado transparente
+        //Makes the status bar transparent
         WindowCompat.setDecorFitsSystemWindows(window, false)
         WindowInsetsControllerCompat(window, binding.root).isAppearanceLightStatusBars = true
         drawerLayout = binding.DrawerLayout

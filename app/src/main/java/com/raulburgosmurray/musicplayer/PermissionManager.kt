@@ -22,6 +22,7 @@ class PermissionManager(private val caller:ActivityResultCaller) {
             permissions.add(android.Manifest.permission.CAMERA)
             permissions.add(android.Manifest.permission.FOREGROUND_SERVICE)
 
+
             // Handle storage permissions according to the Android version
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
                 permissions.add(android.Manifest.permission.READ_EXTERNAL_STORAGE)
