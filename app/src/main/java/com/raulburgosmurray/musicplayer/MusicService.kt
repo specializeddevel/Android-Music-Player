@@ -29,7 +29,7 @@ class MusicService: Service() {
         }
     }
 
-    fun showNotification(){
+    fun showNotification(playPauseBtn: Int){
 
         val flag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             PendingIntent.FLAG_IMMUTABLE
@@ -68,7 +68,7 @@ class MusicService: Service() {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOnlyAlertOnce(true)
             .addAction(R.drawable.previous_icon, "Previus", prevPendingIntent)
-            .addAction(R.drawable.play_icon, "Play", playPendingIntent)
+            .addAction(playPauseBtn, "Play", playPendingIntent)
             .addAction(R.drawable.next_icon, "Next", nextPendingIntent)
             .addAction(R.drawable.exit_icon, "Exit", exitPendingIntent)
             .build()

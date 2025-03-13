@@ -20,10 +20,9 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection {
         var songPosition : Int = 0
         var isPlaying = false
         var musicService : MusicService? = null
+        lateinit var binding: ActivityPlayerBinding
     }
 
-
-    private lateinit var binding: ActivityPlayerBinding
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -100,12 +99,14 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection {
 
     private fun playMusic(){
         binding.playPauseBtnPA.setIconResource(R.drawable.pause_icon)
+        musicService!!.showNotification(R.drawable.pause_icon)
         isPlaying = true
         musicService!!.mediaPlayer.start()
     }
 
     private fun pauseMusic(){
         binding.playPauseBtnPA.setIconResource(R.drawable.play_icon)
+        musicService!!.showNotification(R.drawable.play_icon)
         isPlaying = false
         musicService!!.mediaPlayer.pause()
     }
@@ -136,7 +137,7 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection {
         var binder = service as MusicService.MyBinder
         musicService = binder.currentService()
         createMediaPlayer()
-        musicService!!.showNotification()
+        musicService!!.showNotification(R.drawable.pause_icon)
     }
 
     override fun onServiceDisconnected(name: ComponentName?) {
