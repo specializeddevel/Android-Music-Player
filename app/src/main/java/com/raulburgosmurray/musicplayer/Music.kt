@@ -1,6 +1,8 @@
 package com.raulburgosmurray.musicplayer
 
 import android.media.MediaMetadataRetriever
+import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.musicListPA
+import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.songPosition
 import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
 
@@ -32,13 +34,29 @@ data class Music(
         }
 
         fun exitApplication() {
-            //if (PlayerActivity.musicService != null) {
-            //PlayerActivity.musicService!!.audioManager.abandonAudioFocus(PlayerActivity.musicService)
+            if (PlayerActivity.musicService != null) {
+            PlayerActivity.musicService!!.audioManager.abandonAudioFocus(PlayerActivity.musicService)
             PlayerActivity.musicService!!.stopForeground(true)
             PlayerActivity.musicService!!.mediaPlayer!!.release()
             PlayerActivity.musicService = null
-            //}
+            }
             exitProcess(1)
+        }
+
+        fun setSongPosition(increment: Boolean){
+            if(increment){
+                if(musicListPA.size-1 == songPosition) {
+                    songPosition = 0
+                } else {
+                    ++songPosition
+                }
+            } else {
+                if(songPosition == 0) {
+                    songPosition = musicListPA.size-1
+                } else {
+                    --songPosition
+                }
+            }
         }
     }
 }
