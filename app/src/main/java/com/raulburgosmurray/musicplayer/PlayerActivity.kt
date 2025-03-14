@@ -11,6 +11,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.bumptech.glide.Glide
 import com.bumptech.glide.request.RequestOptions
+import com.raulburgosmurray.musicplayer.Music.Companion.setSongPosition
 import com.raulburgosmurray.musicplayer.databinding.ActivityPlayerBinding
 
 class PlayerActivity : AppCompatActivity(), ServiceConnection {
@@ -73,6 +74,7 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection {
             musicService!!.mediaPlayer.start()
             isPlaying = true
             binding.playPauseBtnPA.setIconResource(R.drawable.pause_icon)
+            musicService!!.showNotification(R.drawable.pause_icon)
         } catch (e: Exception) {
             return
         }
@@ -117,27 +119,11 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection {
         createMediaPlayer()
     }
 
-    private fun setSongPosition(increment: Boolean){
-        if(increment){
-            if(musicListPA.size-1 == songPosition) {
-                songPosition = 0
-            } else {
-                ++songPosition
-            }
-        } else {
-            if(songPosition == 0) {
-                songPosition = musicListPA.size-1
-            } else {
-                --songPosition
-            }
-        }
-    }
-
     override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
         var binder = service as MusicService.MyBinder
         musicService = binder.currentService()
         createMediaPlayer()
-        musicService!!.showNotification(R.drawable.pause_icon)
+
     }
 
     override fun onServiceDisconnected(name: ComponentName?) {
