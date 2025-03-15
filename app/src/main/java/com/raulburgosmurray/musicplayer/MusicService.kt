@@ -8,16 +8,20 @@ import android.media.AudioManager
 import android.media.MediaPlayer
 import android.os.Binder
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import androidx.core.app.NotificationCompat
+import com.raulburgosmurray.musicplayer.Music.Companion.formatDuration
 
 class MusicService: Service(), AudioManager.OnAudioFocusChangeListener {
 
     private var myBinder = MyBinder()
     val mediaPlayer: MediaPlayer by lazy { MediaPlayer() }
     private lateinit var mediaSession : MediaSessionCompat
+    private lateinit var runnable: Runnable
     lateinit var audioManager: AudioManager
 
     override fun onBind(intent: Intent?): IBinder? {
@@ -48,6 +52,9 @@ class MusicService: Service(), AudioManager.OnAudioFocusChangeListener {
         val nextIntent = Intent(baseContext, NotificationReceiver::class.java).setAction(ApplicationClass.NEXT)
         val nextPendingIntent = PendingIntent.getBroadcast(baseContext, 0, nextIntent, flag)
 
+        val forwardIntent = Intent(baseContext, NotificationReceiver::class.java).setAction(ApplicationClass.FORWARD)
+        val forwardPendingIntent = PendingIntent.getBroadcast(baseContext, 0, forwardIntent, flag)
+
         val exitIntent = Intent(baseContext, NotificationReceiver::class.java).setAction(ApplicationClass.EXIT)
         val exitPendingIntent = PendingIntent.getBroadcast(baseContext, 0, exitIntent, flag)
 
@@ -71,6 +78,7 @@ class MusicService: Service(), AudioManager.OnAudioFocusChangeListener {
             .addAction(R.drawable.previous_icon, "Previus", prevPendingIntent)
             .addAction(playPauseBtn, "Play", playPendingIntent)
             .addAction(R.drawable.next_icon, "Next", nextPendingIntent)
+            .addAction(R.drawable.add_icon, "+10", forwardPendingIntent)
             .addAction(R.drawable.exit_icon, "Exit", exitPendingIntent)
             .build()
 
@@ -102,9 +110,23 @@ class MusicService: Service(), AudioManager.OnAudioFocusChangeListener {
             mediaPlayer.prepare()
             PlayerActivity.binding.playPauseBtnPA.setIconResource(R.drawable.pause_icon)
             showNotification(R.drawable.pause_icon)
+            PlayerActivity.binding.tvSeekBarStart.text = formatDuration(mediaPlayer.currentPosition.toLong())
+            PlayerActivity.binding.tvSeekBarEnd.text = formatDuration(mediaPlayer.duration.toLong())
+            PlayerActivity.binding.seekBarPA.progress = 0
+            PlayerActivity.binding.seekBarPA.max = mediaPlayer.duration
         } catch (e: Exception) {
             return
         }
+    }
+
+    fun seekBarSetup(){
+        runnable = Runnable {
+            PlayerActivity.binding.tvSeekBarStart.text =
+                formatDuration(mediaPlayer.currentPosition.toLong())
+            PlayerActivity.binding.seekBarPA.progress = mediaPlayer!!.currentPosition
+            Handler(Looper.getMainLooper()).postDelayed(runnable, 200)
+        }
+        Handler(Looper.getMainLooper()).postDelayed(runnable, 0)
     }
 
     fun getPlayBackState(): PlaybackStateCompat {

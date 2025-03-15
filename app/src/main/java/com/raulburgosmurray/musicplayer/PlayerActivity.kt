@@ -5,12 +5,14 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.os.Bundle
 import android.os.IBinder
+import android.widget.SeekBar
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.bumptech.glide.Glide
 import com.bumptech.glide.request.RequestOptions
+import com.raulburgosmurray.musicplayer.Music.Companion.formatDuration
 import com.raulburgosmurray.musicplayer.Music.Companion.setSongPosition
 import com.raulburgosmurray.musicplayer.databinding.ActivityPlayerBinding
 
@@ -55,6 +57,15 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection {
         binding.nextBtnPA.setOnClickListener{
             prevNextSong(true)
         }
+        binding.seekBarPA.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener{
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if(fromUser) {
+                    musicService!!.mediaPlayer.seekTo(progress)
+                }
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
+            override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
+        })
 
     }
 
@@ -75,6 +86,10 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection {
             isPlaying = true
             binding.playPauseBtnPA.setIconResource(R.drawable.pause_icon)
             musicService!!.showNotification(R.drawable.pause_icon)
+            binding.tvSeekBarStart.text = formatDuration(musicService!!.mediaPlayer.currentPosition.toLong())
+            binding.tvSeekBarEnd.text = formatDuration(musicService!!.mediaPlayer.duration.toLong())
+            binding.seekBarPA.progress = 0
+            binding.seekBarPA.max = musicService!!.mediaPlayer.duration
         } catch (e: Exception) {
             return
         }
@@ -111,6 +126,7 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection {
         musicService!!.showNotification(R.drawable.play_icon)
         isPlaying = false
         musicService!!.mediaPlayer.pause()
+        skipBackward(2000)
     }
 
     private fun prevNextSong(increment: Boolean){
@@ -119,11 +135,33 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection {
         createMediaPlayer()
     }
 
+    private fun skipForward(miliSeconds:Int){
+        PlayerActivity.musicService!!.mediaPlayer?.let { player ->
+            val newPosition = player.currentPosition + miliSeconds
+            if (newPosition <= player.duration) {
+                player.seekTo(newPosition)
+            } else {
+                player.seekTo(player.duration)
+            }
+        }
+    }
+
+    fun skipBackward(miliSeconds: Int) {
+        PlayerActivity.musicService!!.mediaPlayer?.let { player ->
+            val newPosition = player.currentPosition - miliSeconds
+            if (newPosition >= 0) {
+                player.seekTo(newPosition)
+            } else {
+                player.seekTo(0)
+            }
+        }
+    }
+
     override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
         var binder = service as MusicService.MyBinder
         musicService = binder.currentService()
         createMediaPlayer()
-
+        musicService!!.seekBarSetup()
     }
 
     override fun onServiceDisconnected(name: ComponentName?) {

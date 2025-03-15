@@ -1,8 +1,6 @@
 package com.raulburgosmurray.musicplayer
 
 import android.media.MediaMetadataRetriever
-import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.musicListPA
-import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.songPosition
 import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
 
@@ -45,16 +43,16 @@ data class Music(
 
         fun setSongPosition(increment: Boolean){
             if(increment){
-                if(musicListPA.size-1 == songPosition) {
-                    songPosition = 0
+                if(PlayerActivity.musicListPA.size-1 == PlayerActivity.songPosition) {
+                    PlayerActivity.songPosition = 0
                 } else {
-                    ++songPosition
+                    ++PlayerActivity.songPosition
                 }
             } else {
-                if(songPosition == 0) {
-                    songPosition = musicListPA.size-1
+                if(PlayerActivity.songPosition == 0) {
+                    PlayerActivity.songPosition = PlayerActivity.musicListPA.size-1
                 } else {
-                    --songPosition
+                    --PlayerActivity.songPosition
                 }
             }
         }

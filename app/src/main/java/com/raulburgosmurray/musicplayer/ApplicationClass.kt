@@ -11,6 +11,7 @@ class ApplicationClass: Application() {
         const val PLAY = "play"
         const val NEXT = "next"
         const val PREVIUS = "previus"
+        const val FORWARD = "forward"
         const val EXIT = "exit"
     }
 
