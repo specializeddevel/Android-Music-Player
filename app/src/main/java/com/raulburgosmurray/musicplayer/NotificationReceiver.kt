@@ -14,6 +14,7 @@ class NotificationReceiver: BroadcastReceiver() {
             ApplicationClass.PREVIUS -> if(PlayerActivity.musicListPA.size > 1) prevNextSong(increment = false, context = context!!)
             ApplicationClass.PLAY -> if(PlayerActivity.isPlaying) pauseMusic() else playMusic()
             ApplicationClass.NEXT -> if(PlayerActivity.musicListPA.size > 1) prevNextSong(increment = true, context = context!!)
+            ApplicationClass.FORWARD -> skipForward(10000)
             ApplicationClass.EXIT -> Music.exitApplication()
             //TODO: The EXIT action don't works
         }
@@ -44,5 +45,27 @@ class NotificationReceiver: BroadcastReceiver() {
             .into(PlayerActivity.binding.songImgPA)
         PlayerActivity.binding.songNamePA.text = PlayerActivity.musicListPA[PlayerActivity.songPosition].title
         playMusic()
+    }
+
+    private fun skipForward(miliSeconds:Int){
+        PlayerActivity.musicService!!.mediaPlayer?.let { player ->
+            val newPosition = player.currentPosition + miliSeconds
+            if (newPosition <= player.duration) {
+                player.seekTo(newPosition)
+            } else {
+                player.seekTo(player.duration)
+            }
+        }
+    }
+
+    fun skipBackward(miliSeconds: Int) {
+        PlayerActivity.musicService!!.mediaPlayer?.let { player ->
+            val newPosition = player.currentPosition - miliSeconds
+            if (newPosition >= 0) {
+                player.seekTo(newPosition)
+            } else {
+                player.seekTo(0)
+            }
+        }
     }
 }
