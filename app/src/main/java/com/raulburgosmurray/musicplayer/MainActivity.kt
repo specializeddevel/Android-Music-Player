@@ -3,6 +3,7 @@ package com.raulburgosmurray.musicplayer
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.widget.Toast
@@ -124,8 +125,14 @@ companion object{
             MediaStore.Audio.Media.DATA,
             MediaStore.Audio.Media.ALBUM_ID
         )
+        val collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+        } else {
+            // For Android <10, use the traditional URI (may not include the SD card)
+            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+        }
         val cursor = this.contentResolver.query(
-            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+            collection,
             projection,
             selection,
             null,
@@ -143,6 +150,7 @@ companion object{
                     val albumIdC = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.ALBUM_ID)).toString()
                     val uri = Uri.parse("content://media/external/audio/albumart")
                     val artUriC = Uri.withAppendedPath(uri, albumIdC).toString()
+                    val uriC = Uri.withAppendedPath(uri, albumIdC)
 
                     if (durationC > 0) {
                         val music = Music(
@@ -152,7 +160,8 @@ companion object{
                             artist = artistC,
                             duration = durationC,
                             path = pathC,
-                            artUri = artUriC
+                            artUri = artUriC,
+                            uri = uriC
                         )
 
                         if(File(music.path).exists())

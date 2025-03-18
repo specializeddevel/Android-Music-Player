@@ -1,6 +1,7 @@
 package com.raulburgosmurray.musicplayer
 
 import android.media.MediaMetadataRetriever
+import android.net.Uri
 import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
 
@@ -11,7 +12,8 @@ data class Music(
     val artist: String,
     val duration: Long = 0,
     val path: String,
-    val artUri: String
+    val artUri: String,
+    val uri:Uri
 ) {
     companion object {
         fun formatDuration(duration: Long): String {
