@@ -3,6 +3,7 @@ package com.raulburgosmurray.musicplayer
 import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
+import android.media.MediaPlayer
 import android.os.Bundle
 import android.os.IBinder
 import android.widget.SeekBar
@@ -16,7 +17,7 @@ import com.raulburgosmurray.musicplayer.Music.Companion.formatDuration
 import com.raulburgosmurray.musicplayer.Music.Companion.setSongPosition
 import com.raulburgosmurray.musicplayer.databinding.ActivityPlayerBinding
 
-class PlayerActivity : AppCompatActivity(), ServiceConnection {
+class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCompletionListener {
 
     companion object {
         lateinit var musicListPA : ArrayList<Music>
@@ -72,7 +73,7 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection {
     private fun setLayout(){
         Glide.with(this)
             .load(musicListPA[songPosition].artUri)
-            .apply(RequestOptions().placeholder(R.drawable.music_player_icon_splash_screen).centerCrop())
+            .apply(RequestOptions().placeholder(R.drawable.ic_audiobook_cover).centerCrop())
             .into(binding.songImgPA)
         binding.songNamePA.text = musicListPA[songPosition].title
     }
@@ -90,6 +91,7 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection {
             binding.tvSeekBarEnd.text = formatDuration(musicService!!.mediaPlayer.duration.toLong())
             binding.seekBarPA.progress = 0
             binding.seekBarPA.max = musicService!!.mediaPlayer.duration
+            musicService!!.mediaPlayer.setOnCompletionListener(this)
         } catch (e: Exception) {
             return
         }
@@ -166,5 +168,15 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection {
 
     override fun onServiceDisconnected(name: ComponentName?) {
         musicService = null
+    }
+
+    override fun onCompletion(mp: MediaPlayer?) {
+        try {
+            setSongPosition(increment = true)
+            createMediaPlayer()
+            setLayout()
+        } catch (e: Exception) {
+            return
+        }
     }
 }
