@@ -173,4 +173,14 @@ companion object{
         }
         return tempList
     }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if(!PlayerActivity.isPlaying && PlayerActivity.musicService != null){
+            PlayerActivity.musicService!!.stopForeground(true)
+            PlayerActivity.musicService!!.mediaPlayer.release()
+            PlayerActivity.musicService = null
+            exitProcess(1)
+        }
+    }
 }

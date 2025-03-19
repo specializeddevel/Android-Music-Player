@@ -44,6 +44,7 @@ class MusicAdapter(private val context: Context, private val musicList: ArrayLis
             .load(musicList[position].artUri)
             .apply(RequestOptions().placeholder(R.drawable.ic_audiobook_cover).centerCrop())
             .into(holder.image)
+        //Log.i("icon", "arturi: ${holder.image.toString()}")
         holder.root.setOnClickListener {
             val intent = Intent(context, PlayerActivity::class.java)
             intent.putExtra("index", position)

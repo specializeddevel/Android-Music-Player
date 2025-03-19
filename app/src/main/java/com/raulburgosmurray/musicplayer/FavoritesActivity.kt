@@ -22,5 +22,8 @@ class FavoritesActivity : AppCompatActivity() {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
+        binding.backBtnFA.setOnClickListener{
+            finish()
+        }
     }
 }
