@@ -9,6 +9,7 @@ import android.os.IBinder
 import android.widget.SeekBar
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.bumptech.glide.Glide
@@ -25,6 +26,7 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         var isPlaying = false
         var musicService : MusicService? = null
         lateinit var binding: ActivityPlayerBinding
+        var repeat = false
     }
 
 
@@ -44,6 +46,9 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
             insets
         }
         initializeLayout()
+        binding.backBtnPA.setOnClickListener{
+            finish()
+        }
         binding.playPauseBtnPA.setOnClickListener{
             if(isPlaying) {
                 pauseMusic()
@@ -67,6 +72,15 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
             override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
             override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
         })
+        binding.repeatBtnPA.setOnClickListener{
+            if(!repeat){
+                repeat = true
+                binding.repeatBtnPA.setColorFilter(ContextCompat.getColor(this,R.color.purple_500))
+            } else {
+                repeat = false
+                binding.repeatBtnPA.setColorFilter(ContextCompat.getColor(this,R.color.cool_pink))
+            }
+        }
 
     }
 
@@ -76,6 +90,7 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
             .apply(RequestOptions().placeholder(R.drawable.ic_audiobook_cover).centerCrop())
             .into(binding.songImgPA)
         binding.songNamePA.text = musicListPA[songPosition].title
+        if(repeat) binding.repeatBtnPA.setColorFilter(ContextCompat.getColor(this,R.color.purple_500))
     }
 
     private fun createMediaPlayer(){
