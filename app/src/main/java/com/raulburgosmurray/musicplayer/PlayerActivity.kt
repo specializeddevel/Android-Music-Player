@@ -1,12 +1,15 @@
 package com.raulburgosmurray.musicplayer
 
+import android.app.ComponentCaller
 import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
 import android.media.MediaPlayer
+import android.media.audiofx.AudioEffect
 import android.os.Bundle
 import android.os.IBinder
 import android.widget.SeekBar
+import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -81,6 +84,21 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
                 binding.repeatBtnPA.setColorFilter(ContextCompat.getColor(this,R.color.cool_pink))
             }
         }
+
+        binding.equalizerBtnPA.setOnClickListener {
+            try {
+
+
+            val eqIntent = Intent(AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL)
+            eqIntent.putExtra(AudioEffect.EXTRA_AUDIO_SESSION, musicService!!.mediaPlayer.audioSessionId)
+            eqIntent.putExtra(AudioEffect.EXTRA_PACKAGE_NAME, baseContext.packageName)
+            eqIntent.putExtra(AudioEffect.EXTRA_CONTENT_TYPE, AudioEffect.CONTENT_TYPE_MUSIC)
+            startActivityForResult(eqIntent, 13)
+            } catch (e: Exception){
+                Toast.makeText(this, "Equalizer feature not supported!", Toast.LENGTH_SHORT).show()
+            }
+        }
+
 
     }
 
@@ -193,5 +211,16 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         } catch (e: Exception) {
             return
         }
+    }
+
+    override fun onActivityResult(
+        requestCode: Int,
+        resultCode: Int,
+        data: Intent?,
+        caller: ComponentCaller
+    ) {
+        super.onActivityResult(requestCode, resultCode, data, caller)
+        if(requestCode == 13 || resultCode == RESULT_OK)
+            return
     }
 }
