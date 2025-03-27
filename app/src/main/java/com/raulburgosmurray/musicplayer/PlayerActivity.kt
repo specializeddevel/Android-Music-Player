@@ -4,22 +4,34 @@ import android.app.ComponentCaller
 import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
+import android.graphics.Color
 import android.media.MediaPlayer
 import android.media.audiofx.AudioEffect
 import android.os.Bundle
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
+import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
 import com.bumptech.glide.request.RequestOptions
+import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.raulburgosmurray.musicplayer.Music.Companion.formatDuration
 import com.raulburgosmurray.musicplayer.Music.Companion.setSongPosition
 import com.raulburgosmurray.musicplayer.databinding.ActivityPlayerBinding
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.concurrent.thread
+import kotlin.system.exitProcess
 
 class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCompletionListener {
 
@@ -30,6 +42,9 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         var musicService : MusicService? = null
         lateinit var binding: ActivityPlayerBinding
         var repeat = false
+        var min15 = false
+        var min30 = false
+        var min60 = false
     }
 
 
@@ -99,6 +114,31 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
             }
         }
 
+        binding.timerBtnPA.setOnClickListener {
+            val timer = min15 || min30 || min60
+            if(!timer){
+                showBottomSheetDialog()
+            }
+            else {
+                val builder = MaterialAlertDialogBuilder(this)
+                builder.setTitle("Stop timer")
+                    .setMessage("Do you want to stop timer?")
+                    .setPositiveButton("Yes"){_,_ ->
+                        min15 = false
+                        min30 = false
+                        min60 = false
+                        binding.timerBtnPA.setColorFilter(ContextCompat.getColor(this, R.color.cool_pink))
+                    }
+                    .setNegativeButton("No") { dialog, _ ->
+                        dialog.dismiss()
+                    }
+                val customDialog = builder.create()
+                customDialog.show()
+                customDialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(Color.RED)
+                customDialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(Color.RED)
+            }
+        }
+
 
     }
 
@@ -109,6 +149,7 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
             .into(binding.songImgPA)
         binding.songNamePA.text = musicListPA[songPosition].title
         if(repeat) binding.repeatBtnPA.setColorFilter(ContextCompat.getColor(this,R.color.purple_500))
+        if(min15 || min30 || min60) binding.timerBtnPA.setColorFilter(ContextCompat.getColor(this, R.color.purple_500))
     }
 
     private fun createMediaPlayer(){
@@ -181,8 +222,8 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         }
     }
 
-    fun skipBackward(miliSeconds: Int) {
-        PlayerActivity.musicService!!.mediaPlayer?.let { player ->
+    private fun skipBackward(miliSeconds: Int) {
+        musicService!!.mediaPlayer?.let { player ->
             val newPosition = player.currentPosition - miliSeconds
             if (newPosition >= 0) {
                 player.seekTo(newPosition)
@@ -222,5 +263,51 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         super.onActivityResult(requestCode, resultCode, data, caller)
         if(requestCode == 13 || resultCode == RESULT_OK)
             return
+    }
+
+    private fun showBottomSheetDialog(){
+        val dialog = BottomSheetDialog(this@PlayerActivity)
+        dialog.setContentView(R.layout.bottom_sheet_dialog)
+        dialog.show()
+        dialog.findViewById<LinearLayout>(R.id.min_15)?.setOnClickListener{
+            Toast.makeText(baseContext, "Music will stop after 15 minutes", Toast.LENGTH_SHORT).show()
+            binding.timerBtnPA.setColorFilter(ContextCompat.getColor(this, R.color.purple_500))
+            min15 = true
+            Handler(Looper.getMainLooper()).postDelayed({
+                if (min15) {
+                    min15=false
+                    binding.timerBtnPA.setColorFilter(ContextCompat.getColor(this, R.color.cool_pink))
+                    pauseMusic()
+                }
+            }, 5000L) // 30 minutos en milisegundos
+            dialog.dismiss()
+        }
+        dialog.findViewById<LinearLayout>(R.id.min_30)?.setOnClickListener{
+            Toast.makeText(baseContext, "Music will stop after 30 minutes", Toast.LENGTH_SHORT).show()
+            binding.timerBtnPA.setColorFilter(ContextCompat.getColor(this, R.color.purple_500))
+            min30 = true
+            // Necesitas el ámbito de corrutinas (por ejemplo, en un Activity/Fragment)
+            Handler(Looper.getMainLooper()).postDelayed({
+                if (min30) {
+                    min30=false
+                    binding.timerBtnPA.setColorFilter(ContextCompat.getColor(this, R.color.cool_pink))
+                    pauseMusic()
+                }
+            }, 5000L)
+            dialog.dismiss()
+        }
+        dialog.findViewById<LinearLayout>(R.id.min_60)?.setOnClickListener{
+            Toast.makeText(baseContext, "Music will stop after 60 minutes", Toast.LENGTH_SHORT).show()
+            binding.timerBtnPA.setColorFilter(ContextCompat.getColor(this, R.color.purple_500))
+            min60 = true
+            Handler(Looper.getMainLooper()).postDelayed({
+                if (min60) {
+                    min60=false
+                    binding.timerBtnPA.setColorFilter(ContextCompat.getColor(this, R.color.cool_pink))
+                    pauseMusic()
+                }
+            }, 5000L)
+            dialog.dismiss()
+        }
     }
 }

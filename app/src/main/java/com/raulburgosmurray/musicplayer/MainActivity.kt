@@ -71,12 +71,7 @@ companion object{
                     builder.setTitle("Exit")
                         .setMessage("Do you want to close app?")
                         .setPositiveButton("Yes"){_,_ ->
-                            if (PlayerActivity.musicService != null) {
-                                PlayerActivity.musicService!!.stopForeground(true)
-                                PlayerActivity.musicService!!.mediaPlayer.release()
-                                PlayerActivity.musicService = null
-                            }
-                            exitProcess(1)
+                            Music.exitApplication()
                         }
                         .setNegativeButton("No") { dialog, _ ->
                             dialog.dismiss()
@@ -198,11 +193,6 @@ companion object{
 
     override fun onDestroy() {
         super.onDestroy()
-        if(!PlayerActivity.isPlaying && PlayerActivity.musicService != null){
-            PlayerActivity.musicService!!.stopForeground(true)
-            PlayerActivity.musicService!!.mediaPlayer.release()
-            PlayerActivity.musicService = null
-            exitProcess(1)
-        }
+        Music.exitApplication()
     }
 }
