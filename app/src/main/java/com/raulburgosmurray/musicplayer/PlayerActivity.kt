@@ -270,7 +270,7 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         dialog.setContentView(R.layout.bottom_sheet_dialog)
         dialog.show()
         dialog.findViewById<LinearLayout>(R.id.min_15)?.setOnClickListener{
-            Toast.makeText(baseContext, "Music will stop after 15 minutes", Toast.LENGTH_SHORT).show()
+            Toast.makeText(baseContext, R.string.min_15_lit, Toast.LENGTH_SHORT).show()
             binding.timerBtnPA.setColorFilter(ContextCompat.getColor(this, R.color.purple_500))
             min15 = true
             Handler(Looper.getMainLooper()).postDelayed({
@@ -279,25 +279,24 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
                     binding.timerBtnPA.setColorFilter(ContextCompat.getColor(this, R.color.cool_pink))
                     pauseMusic()
                 }
-            }, 5000L) // 30 minutos en milisegundos
+            }, (15*60000L))
             dialog.dismiss()
         }
         dialog.findViewById<LinearLayout>(R.id.min_30)?.setOnClickListener{
-            Toast.makeText(baseContext, "Music will stop after 30 minutes", Toast.LENGTH_SHORT).show()
+            Toast.makeText(baseContext, R.string.min_30_lit, Toast.LENGTH_SHORT).show()
             binding.timerBtnPA.setColorFilter(ContextCompat.getColor(this, R.color.purple_500))
             min30 = true
-            // Necesitas el ámbito de corrutinas (por ejemplo, en un Activity/Fragment)
             Handler(Looper.getMainLooper()).postDelayed({
                 if (min30) {
                     min30=false
                     binding.timerBtnPA.setColorFilter(ContextCompat.getColor(this, R.color.cool_pink))
                     pauseMusic()
                 }
-            }, 5000L)
+            }, (30*60000L))
             dialog.dismiss()
         }
         dialog.findViewById<LinearLayout>(R.id.min_60)?.setOnClickListener{
-            Toast.makeText(baseContext, "Music will stop after 60 minutes", Toast.LENGTH_SHORT).show()
+            Toast.makeText(baseContext, R.string.min_60_lit, Toast.LENGTH_SHORT).show()
             binding.timerBtnPA.setColorFilter(ContextCompat.getColor(this, R.color.purple_500))
             min60 = true
             Handler(Looper.getMainLooper()).postDelayed({
@@ -306,7 +305,7 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
                     binding.timerBtnPA.setColorFilter(ContextCompat.getColor(this, R.color.cool_pink))
                     pauseMusic()
                 }
-            }, 5000L)
+            }, (60*60000L))
             dialog.dismiss()
         }
     }
