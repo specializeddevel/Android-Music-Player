@@ -37,5 +37,6 @@
     <string name="yes">Yes</string>
     <string name="no">No</string>
     <string name="text_dialog_permissions">Previously some permissions have been rejected. Do you want to go to open configuration to grant them now?</string>
+    <string name="search_view">Search View</string>
 
 </resources>
