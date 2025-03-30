@@ -7,10 +7,12 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
+import android.view.Menu
 import android.widget.Toast
 import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.SearchView
 import androidx.appcompat.widget.Toolbar
 import androidx.core.view.GravityCompat
 import androidx.core.view.ViewCompat
@@ -37,6 +39,8 @@ class MainActivity : AppCompatActivity() {
 
 companion object{
     lateinit var MusicListMA : ArrayList<Music>
+    lateinit var musicListSearch: ArrayList<Music>
+    var search = false
 }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -110,6 +114,8 @@ companion object{
         toogle = ActionBarDrawerToggle(this, drawerLayout, toolbar, R.string.open, R.string.close)
         drawerLayout.addDrawerListener(toogle)
         toogle.syncState()
+
+        search = false
 
         //For ReciclerView
         MusicListMA = getAllAudio()
@@ -194,5 +200,30 @@ companion object{
     override fun onDestroy() {
         super.onDestroy()
         Music.exitApplication()
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
+        menuInflater.inflate(R.menu.search_view_menu, menu)
+        val searchView = menu?.findItem(R.id.searchView)?.actionView as SearchView
+        searchView.setOnQueryTextListener(object: SearchView.OnQueryTextListener{
+            override fun onQueryTextSubmit(query: String?): Boolean = true
+
+            override fun onQueryTextChange(newText: String?): Boolean {
+                musicListSearch = ArrayList()
+                if(newText != null){
+                    val userInput = newText.lowercase()
+                    for(song in MusicListMA) {
+                        if (song.title.lowercase().contains(userInput)) {
+                            musicListSearch.add(song)
+                        }
+                    }
+                    search = true
+                    musicAdapter.updateMusicList(searchList = musicListSearch)
+                }
+                return true
+            }
+
+        })
+        return super.onCreateOptionsMenu(menu)
     }
 }

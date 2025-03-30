@@ -19,7 +19,7 @@ import java.io.File
 import java.io.FileInputStream
 import java.security.MessageDigest
 
-class MusicAdapter(private val context: Context, private val musicList: ArrayList<Music>): RecyclerView.Adapter<MusicAdapter.MyHolder>() {
+class MusicAdapter(private val context: Context, private var musicList: ArrayList<Music>): RecyclerView.Adapter<MusicAdapter.MyHolder>() {
     class MyHolder(binding: MusicViewBinding): RecyclerView.ViewHolder(binding.root) {
         val title = binding.songNameMV
         val album = binding.songAlbumMV
@@ -46,11 +46,10 @@ class MusicAdapter(private val context: Context, private val musicList: ArrayLis
             .into(holder.image)
         //Log.i("icon", "arturi: ${holder.image.toString()}")
         holder.root.setOnClickListener {
-            val intent = Intent(context, PlayerActivity::class.java)
-            intent.putExtra("index", position)
-            intent.putExtra("class", "MusicAdapter")
-            ContextCompat.startActivity(context, intent, null)
-//            var fileHash = readHashFromMetadata(musicList[position].path)
+            when{
+                MainActivity.search -> sendIntent("MusicAdapterSearch", position)
+                else -> sendIntent("MusicAdapter", position)
+            }
 //            Log.i("_ID", "_ID: ${musicList[position].id}")
 //            if (fileHash.isNullOrEmpty()) {
 //                fileHash = calculateFileHash(musicList[position].path)
@@ -65,6 +64,13 @@ class MusicAdapter(private val context: Context, private val musicList: ArrayLis
 //            }
 //            Log.i("HASH", "HASH generado: $fileHash")
         }
+    }
+
+    private fun sendIntent(ref: String, pos: Int) {
+        val intent = Intent(context, PlayerActivity::class.java)
+        intent.putExtra("index", pos)
+        intent.putExtra("class", ref)
+        ContextCompat.startActivity(context, intent, null)
     }
 
     fun calculateFileHash(filePath: String): String {
@@ -110,5 +116,11 @@ class MusicAdapter(private val context: Context, private val musicList: ArrayLis
         val selectionArgs = arrayOf(filePath)
 
         contentResolver.update(uri, values, selection, selectionArgs)
+    }
+
+    fun updateMusicList(searchList: ArrayList<Music>){
+        musicList = ArrayList()
+        musicList.addAll(searchList)
+        notifyDataSetChanged()
     }
 }
