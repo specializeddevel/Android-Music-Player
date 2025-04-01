@@ -37,8 +37,6 @@ class NotificationReceiver: BroadcastReceiver() {
 
     private fun prevNextSong(increment: Boolean, context: Context){
         Music.setSongPosition(increment=increment)
-       // PlayerActivity.binding.playPauseBtnPA.setIconResource(R.drawable.pause_icon)
-        //PlayerActivity.musicService!!.showNotification(R.drawable.pause_icon)
         PlayerActivity.musicService!!.createMediaPlayer()
         Glide.with(context)
             .load(musicListPA[songPosition].artUri)

@@ -10,99 +10,118 @@
     tools:context=".MainActivity">
 
     <!-- Contenedor principal con el Toolbar -->
-    <androidx.coordinatorlayout.widget.CoordinatorLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:fitsSystemWindows="true">
 
-        <com.google.android.material.appbar.AppBarLayout
+
+        <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:outlineAmbientShadowColor="@color/black"
-            android:outlineSpotShadowColor="@color/black"
-            android:elevation="4dp"
-            android:theme="@style/CardView"
-            >
+            android:layout_height="match_parent">
 
-            <!-- Toolbar (para el botón de menú) -->
-            <androidx.appcompat.widget.Toolbar
-                android:id="@+id/toolbar"
-                android:layout_width="match_parent"
-                android:layout_height="?attr/actionBarSize"
-                app:title="@string/app_name"/>
-        </com.google.android.material.appbar.AppBarLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="vertical"
-            app:layout_behavior="@string/appbar_scrolling_view_behavior"
-            android:background="@color/white"
-            android:elevation="0dp"
-            >
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
-
-                <Button
-                    android:id="@+id/shuffleBtn"
-                    style="@style/Widget.AppCompat.Button.Borderless"
-                    android:layout_width="wrap_content"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:contentDescription="@string/shuffle_btn"
-                    android:drawableTop="@drawable/shuffle_icon"
-                    android:drawableTint="@color/icon_tint_color"
-                    android:text="@string/shuffle_btn"
-                    android:textColor="@color/black"
-                    android:textAllCaps="false"
-                    />
-
-                <Button
-                    android:id="@+id/favoritesBtn"
-                    style="@style/Widget.AppCompat.Button.Borderless"
-                    android:layout_width="wrap_content"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:contentDescription="@string/favourites_btn"
-                    android:drawableTop="@drawable/favourite_icon"
-                    android:drawableTint="@color/icon_tint_color"
-                    android:text="@string/favourites_btn"
-                    android:textColor="@color/black"
-                    android:textAllCaps="false"/>
-
-                <Button
-                    android:id="@+id/playlistBtn"
-                    style="@style/Widget.AppCompat.Button.Borderless"
-                    android:layout_width="wrap_content"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:contentDescription="@string/playlist_btn"
-                    android:drawableTop="@drawable/playlist_icon"
-                    android:drawableTint="@color/icon_tint_color"
-                    android:text="@string/playlist_btn"
-                    android:textColor="@color/black"
-                    android:textAllCaps="false"/>
-            </LinearLayout>
-
-            <TextView
-                android:id="@+id/totalSongs"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/total_songs"
-                android:textColor="@color/black"
-                android:layout_margin="10dp">
-            </TextView>
-
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/musicRV"
+            <androidx.coordinatorlayout.widget.CoordinatorLayout
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:scrollbars="vertical"
-                android:scrollbarThumbVertical="@drawable/scroll_bar_icon"/>
-        </LinearLayout>
-    </androidx.coordinatorlayout.widget.CoordinatorLayout>
+                android:fitsSystemWindows="true">
+
+            <com.google.android.material.appbar.AppBarLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:outlineAmbientShadowColor="@color/black"
+                android:outlineSpotShadowColor="@color/black"
+                android:elevation="4dp"
+                android:theme="@style/CardView"
+                >
+
+                <!-- Toolbar (para el botón de menú) -->
+                <androidx.appcompat.widget.Toolbar
+                    android:id="@+id/toolbar"
+                    android:layout_width="match_parent"
+                    android:layout_height="?attr/actionBarSize"
+                    app:title="@string/app_name"/>
+            </com.google.android.material.appbar.AppBarLayout>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                app:layout_behavior="@string/appbar_scrolling_view_behavior"
+                android:background="@color/white"
+                android:elevation="0dp"
+                >
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/shuffleBtn"
+                        style="@style/Widget.AppCompat.Button.Borderless"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:contentDescription="@string/shuffle_btn"
+                        android:drawableTop="@drawable/shuffle_icon"
+                        android:drawableTint="@color/icon_tint_color"
+                        android:text="@string/shuffle_btn"
+                        android:textColor="@color/black"
+                        android:textAllCaps="false"
+                        />
+
+                    <Button
+                        android:id="@+id/favoritesBtn"
+                        style="@style/Widget.AppCompat.Button.Borderless"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:contentDescription="@string/favourites_btn"
+                        android:drawableTop="@drawable/favourite_icon"
+                        android:drawableTint="@color/icon_tint_color"
+                        android:text="@string/favourites_btn"
+                        android:textColor="@color/black"
+                        android:textAllCaps="false"/>
+
+                    <Button
+                        android:id="@+id/playlistBtn"
+                        style="@style/Widget.AppCompat.Button.Borderless"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:contentDescription="@string/playlist_btn"
+                        android:drawableTop="@drawable/playlist_icon"
+                        android:drawableTint="@color/icon_tint_color"
+                        android:text="@string/playlist_btn"
+                        android:textColor="@color/black"
+                        android:textAllCaps="false"/>
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/totalSongs"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/total_songs"
+                    android:textColor="@color/black"
+                    android:layout_margin="10dp">
+                </TextView>
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/musicRV"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scrollbars="vertical"
+                    android:scrollbarThumbVertical="@drawable/scroll_bar_icon"/>
+            </LinearLayout>
+
+            <androidx.fragment.app.FragmentContainerView
+                android:id="@+id/nowPlaying"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                android:name="com.raulburgosmurray.musicplayer.NowPlaying"
+                tools:layout="@layout/fragment_now_playing"
+                />
+            </androidx.coordinatorlayout.widget.CoordinatorLayout>
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+
 
     <com.google.android.material.navigation.NavigationView
         android:id="@+id/navView"
