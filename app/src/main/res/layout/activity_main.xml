@@ -13,6 +13,7 @@
 
 
         <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/papa"
             android:layout_width="match_parent"
             android:layout_height="match_parent">
 
@@ -107,7 +108,7 @@
                     android:scrollbars="vertical"
                     android:scrollbarThumbVertical="@drawable/scroll_bar_icon"/>
             </LinearLayout>
-
+            </androidx.coordinatorlayout.widget.CoordinatorLayout>
             <androidx.fragment.app.FragmentContainerView
                 android:id="@+id/nowPlaying"
                 android:layout_width="match_parent"
@@ -115,10 +116,11 @@
                 app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
+                android:layout_marginBottom="30dp"
                 android:name="com.raulburgosmurray.musicplayer.NowPlaying"
                 tools:layout="@layout/fragment_now_playing"
                 />
-            </androidx.coordinatorlayout.widget.CoordinatorLayout>
+
         </androidx.constraintlayout.widget.ConstraintLayout>
 
 
