@@ -21,7 +21,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
 import com.bumptech.glide.request.RequestOptions
 import com.google.android.material.bottomsheet.BottomSheetDialog
@@ -29,10 +28,6 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.raulburgosmurray.musicplayer.Music.Companion.formatDuration
 import com.raulburgosmurray.musicplayer.Music.Companion.setSongPosition
 import com.raulburgosmurray.musicplayer.databinding.ActivityPlayerBinding
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlin.concurrent.thread
-import kotlin.system.exitProcess
 
 class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCompletionListener {
 

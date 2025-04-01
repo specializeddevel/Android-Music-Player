@@ -16,7 +16,7 @@ object DialogHelper {
             .setPositiveButton(activity.getString(R.string.yes)) { _, _ ->
                 openSettings(activity)
             }
-            .setNegativeButton(activity.getString(R.string.no)) { dialog, _ ->
+            .setNegativeButton(activity.getString(R.string.no)) { _, _ ->
                 exitProcess(1)
             }
             .show()
