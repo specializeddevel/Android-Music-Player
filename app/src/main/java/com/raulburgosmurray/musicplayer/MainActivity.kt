@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.view.Menu
+import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AlertDialog
@@ -46,6 +47,20 @@ companion object{
         super.onCreate(savedInstanceState)
 
         initializeLayout()
+
+        val nowPlaying = binding.nowPlaying
+        val recyclerView = binding.musicRV
+
+
+
+        nowPlaying.viewTreeObserver.addOnGlobalLayoutListener {
+            if(nowPlaying.visibility==View.VISIBLE){
+                val fragmentHeight = nowPlaying.height
+                recyclerView.setPadding(0, 0, 0, fragmentHeight)
+            } else {
+                recyclerView.setPadding(0, 0, 0, 0)
+            }
+        }
 
         binding.shuffleBtn.setOnClickListener {
             val intent = Intent(this, PlayerActivity::class.java)

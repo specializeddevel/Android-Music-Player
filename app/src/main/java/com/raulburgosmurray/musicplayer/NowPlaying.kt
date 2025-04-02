@@ -25,7 +25,7 @@ class NowPlaying : Fragment() {
     ): View? {
         val view = inflater.inflate(R.layout.fragment_now_playing, container, false)
         binding = FragmentNowPlayingBinding.bind(view)
-        binding.root.visibility = View.INVISIBLE
+        binding.root.visibility = View.GONE
         binding.playPauseBtnNP.setOnClickListener{
             if(PlayerActivity.isPlaying) {
                 pauseMusic()
