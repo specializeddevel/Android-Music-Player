@@ -3,9 +3,13 @@ package com.raulburgosmurray.musicplayer
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.media.PlaybackParams
+import android.os.Build
 import com.bumptech.glide.Glide
 import com.bumptech.glide.request.RequestOptions
+import com.raulburgosmurray.musicplayer.NowPlaying.Companion.binding
 import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.musicListPA
+import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.musicService
 import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.songPosition
 
 class NotificationReceiver: BroadcastReceiver() {
@@ -22,10 +26,15 @@ class NotificationReceiver: BroadcastReceiver() {
 
     private fun playMusic(){
         PlayerActivity.isPlaying = true
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val playbackParams = PlaybackParams()
+            playbackParams.speed = PlayerActivity.speed
+            PlayerActivity.musicService!!.mediaPlayer.playbackParams = playbackParams
+        }
         PlayerActivity.musicService!!.mediaPlayer.start()
         PlayerActivity.musicService!!.showNotification(R.drawable.pause_icon)
         PlayerActivity.binding.playPauseBtnPA.setIconResource(R.drawable.pause_icon)
-        NowPlaying.binding.playPauseBtnNP.setIconResource(R.drawable.pause_icon)
+        try{ NowPlaying.binding.playPauseBtnNP.setIconResource(R.drawable.pause_icon) }catch (_: Exception){}
     }
 
     private fun pauseMusic(){
@@ -33,7 +42,7 @@ class NotificationReceiver: BroadcastReceiver() {
         PlayerActivity.musicService!!.mediaPlayer.pause()
         PlayerActivity.musicService!!.showNotification(R.drawable.play_icon)
         PlayerActivity.binding.playPauseBtnPA.setIconResource(R.drawable.play_icon)
-        NowPlaying.binding.playPauseBtnNP.setIconResource(R.drawable.play_icon)
+        try{ NowPlaying.binding.playPauseBtnNP.setIconResource(R.drawable.play_icon) }catch (_: Exception){}
         skipBackward(2000)
     }
 
@@ -42,9 +51,14 @@ class NotificationReceiver: BroadcastReceiver() {
         PlayerActivity.musicService!!.createMediaPlayer()
         Glide.with(context)
             .load(musicListPA[songPosition].artUri)
-            .apply(RequestOptions().placeholder(R.drawable.music_player_icon_splash_screen).centerCrop())
+            .apply(RequestOptions().placeholder(R.drawable.music_player_icon_splash_screen).centerInside())
             .into(PlayerActivity.binding.songImgPA)
         PlayerActivity.binding.songNamePA.text = PlayerActivity.musicListPA[PlayerActivity.songPosition].title
+        Glide.with(context)
+            .load(musicListPA[songPosition].artUri)
+            .apply(RequestOptions().placeholder(R.drawable.ic_audiobook_cover).centerInside())
+            .into(binding.songImgNP)
+        binding.songNameNP.text = PlayerActivity.musicListPA[PlayerActivity.songPosition].title
         playMusic()
     }
 

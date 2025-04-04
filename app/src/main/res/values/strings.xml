@@ -32,6 +32,12 @@
     <string name="min_15_lit">Music will stop after 15 minutes</string>
     <string name="min_30_lit">Music will stop after 30 minutes</string>
     <string name="min_60_lit">Music will stop after 60 minutes</string>
+    <string name="play_speed_at_1x">Play speed at 1.0x</string>
+    <string name="play_speed_at_15x">Play speed at 1.5x</string>
+    <string name="play_speed_at_2x">Play speed at 2.0x</string>
+    <string name="play_speed_at_1x_lit">The book will be played at 1.0x</string>
+    <string name="play_speed_at_15x_lit">The book will be played at 1.5x</string>
+    <string name="play_speed_at_2x_lit">The book will be played at 2.0x</string>
 
     <!--    titles, messages or dialogs texts-->
     <string name="yes">Yes</string>
@@ -40,5 +46,6 @@
     <string name="search_view">Search View</string>
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>
+
 
 </resources>

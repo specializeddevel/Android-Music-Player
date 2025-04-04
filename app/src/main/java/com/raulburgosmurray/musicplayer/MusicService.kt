@@ -6,6 +6,7 @@ import android.content.Intent
 import android.graphics.BitmapFactory
 import android.media.AudioManager
 import android.media.MediaPlayer
+import android.media.PlaybackParams
 import android.os.Binder
 import android.os.Build
 import android.os.Handler
@@ -15,6 +16,7 @@ import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import androidx.core.app.NotificationCompat
 import com.raulburgosmurray.musicplayer.Music.Companion.formatDuration
+import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.musicService
 
 class MusicService: Service(), AudioManager.OnAudioFocusChangeListener {
 
@@ -107,6 +109,12 @@ class MusicService: Service(), AudioManager.OnAudioFocusChangeListener {
         try {
             mediaPlayer.reset()
             mediaPlayer.setDataSource(PlayerActivity.musicListPA[PlayerActivity.songPosition].path)
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val playbackParams = PlaybackParams()
+                playbackParams.speed = PlayerActivity.speed
+                mediaPlayer.playbackParams = playbackParams
+            }
             mediaPlayer.prepare()
             PlayerActivity.binding.playPauseBtnPA.setIconResource(R.drawable.pause_icon)
             showNotification(R.drawable.pause_icon)
@@ -114,6 +122,7 @@ class MusicService: Service(), AudioManager.OnAudioFocusChangeListener {
             PlayerActivity.binding.tvSeekBarEnd.text = formatDuration(mediaPlayer.duration.toLong())
             PlayerActivity.binding.seekBarPA.progress = 0
             PlayerActivity.binding.seekBarPA.max = mediaPlayer.duration
+
         } catch (e: Exception) {
             return
         }

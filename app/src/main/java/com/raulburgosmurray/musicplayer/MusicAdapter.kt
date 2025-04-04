@@ -42,7 +42,7 @@ class MusicAdapter(private val context: Context, private var musicList: ArrayLis
         holder.duration.text = Music.formatDuration(musicList[position].duration)
         Glide.with(context)
             .load(musicList[position].artUri)
-            .apply(RequestOptions().placeholder(R.drawable.ic_audiobook_cover).centerCrop())
+            .apply(RequestOptions().placeholder(R.drawable.ic_audiobook_cover).centerInside())
             .into(holder.image)
         //Log.i("icon", "arturi: ${holder.image.toString()}")
         holder.root.setOnClickListener {
