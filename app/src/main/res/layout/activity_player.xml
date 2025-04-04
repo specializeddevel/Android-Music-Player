@@ -204,6 +204,17 @@
             android:layout_weight="1"
             />
 
+        <ImageButton
+            android:id="@+id/speedBtnPA"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/speed_icon"
+            android:background="@android:color/transparent"
+            app:tint="@color/cool_pink"
+            android:contentDescription="@string/share_btn"
+            android:layout_weight="1"
+            />
+
 
 
 

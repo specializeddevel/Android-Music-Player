@@ -6,14 +6,17 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.graphics.Color
 import android.media.MediaPlayer
+import android.media.PlaybackParams
 import android.media.audiofx.AudioEffect
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.widget.LinearLayout
 import android.widget.SeekBar
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AlertDialog
@@ -41,6 +44,7 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         var min15 = false
         var min30 = false
         var min60 = false
+        var speed = 1.0f
     }
 
 
@@ -50,10 +54,7 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         binding = ActivityPlayerBinding.inflate(layoutInflater)
         enableEdgeToEdge()
         setContentView(binding.root)
-        //For Starting service
-        val intent = Intent(this, MusicService::class.java)
-        bindService(intent, this, BIND_AUTO_CREATE)
-        startService(intent)
+
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.DrawerLayout)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
@@ -143,24 +144,35 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
             startActivity(Intent.createChooser(shareIntent, "Sharing your music file!"))
         }
 
+        binding.speedBtnPA.setOnClickListener {
+            showBottomSheetSpeedDialog()
+        }
+
 
     }
 
     private fun setLayout(){
         Glide.with(this)
             .load(musicListPA[songPosition].artUri)
-            .apply(RequestOptions().placeholder(R.drawable.ic_audiobook_cover).centerCrop())
+            .apply(RequestOptions().placeholder(R.drawable.ic_audiobook_cover).centerInside())
             .into(binding.songImgPA)
         binding.songNamePA.text = musicListPA[songPosition].title
         if(repeat) binding.repeatBtnPA.setColorFilter(ContextCompat.getColor(this,R.color.purple_500))
         if(min15 || min30 || min60) binding.timerBtnPA.setColorFilter(ContextCompat.getColor(this, R.color.purple_500))
+
     }
 
     private fun createMediaPlayer(){
         try {
             musicService!!.mediaPlayer.reset()
+
             musicService!!.mediaPlayer.setDataSource(musicListPA[songPosition].path)
             musicService!!.mediaPlayer.prepare()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val playbackParams = PlaybackParams()
+                playbackParams.speed = speed
+                musicService!!.mediaPlayer.playbackParams = playbackParams
+            }
             musicService!!.mediaPlayer.start()
             isPlaying = true
             binding.playPauseBtnPA.setIconResource(R.drawable.pause_icon)
@@ -178,18 +190,37 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
     private fun initializeLayout(){
         songPosition = intent.getIntExtra("index", 0)
         when(intent.getStringExtra("class")){
+            "NowPlaying" -> {
+                setLayout()
+                binding.tvSeekBarEnd.text = formatDuration(musicService!!.mediaPlayer.currentPosition.toLong())
+                binding.tvSeekBarEnd.text = formatDuration(musicService!!.mediaPlayer.duration.toLong())
+                binding.seekBarPA.max = musicService!!.mediaPlayer.duration
+                binding.seekBarPA.progress = musicService!!.mediaPlayer.currentPosition
+            }
             "MusicAdapterSearch" -> {
+                //For Starting service
+                val intent = Intent(this, MusicService::class.java)
+                bindService(intent, this, BIND_AUTO_CREATE)
+                startService(intent)
                 musicListPA = ArrayList()
                 musicListPA.addAll(MainActivity.musicListSearch)
                 setLayout()
             }
             "MusicAdapter" -> {
+                //For Starting service
+                val intent = Intent(this, MusicService::class.java)
+                bindService(intent, this, BIND_AUTO_CREATE)
+                startService(intent)
                 musicListPA = ArrayList()
                 musicListPA.addAll(MainActivity.MusicListMA)
                 setLayout()
 
             }
             "MainActivity" -> {
+                //For Starting service
+                val intent = Intent(this, MusicService::class.java)
+                bindService(intent, this, BIND_AUTO_CREATE)
+                startService(intent)
                 musicListPA = ArrayList()
                 musicListPA.addAll(MainActivity.MusicListMA)
                 musicListPA.shuffle()
@@ -203,6 +234,11 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         binding.playPauseBtnPA.setIconResource(R.drawable.pause_icon)
         musicService!!.showNotification(R.drawable.pause_icon)
         isPlaying = true
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val playbackParams = PlaybackParams()
+            playbackParams.speed = speed
+            musicService!!.mediaPlayer.playbackParams = playbackParams
+        }
         musicService!!.mediaPlayer.start()
     }
 
@@ -212,6 +248,8 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         isPlaying = false
         musicService!!.mediaPlayer.pause()
         skipBackward(2000)
+
+
     }
 
     private fun prevNextSong(increment: Boolean){
@@ -317,5 +355,59 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
             }, (60*60000L))
             dialog.dismiss()
         }
+    }
+
+
+    private fun showBottomSheetSpeedDialog(){
+        val dialog = BottomSheetDialog(this@PlayerActivity)
+        dialog.setContentView(R.layout.bottom_speed_dialog)
+        val speed1xText = dialog.findViewById<TextView>(R.id.speed1xText)
+        val speed15xText = dialog.findViewById<TextView>(R.id.speed15xText)
+        val speed2xText = dialog.findViewById<TextView>(R.id.speed2xText)
+        when (speed) {
+            1.0f -> {
+                speed15xText?.setTextColor(ContextCompat.getColor(this, R.color.black))
+                speed2xText?.setTextColor(ContextCompat.getColor(this, R.color.black))
+                speed1xText?.setTextColor(ContextCompat.getColor(this, R.color.purple_700))
+            }
+            1.5f -> {
+
+
+
+                speed15xText?.setTextColor(ContextCompat.getColor(this, R.color.purple_700))
+                speed2xText?.setTextColor(ContextCompat.getColor(this, R.color.black))
+                speed1xText?.setTextColor(ContextCompat.getColor(this, R.color.black))
+
+            }
+            2.0f -> {
+
+
+                speed15xText?.setTextColor(ContextCompat.getColor(this, R.color.black))
+                speed2xText?.setTextColor(ContextCompat.getColor(this, R.color.purple_700))
+                speed1xText?.setTextColor(ContextCompat.getColor(this, R.color.black))
+
+            }
+        }
+
+        dialog.show()
+        dialog.findViewById<LinearLayout>(R.id.speed1x)?.setOnClickListener{
+            Toast.makeText(baseContext, R.string.play_speed_at_1x_lit, Toast.LENGTH_SHORT).show()
+            speed=1.0f
+            playMusic()
+            dialog.dismiss()
+        }
+        dialog.findViewById<LinearLayout>(R.id.speed15x)?.setOnClickListener{
+            Toast.makeText(baseContext, R.string.play_speed_at_15x_lit, Toast.LENGTH_SHORT).show()
+            speed=1.5f
+            playMusic()
+            dialog.dismiss()
+        }
+        dialog.findViewById<LinearLayout>(R.id.speed2x)?.setOnClickListener{
+            Toast.makeText(baseContext, R.string.play_speed_at_2x_lit, Toast.LENGTH_SHORT).show()
+            speed=2.0f
+            playMusic()
+            dialog.dismiss()
+        }
+
     }
 }
