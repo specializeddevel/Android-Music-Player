@@ -16,7 +16,7 @@ import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import androidx.core.app.NotificationCompat
 import com.raulburgosmurray.musicplayer.Music.Companion.formatDuration
-import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.musicService
+
 
 class MusicService: Service(), AudioManager.OnAudioFocusChangeListener {
 
@@ -83,7 +83,6 @@ class MusicService: Service(), AudioManager.OnAudioFocusChangeListener {
             .addAction(R.drawable.add_icon, "+10", forwardPendingIntent)
             .addAction(R.drawable.exit_icon, "Exit", exitPendingIntent)
             .build()
-
         startForeground(13, notification)
     }
 
@@ -92,6 +91,7 @@ class MusicService: Service(), AudioManager.OnAudioFocusChangeListener {
         PlayerActivity.binding.playPauseBtnPA.setIconResource(R.drawable.pause_icon)
         //NowPlaying.binding.playPauseBtnNP.setIconResource(R.drawable.pause_icon)
         PlayerActivity.isPlaying = true
+        //Music.restorePlaybackState(baseContext,PlayerActivity.musicListPA[songPosition].id)
         mediaPlayer?.start()
         showNotification(R.drawable.pause_icon)
     }
@@ -101,9 +101,12 @@ class MusicService: Service(), AudioManager.OnAudioFocusChangeListener {
         PlayerActivity.binding.playPauseBtnPA.setIconResource(R.drawable.play_icon)
         //NowPlaying.binding.playPauseBtnNP.setIconResource(R.drawable.play_icon)
         PlayerActivity.isPlaying = false
+        //Music.savePlaybackState(baseContext, PlayerActivity.musicListPA[songPosition].id, PlayerActivity.musicService!!.mediaPlayer.currentPosition)
         mediaPlayer!!.pause()
         showNotification(R.drawable.play_icon)
     }
+
+
 
     fun createMediaPlayer(){
         try {
@@ -122,7 +125,10 @@ class MusicService: Service(), AudioManager.OnAudioFocusChangeListener {
             PlayerActivity.binding.tvSeekBarEnd.text = formatDuration(mediaPlayer.duration.toLong())
             PlayerActivity.binding.seekBarPA.progress = 0
             PlayerActivity.binding.seekBarPA.max = mediaPlayer.duration
-
+            //Music.restorePlaybackState(baseContext, PlayerActivity.musicListPA[songPosition].id)
+            PlayerActivity.musicService!!.mediaPlayer?.let { player ->
+                Music.restorePlaybackState(applicationContext, PlayerActivity.musicListPA[PlayerActivity.songPosition].id)
+            }
         } catch (e: Exception) {
             return
         }
@@ -150,6 +156,9 @@ class MusicService: Service(), AudioManager.OnAudioFocusChangeListener {
 
     override fun onAudioFocusChange(focusChange: Int) {
         if (focusChange <= 0) {
+            PlayerActivity.musicService!!.mediaPlayer?.let { player ->
+                Music.savePlaybackState(applicationContext , PlayerActivity.musicListPA[PlayerActivity.songPosition].id, player.currentPosition)
+            }
             pauseMusic()
         }
     }

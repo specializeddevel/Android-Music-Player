@@ -1,6 +1,7 @@
 package com.raulburgosmurray.musicplayer
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
@@ -24,6 +25,12 @@ import androidx.drawerlayout.widget.DrawerLayout
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.navigation.NavigationView
+import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.KEY_LAST_AUDIO
+import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.KEY_LAST_POSITION
+import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.PREFS_NAME
+import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.musicListPA
+import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.musicService
+import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.songPosition
 import com.raulburgosmurray.musicplayer.databinding.ActivityMainBinding
 import java.io.File
 
@@ -89,8 +96,9 @@ companion object{
                     builder.setTitle("Exit")
                         .setMessage("Do you want to close app?")
                         .setPositiveButton("Yes"){_,_ ->
-                            Music.exitApplication()
+                             Music.exitApplication(applicationContext)
                         }
+
                         .setNegativeButton("No") { dialog, _ ->
                             dialog.dismiss()
                         }
@@ -213,8 +221,11 @@ companion object{
 
     override fun onDestroy() {
         super.onDestroy()
-        Music.exitApplication()
+        Music.exitApplication(applicationContext)
+
     }
+
+
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         menuInflater.inflate(R.menu.search_view_menu, menu)

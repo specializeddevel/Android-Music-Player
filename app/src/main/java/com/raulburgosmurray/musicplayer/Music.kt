@@ -1,7 +1,15 @@
 package com.raulburgosmurray.musicplayer
 
+import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import androidx.appcompat.app.AppCompatActivity.MODE_PRIVATE
+import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.KEY_LAST_AUDIO
+import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.KEY_LAST_POSITION
+import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.PREFS_NAME
+import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.musicListPA
+import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.musicService
+import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.songPosition
 import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
 
@@ -33,8 +41,12 @@ data class Music(
             return retriever.embeddedPicture
         }
 
-        fun exitApplication() {
+        fun exitApplication(context: Context) {
             if (PlayerActivity.musicService != null) {
+                PlayerActivity.musicService!!.mediaPlayer?.let { player ->
+                    Music.savePlaybackState(context , PlayerActivity.musicListPA[PlayerActivity.songPosition].id, player.currentPosition)
+                }
+                Thread.sleep(400)
                 PlayerActivity.musicService!!.stopForeground(true)
                 PlayerActivity.musicService!!.mediaPlayer!!.release()
                 PlayerActivity.musicService = null
@@ -57,6 +69,25 @@ data class Music(
                         --PlayerActivity.songPosition
                     }
                 }
+            }
+        }
+
+        // Save the current position
+        fun savePlaybackState(context: Context, audioId: String, position: Int) {
+            val prefs = context.getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            prefs.edit()
+                .putString(KEY_LAST_AUDIO, audioId)
+                .putInt(KEY_LAST_POSITION, position-5000)
+                .apply()
+        }
+
+        fun restorePlaybackState(context: Context, audioId: String) {
+            val prefs = context.getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            val lastAudioId = prefs.getString(KEY_LAST_AUDIO, null)
+            val lastPosition = prefs.getInt(KEY_LAST_POSITION, 0)
+
+            if (lastAudioId == audioId && lastPosition > 0) {
+                PlayerActivity.musicService!!.mediaPlayer.seekTo(lastPosition)
             }
         }
     }

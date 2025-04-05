@@ -45,6 +45,10 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         var min30 = false
         var min60 = false
         var speed = 1.0f
+        // Constants for Sharedpreferences
+        val PREFS_NAME = "AudioPrefs"
+        val KEY_LAST_AUDIO = "last_audio"
+        val KEY_LAST_POSITION = "last_position"
     }
 
 
@@ -67,7 +71,14 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         binding.playPauseBtnPA.setOnClickListener{
             if(isPlaying) {
                 pauseMusic()
+                musicService!!.mediaPlayer?.let { player ->
+                    Music.savePlaybackState(applicationContext,musicListPA[songPosition].id, player.currentPosition)
+                }
+
             } else {
+                musicService!!.mediaPlayer?.let { player ->
+                    Music.restorePlaybackState(applicationContext ,musicListPA[songPosition].id)
+                }
                 playMusic()
             }
         }
@@ -164,10 +175,14 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
 
     private fun createMediaPlayer(){
         try {
+
             musicService!!.mediaPlayer.reset()
 
             musicService!!.mediaPlayer.setDataSource(musicListPA[songPosition].path)
             musicService!!.mediaPlayer.prepare()
+
+            Music.restorePlaybackState(applicationContext, musicListPA[songPosition].id)
+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 val playbackParams = PlaybackParams()
                 playbackParams.speed = speed
@@ -247,9 +262,6 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         musicService!!.showNotification(R.drawable.play_icon)
         isPlaying = false
         musicService!!.mediaPlayer.pause()
-        skipBackward(2000)
-
-
     }
 
     private fun prevNextSong(increment: Boolean){
@@ -257,6 +269,8 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         setLayout()
         createMediaPlayer()
     }
+
+
 
     private fun skipForward(miliSeconds:Int){
         PlayerActivity.musicService!!.mediaPlayer?.let { player ->
