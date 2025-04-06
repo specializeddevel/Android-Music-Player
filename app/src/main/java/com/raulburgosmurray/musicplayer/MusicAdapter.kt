@@ -46,6 +46,7 @@ class MusicAdapter(private val context: Context, private var musicList: ArrayLis
             .into(holder.image)
         //Log.i("icon", "arturi: ${holder.image.toString()}")
         holder.root.setOnClickListener {
+
             when{
                 MainActivity.search -> sendIntent("MusicAdapterSearch", position)
                 else -> sendIntent("MusicAdapter", position)

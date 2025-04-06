@@ -1,5 +1,6 @@
 package com.raulburgosmurray.musicplayer
 
+import android.app.Service.MODE_PRIVATE
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -8,19 +9,35 @@ import android.os.Build
 import com.bumptech.glide.Glide
 import com.bumptech.glide.request.RequestOptions
 import com.raulburgosmurray.musicplayer.NowPlaying.Companion.binding
+import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.KEY_LAST_AUDIO
+import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.KEY_LAST_POSITION
 import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.musicListPA
 import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.musicService
 import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.songPosition
 
 class NotificationReceiver: BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
+        if (context == null) return // Manejar el caso de contexto nulo
+
         when(intent?.action) {
-            ApplicationClass.PREVIUS -> if(PlayerActivity.musicListPA.size > 1) prevNextSong(increment = false, context = context!!)
-            ApplicationClass.PLAY -> if(PlayerActivity.isPlaying) pauseMusic() else playMusic()
-            ApplicationClass.NEXT -> if(PlayerActivity.musicListPA.size > 1) prevNextSong(increment = true, context = context!!)
-            ApplicationClass.FORWARD -> skipForward(10000)
-            ApplicationClass.EXIT -> Music.exitApplication()
-            //TODO: The EXIT action don't works
+            ApplicationClass.PREVIUS -> if(PlayerActivity.musicListPA.size > 1) prevNextSong(increment = false, context = context)
+            ApplicationClass.PLAY -> {
+                if(PlayerActivity.isPlaying) {
+                    pauseMusic()
+                    PlayerActivity.musicService!!.mediaPlayer?.let { player ->
+                        Music.savePlaybackState(context, PlayerActivity.musicListPA[PlayerActivity.songPosition].id, player.currentPosition)
+                    }
+                } else {
+                    Music.restorePlaybackState(context, PlayerActivity.musicListPA[songPosition].id)
+                    playMusic()
+                }
+            }
+            ApplicationClass.NEXT -> if(PlayerActivity.musicListPA.size > 1) prevNextSong(increment = true, context = context)
+            ApplicationClass.EXIT -> {
+                // Guardar posición antes de salir
+
+                Music.exitApplication(context)
+            }
         }
     }
 
@@ -43,7 +60,7 @@ class NotificationReceiver: BroadcastReceiver() {
         PlayerActivity.musicService!!.showNotification(R.drawable.play_icon)
         PlayerActivity.binding.playPauseBtnPA.setIconResource(R.drawable.play_icon)
         try{ NowPlaying.binding.playPauseBtnNP.setIconResource(R.drawable.play_icon) }catch (_: Exception){}
-        skipBackward(2000)
+        //skipBackward(2000)
     }
 
     private fun prevNextSong(increment: Boolean, context: Context){
@@ -83,4 +100,6 @@ class NotificationReceiver: BroadcastReceiver() {
             }
         }
     }
+
+
 }

@@ -1,12 +1,14 @@
 package com.raulburgosmurray.musicplayer
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
+import android.util.Log
 import android.view.Menu
 import android.view.View
 import android.widget.Toast
@@ -24,6 +26,12 @@ import androidx.drawerlayout.widget.DrawerLayout
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.navigation.NavigationView
+import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.KEY_LAST_AUDIO
+import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.KEY_LAST_POSITION
+import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.PREFS_NAME
+import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.musicListPA
+import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.musicService
+import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.songPosition
 import com.raulburgosmurray.musicplayer.databinding.ActivityMainBinding
 import java.io.File
 
@@ -36,6 +44,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var navigationView: NavigationView
     private lateinit var toolbar: Toolbar
     private lateinit var musicAdapter: MusicAdapter
+    private var backPressedTime = 0L
 
 companion object{
     lateinit var MusicListMA : ArrayList<Music>
@@ -89,8 +98,9 @@ companion object{
                     builder.setTitle("Exit")
                         .setMessage("Do you want to close app?")
                         .setPositiveButton("Yes"){_,_ ->
-                            Music.exitApplication()
+                             Music.exitApplication(applicationContext)
                         }
+
                         .setNegativeButton("No") { dialog, _ ->
                             dialog.dismiss()
                         }
@@ -211,9 +221,35 @@ companion object{
         return tempList
     }
 
+    override fun onResume() {
+
+            PlayerActivity.musicService?.mediaPlayer?.let { player ->
+
+                Music.savePlaybackState(
+                    applicationContext,
+                    musicListPA[songPosition].id,
+                    player.currentPosition
+                )
+                Thread.sleep(500)
+            }
+
+        super.onResume()
+  }
+
+   override fun onBackPressed() {
+
+        if (backPressedTime + 2000 > System.currentTimeMillis()) {
+            super.onBackPressed()
+            Music.exitApplication(applicationContext)
+        } else {
+            Toast.makeText(this, getString(R.string.press_back_again_to_exit), Toast.LENGTH_SHORT).show()
+        }
+        backPressedTime = System.currentTimeMillis()
+    }
+
     override fun onDestroy() {
+        Music.exitApplication(applicationContext)
         super.onDestroy()
-        Music.exitApplication()
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
