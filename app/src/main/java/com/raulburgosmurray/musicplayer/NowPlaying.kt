@@ -13,6 +13,7 @@ import com.bumptech.glide.Glide
 import com.bumptech.glide.request.RequestOptions
 import com.raulburgosmurray.musicplayer.PlayerActivity.Companion
 import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.musicListPA
+import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.musicService
 import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.songPosition
 import com.raulburgosmurray.musicplayer.databinding.FragmentNowPlayingBinding
 
@@ -32,8 +33,20 @@ class NowPlaying : Fragment() {
         binding.root.visibility = View.GONE
         binding.playPauseBtnNP.setOnClickListener{
             if(PlayerActivity.isPlaying) {
+                val context = context
+                context?.let {
+                    musicService!!.mediaPlayer?.let { player ->
+                        Music.savePlaybackState(context,musicListPA[songPosition].id, player.currentPosition)
+                    }
+                }
                 pauseMusic()
             } else {
+                val context = context
+                context?.let {
+                    musicService!!.mediaPlayer?.let { player ->
+                        Music.restorePlaybackState(context, musicListPA[songPosition].id)
+                    }
+                }
                 playMusic()
             }
 

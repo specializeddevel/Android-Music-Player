@@ -14,6 +14,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.raulburgosmurray.musicplayer.Music.Companion.formatDuration
 
@@ -23,8 +24,9 @@ class MusicService: Service(), AudioManager.OnAudioFocusChangeListener {
     private var myBinder = MyBinder()
     val mediaPlayer: MediaPlayer by lazy { MediaPlayer() }
     private lateinit var mediaSession : MediaSessionCompat
-    private lateinit var runnable: Runnable
     lateinit var audioManager: AudioManager
+    private var handler: Handler? = null
+    private var runnable: Runnable? = null
 
     override fun onBind(intent: Intent?): IBinder? {
         mediaSession = MediaSessionCompat(baseContext, "My Music")
@@ -110,6 +112,10 @@ class MusicService: Service(), AudioManager.OnAudioFocusChangeListener {
 
     fun createMediaPlayer(){
         try {
+
+            mediaPlayer?.let { player ->
+                Music.savePlaybackState(applicationContext, PlayerActivity.musicListPA[PlayerActivity.songPosition].id, player.currentPosition)
+            }
             mediaPlayer.reset()
             mediaPlayer.setDataSource(PlayerActivity.musicListPA[PlayerActivity.songPosition].path)
 
@@ -134,15 +140,45 @@ class MusicService: Service(), AudioManager.OnAudioFocusChangeListener {
         }
     }
 
-    fun seekBarSetup(){
-        runnable = Runnable {
-            PlayerActivity.binding.tvSeekBarStart.text =
-                formatDuration(mediaPlayer.currentPosition.toLong())
-            PlayerActivity.binding.seekBarPA.progress = mediaPlayer!!.currentPosition
-            Handler(Looper.getMainLooper()).postDelayed(runnable, 200)
+    fun seekBarSetup() {
+        // 1. Cancelar cualquier actualización previa
+        runnable?.let { handler?.removeCallbacks(it) }
+
+        // 2. Inicializar nuevo Handler
+        handler = Handler(Looper.getMainLooper())
+
+        // 3. Definir el Runnable con verificación segura
+        runnable = object : Runnable {
+            override fun run() {
+                try {
+                    // Verificación en cascada para evitar NullPointerException
+                    mediaPlayer?.takeIf { it.isPlaying }?.let { player ->
+                        PlayerActivity.binding.tvSeekBarStart.text =
+                            formatDuration(player.currentPosition.toLong())
+                        PlayerActivity.binding.seekBarPA.progress = player.currentPosition
+                    }
+                } catch (e: IllegalStateException) {
+                    // Manejar error específico de MediaPlayer
+                    Log.e("MediaPlayer", "Error en seekBarSetup: ${e.message}")
+                    stopSeekBarUpdates()
+                    return
+                }
+
+                // Programar próxima actualización (solo si el mediaPlayer es válido)
+                handler?.postDelayed(this, 200)
+            }
         }
-        Handler(Looper.getMainLooper()).postDelayed(runnable, 0)
+
+        // 4. Iniciar las actualizaciones
+        handler?.post(runnable as Runnable)
     }
+
+    fun stopSeekBarUpdates() {
+        runnable?.let { handler?.removeCallbacks(it) }
+        handler = null
+        runnable = null
+    }
+
 
     fun getPlayBackState(): PlaybackStateCompat {
         val playbackSpeed = if (PlayerActivity.isPlaying) 1F else 0F

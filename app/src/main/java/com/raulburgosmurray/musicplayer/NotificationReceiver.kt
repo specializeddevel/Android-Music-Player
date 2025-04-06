@@ -35,9 +35,7 @@ class NotificationReceiver: BroadcastReceiver() {
             ApplicationClass.NEXT -> if(PlayerActivity.musicListPA.size > 1) prevNextSong(increment = true, context = context)
             ApplicationClass.EXIT -> {
                 // Guardar posición antes de salir
-                PlayerActivity.musicService!!.mediaPlayer?.let { player ->
-                    Music.savePlaybackState(context, PlayerActivity.musicListPA[PlayerActivity.songPosition].id, player.currentPosition)
-                }
+
                 Music.exitApplication(context)
             }
         }

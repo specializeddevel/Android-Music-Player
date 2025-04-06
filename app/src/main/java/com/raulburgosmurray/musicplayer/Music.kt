@@ -7,9 +7,7 @@ import androidx.appcompat.app.AppCompatActivity.MODE_PRIVATE
 import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.KEY_LAST_AUDIO
 import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.KEY_LAST_POSITION
 import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.PREFS_NAME
-import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.musicListPA
 import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.musicService
-import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.songPosition
 import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
 
@@ -42,16 +40,23 @@ data class Music(
         }
 
         fun exitApplication(context: Context) {
+
             if (PlayerActivity.musicService != null) {
-                PlayerActivity.musicService!!.mediaPlayer?.let { player ->
-                    Music.savePlaybackState(context , PlayerActivity.musicListPA[PlayerActivity.songPosition].id, player.currentPosition)
+                PlayerActivity.musicService?.mediaPlayer?.let { player ->
+                    musicService!!.stopSeekBarUpdates()
+                    if (player.isPlaying) {
+                        player.stop()
+                    }
+                    PlayerActivity.musicService!!.mediaPlayer?.let { player ->
+                        Music.savePlaybackState(context , PlayerActivity.musicListPA[PlayerActivity.songPosition].id, player.currentPosition)
+                    }
+                    Thread.sleep(500)
+                    player.release()
                 }
-                Thread.sleep(400)
                 PlayerActivity.musicService!!.stopForeground(true)
-                PlayerActivity.musicService!!.mediaPlayer!!.release()
                 PlayerActivity.musicService = null
             }
-            exitProcess(1)
+            exitProcess(0)
         }
 
         fun setSongPosition(increment: Boolean){
@@ -90,5 +95,6 @@ data class Music(
                 PlayerActivity.musicService!!.mediaPlayer.seekTo(lastPosition)
             }
         }
+
     }
 }

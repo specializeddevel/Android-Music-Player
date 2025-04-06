@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
+import android.util.Log
 import android.view.Menu
 import android.view.View
 import android.widget.Toast
@@ -43,6 +44,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var navigationView: NavigationView
     private lateinit var toolbar: Toolbar
     private lateinit var musicAdapter: MusicAdapter
+    private var backPressedTime = 0L
 
 companion object{
     lateinit var MusicListMA : ArrayList<Music>
@@ -219,13 +221,36 @@ companion object{
         return tempList
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        Music.exitApplication(applicationContext)
+    override fun onResume() {
 
+            PlayerActivity.musicService?.mediaPlayer?.let { player ->
+
+                Music.savePlaybackState(
+                    applicationContext,
+                    musicListPA[songPosition].id,
+                    player.currentPosition
+                )
+                Thread.sleep(500)
+            }
+
+        super.onResume()
+  }
+
+   override fun onBackPressed() {
+
+        if (backPressedTime + 2000 > System.currentTimeMillis()) {
+            super.onBackPressed()
+            Music.exitApplication(applicationContext)
+        } else {
+            Toast.makeText(this, getString(R.string.press_back_again_to_exit), Toast.LENGTH_SHORT).show()
+        }
+        backPressedTime = System.currentTimeMillis()
     }
 
-
+    override fun onDestroy() {
+        Music.exitApplication(applicationContext)
+        super.onDestroy()
+    }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         menuInflater.inflate(R.menu.search_view_menu, menu)
