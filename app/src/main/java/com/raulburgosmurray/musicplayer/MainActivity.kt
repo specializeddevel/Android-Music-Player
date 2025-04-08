@@ -17,6 +17,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
 import androidx.appcompat.widget.Toolbar
+import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -59,6 +60,7 @@ companion object{
 
         val nowPlaying = binding.nowPlaying
         val recyclerView = binding.musicRV
+
 
 
 
@@ -113,6 +115,7 @@ companion object{
             drawerLayout.closeDrawer(GravityCompat.START)
             true
         }
+
     }
 
     private fun initializeLayout() {
@@ -156,6 +159,8 @@ companion object{
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
+
+
     }
 
     @SuppressLint("Recycle", "Range")
@@ -251,6 +256,13 @@ companion object{
         Music.exitApplication(applicationContext)
         super.onDestroy()
     }
+
+    override fun onStart() {
+
+        super.onStart()
+    }
+
+
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         menuInflater.inflate(R.menu.search_view_menu, menu)

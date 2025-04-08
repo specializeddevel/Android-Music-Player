@@ -22,6 +22,9 @@ data class Music(
     val uri:Uri
 ) {
     companion object {
+
+        var backInMiliseconds = 5000;
+
         fun formatDuration(duration: Long): String {
             val hours = TimeUnit.HOURS.convert(duration, TimeUnit.MILLISECONDS)
             val minutes = TimeUnit.MINUTES.convert(duration, TimeUnit.MILLISECONDS) % 60
@@ -82,7 +85,7 @@ data class Music(
             val prefs = context.getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
             prefs.edit()
                 .putString(KEY_LAST_AUDIO, audioId)
-                .putInt(KEY_LAST_POSITION, position-5000)
+                .putInt(KEY_LAST_POSITION, position- backInMiliseconds)
                 .apply()
         }
 

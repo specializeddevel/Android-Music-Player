@@ -45,10 +45,12 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         var min30 = false
         var min60 = false
         var speed = 1.0f
+        var nowPlayingId: String = ""
         // Constants for Sharedpreferences
         val PREFS_NAME = "AudioPrefs"
         val KEY_LAST_AUDIO = "last_audio"
         val KEY_LAST_POSITION = "last_position"
+        val KEY_LAST_FILE_ID = "last_file_id"
     }
 
 
@@ -197,6 +199,7 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
             binding.seekBarPA.progress = 0
             binding.seekBarPA.max = musicService!!.mediaPlayer.duration
             musicService!!.mediaPlayer.setOnCompletionListener(this)
+            nowPlayingId = musicListPA[songPosition].id
         } catch (e: Exception) {
             return
         }
@@ -207,10 +210,14 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         when(intent.getStringExtra("class")){
             "NowPlaying" -> {
                 setLayout()
-                binding.tvSeekBarEnd.text = formatDuration(musicService!!.mediaPlayer.currentPosition.toLong())
+                binding.tvSeekBarStart.text = formatDuration(musicService!!.mediaPlayer.currentPosition.toLong())
                 binding.tvSeekBarEnd.text = formatDuration(musicService!!.mediaPlayer.duration.toLong())
                 binding.seekBarPA.max = musicService!!.mediaPlayer.duration
                 binding.seekBarPA.progress = musicService!!.mediaPlayer.currentPosition
+                if(isPlaying) {
+                    binding.playPauseBtnPA.setIconResource(R.drawable.pause_icon)}
+                else {
+                    binding.playPauseBtnPA.setIconResource(R.drawable.play_icon)}
             }
             "MusicAdapterSearch" -> {
                 //For Starting service
