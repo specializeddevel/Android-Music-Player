@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <color name="white">#FF000000</color>
-    <color name="black">#FFFFFFFF</color>
-    <color name="icon_tint_color">@android:color/holo_red_light</color>
-</resources>

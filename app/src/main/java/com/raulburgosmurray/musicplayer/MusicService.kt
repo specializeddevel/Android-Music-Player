@@ -135,6 +135,7 @@ class MusicService: Service(), AudioManager.OnAudioFocusChangeListener {
             PlayerActivity.musicService!!.mediaPlayer?.let { player ->
                 Music.restorePlaybackState(applicationContext, PlayerActivity.musicListPA[PlayerActivity.songPosition].id)
             }
+            PlayerActivity.nowPlayingId = PlayerActivity.musicListPA[PlayerActivity.songPosition].id
         } catch (e: Exception) {
             return
         }
