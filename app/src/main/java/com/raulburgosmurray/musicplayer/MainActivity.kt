@@ -116,6 +116,15 @@ companion object{
             true
         }
 
+        val currentId =  Music.loadPlaybackState(applicationContext)
+        currentId.let {
+            val intent = Intent(this, PlayerActivity::class.java).apply {
+                putExtra("index", musicAdapter.findIndexById(currentId!!))
+                putExtra("class", "ContinuePlaying")
+            }
+            startActivity(intent)
+        }
+
     }
 
     private fun initializeLayout() {

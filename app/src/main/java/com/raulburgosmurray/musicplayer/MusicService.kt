@@ -17,6 +17,8 @@ import android.support.v4.media.session.PlaybackStateCompat
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.raulburgosmurray.musicplayer.Music.Companion.formatDuration
+import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.binding
+import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.musicService
 
 
 class MusicService: Service(), AudioManager.OnAudioFocusChangeListener {
@@ -125,8 +127,18 @@ class MusicService: Service(), AudioManager.OnAudioFocusChangeListener {
                 mediaPlayer.playbackParams = playbackParams
             }
             mediaPlayer.prepare()
-            PlayerActivity.binding.playPauseBtnPA.setIconResource(R.drawable.pause_icon)
-            showNotification(R.drawable.pause_icon)
+            if(!PlayerActivity.isResumed){
+                PlayerActivity.binding.playPauseBtnPA.setIconResource(R.drawable.pause_icon)
+                showNotification(R.drawable.pause_icon)
+                PlayerActivity.binding.seekBarPA.progress = 0
+
+            }
+            else {
+                PlayerActivity.binding.playPauseBtnPA.setIconResource(R.drawable.play_icon)
+                showNotification(R.drawable.play_icon)
+                binding.seekBarPA.progress = musicService!!.mediaPlayer.currentPosition
+                mediaPlayer.pause()
+            }
             PlayerActivity.binding.tvSeekBarStart.text = formatDuration(mediaPlayer.currentPosition.toLong())
             PlayerActivity.binding.tvSeekBarEnd.text = formatDuration(mediaPlayer.duration.toLong())
             PlayerActivity.binding.seekBarPA.progress = 0

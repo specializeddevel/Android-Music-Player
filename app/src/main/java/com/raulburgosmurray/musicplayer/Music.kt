@@ -99,5 +99,12 @@ data class Music(
             }
         }
 
+        fun loadPlaybackState(context: Context) : String? {
+            val prefs = context.getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            val id : String? = prefs.getString(KEY_LAST_AUDIO, null)
+            return id
+
+        }
+
     }
 }

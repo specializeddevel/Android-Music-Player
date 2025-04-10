@@ -25,10 +25,16 @@ class MusicAdapter(private val context: Context, private var musicList: ArrayLis
         val album = binding.songAlbumMV
         val image = binding.imageMV
         val duration = binding.songDuration
+        val id = binding.songIdMV
         val root = binding.root
     }
 
+    fun findIndexById(id: String): Int {
+        return musicList.indexOfFirst { it.id.equals(id, ignoreCase = true) }
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MyHolder {
+
         return MyHolder(MusicViewBinding.inflate(LayoutInflater.from(context),parent,false))
     }
 
@@ -45,6 +51,7 @@ class MusicAdapter(private val context: Context, private var musicList: ArrayLis
             .apply(RequestOptions().placeholder(R.drawable.ic_audiobook_cover).centerInside())
             .into(holder.image)
         //Log.i("icon", "arturi: ${holder.image.toString()}")
+
         holder.root.setOnClickListener {
 
             when{
@@ -123,6 +130,8 @@ class MusicAdapter(private val context: Context, private var musicList: ArrayLis
     fun updateMusicList(searchList: ArrayList<Music>){
         musicList = ArrayList()
         musicList.addAll(searchList)
+
         notifyDataSetChanged()
+
     }
 }

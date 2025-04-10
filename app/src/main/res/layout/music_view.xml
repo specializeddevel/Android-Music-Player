@@ -16,6 +16,20 @@
         android:layout_marginVertical="5dp"/>
 
     <TextView
+        android:id="@+id/songIdMV"
+        android:layout_width="wrap_content"
+        android:layout_height="35dp"
+        android:layout_toStartOf="@id/songDuration"
+        android:layout_toEndOf="@id/imageMV"
+        android:gravity="center_vertical"
+        android:singleLine="true"
+        android:text="@string/song_name"
+        android:textColor="?colorOnPrimary"
+        android:layout_marginStart="70dp"
+        android:layout_marginEnd="70dp"
+        android:visibility="gone"/>
+
+    <TextView
         android:id="@+id/songNameMV"
         android:layout_width="wrap_content"
         android:layout_height="35dp"
