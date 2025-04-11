@@ -5,7 +5,11 @@
     android:layout_height="65dp"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     app:cardCornerRadius="15dp"
-    android:layout_marginBottom="5dp">
+    android:layout_marginBottom="5dp"
+    app:cardElevation="4dp"
+    app:strokeWidth="1dp"
+    app:strokeColor="#CCCCCC"
+    >
 
     <com.google.android.material.imageview.ShapeableImageView
         android:id="@+id/imageMV"

@@ -20,6 +20,9 @@ import java.io.FileInputStream
 import java.security.MessageDigest
 
 class MusicAdapter(private val context: Context, private var musicList: ArrayList<Music>): RecyclerView.Adapter<MusicAdapter.MyHolder>() {
+
+    private var currentlyPlayingHolder: MyHolder? = null
+
     class MyHolder(binding: MusicViewBinding): RecyclerView.ViewHolder(binding.root) {
         val title = binding.songNameMV
         val album = binding.songAlbumMV
@@ -52,13 +55,28 @@ class MusicAdapter(private val context: Context, private var musicList: ArrayLis
             .into(holder.image)
         //Log.i("icon", "arturi: ${holder.image.toString()}")
 
+        if(musicList[position].id == PlayerActivity.nowPlayingId){
+            holder.title.setTextColor(ContextCompat.getColor(context, R.color.cool_pink))
+            currentlyPlayingHolder = holder
+        } else {
+            holder.title.setTextColor(ContextCompat.getColor(context, R.color.black)) // or any default color
+        }
+
         holder.root.setOnClickListener {
+
+            val previousHolder = currentlyPlayingHolder
+            currentlyPlayingHolder = holder
+
+            previousHolder?.title?.setTextColor(ContextCompat.getColor(context, R.color.black))  // Reset previous playing song color
+
+            holder.title.setTextColor(ContextCompat.getColor(context, R.color.cool_pink))
 
             when{
                 MainActivity.search -> sendIntent("MusicAdapterSearch", position)
                 musicList[position].id == PlayerActivity.nowPlayingId -> sendIntent("NowPlaying", PlayerActivity.songPosition)
                 else -> sendIntent("MusicAdapter", position)
             }
+
 //            Log.i("_ID", "_ID: ${musicList[position].id}")
 //            if (fileHash.isNullOrEmpty()) {
 //                fileHash = calculateFileHash(musicList[position].path)
@@ -76,9 +94,10 @@ class MusicAdapter(private val context: Context, private var musicList: ArrayLis
     }
 
     private fun sendIntent(ref: String, pos: Int) {
-        val intent = Intent(context, PlayerActivity::class.java)
-        intent.putExtra("index", pos)
-        intent.putExtra("class", ref)
+        val intent = Intent(context, PlayerActivity::class.java).apply {
+            putExtra("index", pos)
+            putExtra("class", ref)
+        }
         ContextCompat.startActivity(context, intent, null)
     }
 
@@ -127,7 +146,7 @@ class MusicAdapter(private val context: Context, private var musicList: ArrayLis
         contentResolver.update(uri, values, selection, selectionArgs)
     }
 
-    fun updateMusicList(searchList: ArrayList<Music>){
+    public fun updateMusicList(searchList: ArrayList<Music>){
         musicList = ArrayList()
         musicList.addAll(searchList)
 

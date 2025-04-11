@@ -44,12 +44,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var drawerLayout: DrawerLayout
     private lateinit var navigationView: NavigationView
     private lateinit var toolbar: Toolbar
-    private lateinit var musicAdapter: MusicAdapter
+
     private var backPressedTime = 0L
 
 companion object{
     lateinit var MusicListMA : ArrayList<Music>
     lateinit var musicListSearch: ArrayList<Music>
+    lateinit var musicAdapter: MusicAdapter
     var search = false
 }
 
@@ -74,9 +75,10 @@ companion object{
         }
 
         binding.shuffleBtn.setOnClickListener {
-            val intent = Intent(this, PlayerActivity::class.java)
-            intent.putExtra("index", 0)
-            intent.putExtra("class", "MainActivity")
+            val intent = Intent(this, PlayerActivity::class.java).apply {
+                putExtra("index", 0)
+                putExtra("class", "MainActivity")
+            }
             startActivity(intent)
 
         }
@@ -116,11 +118,10 @@ companion object{
             true
         }
 
-        val currentId =  Music.loadPlaybackState(applicationContext)
-        currentId.let {
+        val currentId =  Music.loadPlaybackState(applicationContext)?.let {
             val intent = Intent(this, PlayerActivity::class.java).apply {
-                putExtra("index", musicAdapter.findIndexById(currentId!!))
-                putExtra("class", "ContinuePlaying")
+            putExtra("index", musicAdapter.findIndexById(it))
+            putExtra("class", "ContinuePlaying")
             }
             startActivity(intent)
         }
@@ -155,6 +156,7 @@ companion object{
 
         //For ReciclerView
         MusicListMA = getAllAudio()
+
 
         binding.musicRV.setHasFixedSize(true)
         binding.musicRV.setItemViewCacheSize(13)
@@ -232,6 +234,7 @@ companion object{
             }
             cursor.close()
         }
+        tempList.sortBy { it.title }
         return tempList
     }
 
@@ -269,6 +272,7 @@ companion object{
     override fun onStart() {
 
         super.onStart()
+
     }
 
 

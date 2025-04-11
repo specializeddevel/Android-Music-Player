@@ -354,6 +354,13 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         }
     }
 
+    override fun onDestroy() {
+        if(!MainActivity.search){
+            MainActivity.musicAdapter.updateMusicList(MainActivity.MusicListMA)
+        }
+        super.onDestroy()
+
+    }
     override fun onActivityResult(
         requestCode: Int,
         resultCode: Int,
