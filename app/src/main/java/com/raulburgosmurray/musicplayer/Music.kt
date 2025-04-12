@@ -106,5 +106,15 @@ data class Music(
 
         }
 
+        fun favoriteChecker(id: String): Int {
+            PlayerActivity.isFavorite = false
+            FavoritesActivity.favoriteSongs.forEachIndexed { index, music ->
+                if (id == music.id) {
+                    PlayerActivity.isFavorite = true
+                    return index
+                }
+            }
+            return -1
+        }
     }
 }

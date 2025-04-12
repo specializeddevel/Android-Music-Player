@@ -50,7 +50,9 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         val PREFS_NAME = "AudioPrefs"
         val KEY_LAST_AUDIO = "last_audio"
         val KEY_LAST_POSITION = "last_position"
-        var isResumed = false;
+        var isResumed = false
+        var isFavorite = false
+        var fIndex = -1
     }
 
 
@@ -112,8 +114,6 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
 
         binding.equalizerBtnPA.setOnClickListener {
             try {
-
-
                 val eqIntent = Intent(AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL)
                 eqIntent.putExtra(AudioEffect.EXTRA_AUDIO_SESSION, musicService!!.mediaPlayer.audioSessionId)
                 eqIntent.putExtra(AudioEffect.EXTRA_PACKAGE_NAME, baseContext.packageName)
@@ -123,7 +123,6 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
                 Toast.makeText(this, "Equalizer feature not supported!", Toast.LENGTH_SHORT).show()
             }
         }
-
         binding.timerBtnPA.setOnClickListener {
             val timer = min15 || min30 || min60
             if(!timer){
@@ -161,10 +160,22 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
             showBottomSheetSpeedDialog()
         }
 
-
+        binding.favoriteBtnPA.setOnClickListener {
+            if(isFavorite) {
+                fIndex = Music.favoriteChecker(musicListPA[songPosition].id)
+                isFavorite = false
+                binding.favoriteBtnPA.setImageResource(R.drawable.favourite_empty_icon)
+                FavoritesActivity.favoriteSongs.removeAt(fIndex)
+            } else {
+                isFavorite = true
+                binding.favoriteBtnPA.setImageResource(R.drawable.favourite_icon)
+                FavoritesActivity.favoriteSongs.add(musicListPA[songPosition])
+            }
+        }
     }
 
     private fun setLayout(){
+        fIndex = Music.favoriteChecker(musicListPA[songPosition].id)
         Glide.with(this)
             .load(musicListPA[songPosition].artUri)
             .apply(RequestOptions().placeholder(R.drawable.ic_audiobook_cover).centerInside())
@@ -172,7 +183,8 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         binding.songNamePA.text = musicListPA[songPosition].title
         if(repeat) binding.repeatBtnPA.setColorFilter(ContextCompat.getColor(this,R.color.purple_500))
         if(min15 || min30 || min60) binding.timerBtnPA.setColorFilter(ContextCompat.getColor(this, R.color.purple_500))
-
+        if(isFavorite) binding.favoriteBtnPA.setImageResource(R.drawable.favourite_icon)
+        else binding.favoriteBtnPA.setImageResource(R.drawable.favourite_empty_icon)
     }
 
     private fun createMediaPlayer(){
@@ -221,6 +233,15 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
     private fun initializeLayout(){
         songPosition = intent.getIntExtra("index", 0)
         when(intent.getStringExtra("class")){
+            "FavoriteAdapter" -> {
+                val intent = Intent(this, MusicService::class.java)
+                bindService(intent, this, BIND_AUTO_CREATE)
+                startService(intent)
+                musicListPA = ArrayList()
+                musicListPA.addAll(FavoritesActivity.favoriteSongs)
+                isResumed = false
+                setLayout()
+            }
             "NowPlaying" -> {
                 setLayout()
                 isResumed = false
@@ -234,7 +255,6 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
                     binding.playPauseBtnPA.setIconResource(R.drawable.play_icon)}
             }
             "MusicAdapterSearch" -> {
-                //For Starting service
                 val intent = Intent(this, MusicService::class.java)
                 bindService(intent, this, BIND_AUTO_CREATE)
                 startService(intent)
@@ -244,7 +264,6 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
                 setLayout()
             }
             "MusicAdapter" -> {
-                //For Starting service
                 val intent = Intent(this, MusicService::class.java)
                 bindService(intent, this, BIND_AUTO_CREATE)
                 startService(intent)
@@ -255,7 +274,6 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
 
             }
             "MainActivity" -> {
-                //For Starting service
                 val intent = Intent(this, MusicService::class.java)
                 bindService(intent, this, BIND_AUTO_CREATE)
                 startService(intent)
@@ -268,13 +286,11 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
 
             }
             "ContinuePlaying" -> {
-                //For Starting service
                 val intent = Intent(this, MusicService::class.java)
                 bindService(intent, this, BIND_AUTO_CREATE)
                 startService(intent)
                 musicListPA = ArrayList()
                 musicListPA.addAll(MainActivity.MusicListMA)
-
                 setLayout()
                 isResumed = true
                 createMediaPlayer()

@@ -53,7 +53,6 @@ class NowPlaying : Fragment() {
         }
         binding.nextBtnNP.setOnClickListener{
             try {
-                //TODO: el boton no funciona si no se realiza previamente el filtrado de la lista con una busqueda, revisar
                 if (MainActivity.MusicListMA.size > 1) {
                     Music.setSongPosition(increment = true)
                     PlayerActivity.musicService!!.createMediaPlayer()
@@ -67,6 +66,9 @@ class NowPlaying : Fragment() {
                     binding.songNameNP.text =
                         PlayerActivity.musicListPA[PlayerActivity.songPosition].title
                     PlayerActivity.musicService!!.showNotification(R.drawable.pause_icon)
+                    if(!MainActivity.search){
+                        MainActivity.musicAdapter.updateMusicList(MainActivity.MusicListMA)
+                    }
                     playMusic()
                 }
             } catch (_: Exception){}
