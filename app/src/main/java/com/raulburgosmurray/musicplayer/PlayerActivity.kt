@@ -171,6 +171,7 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
                 binding.favoriteBtnPA.setImageResource(R.drawable.favourite_icon)
                 FavoritesActivity.favoriteSongs.add(musicListPA[songPosition])
             }
+            FavoritesActivity.favoritesChanged = true
         }
     }
 
@@ -373,6 +374,9 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
     override fun onDestroy() {
         if(!MainActivity.search){
             MainActivity.musicAdapter.updateMusicList(MainActivity.MusicListMA)
+        }
+        musicService!!.mediaPlayer?.let { player ->
+            Music.savePlaybackState(applicationContext,musicListPA[songPosition].id, player.currentPosition)
         }
         super.onDestroy()
 

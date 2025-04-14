@@ -4,10 +4,13 @@ import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import androidx.appcompat.app.AppCompatActivity.MODE_PRIVATE
+import com.google.gson.GsonBuilder
+import com.google.gson.reflect.TypeToken
 import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.KEY_LAST_AUDIO
 import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.KEY_LAST_POSITION
 import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.PREFS_NAME
 import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.musicService
+import java.io.File
 import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
 
@@ -19,7 +22,7 @@ data class Music(
     val duration: Long = 0,
     val path: String,
     val artUri: String,
-    val uri:Uri
+
 ) {
     companion object {
 
@@ -53,6 +56,7 @@ data class Music(
                     PlayerActivity.musicService!!.mediaPlayer?.let { player ->
                         Music.savePlaybackState(context , PlayerActivity.musicListPA[PlayerActivity.songPosition].id, player.currentPosition)
                     }
+
                     Thread.sleep(500)
                     player.release()
                 }
@@ -60,6 +64,15 @@ data class Music(
                 PlayerActivity.musicService = null
             }
             exitProcess(0)
+        }
+
+        fun checkPlaylist(playlist: ArrayList<Music>) : ArrayList<Music>{
+            playlist.forEachIndexed { index, music ->
+                val file = File(music.path)
+                if(!file.exists())
+                    playlist.removeAt(index)
+            }
+            return playlist
         }
 
         fun setSongPosition(increment: Boolean){
@@ -87,6 +100,22 @@ data class Music(
                 .putString(KEY_LAST_AUDIO, audioId)
                 .putInt(KEY_LAST_POSITION, position- backInMiliseconds)
                 .apply()
+        }
+
+        fun saveFavoriteSongs(context: Context) {
+            val editor = context.getSharedPreferences("FAVORITES", MODE_PRIVATE).edit()
+            val jsonString = GsonBuilder().create().toJson(FavoritesActivity.favoriteSongs)
+            editor.putString("FavoriteSongs", jsonString)
+            editor.apply()
+        }
+
+        fun loadFavorites(context: Context) {
+            val editor = context.getSharedPreferences("FAVORITES", MODE_PRIVATE)
+            val jsonString = editor.getString("FavoriteSongs", null)
+            val typeToken = object : TypeToken<ArrayList<Music>>() {}.type
+            if (jsonString != null) {
+                FavoritesActivity.favoriteSongs = GsonBuilder().create().fromJson(jsonString, typeToken)
+            }
         }
 
         fun restorePlaybackState(context: Context, audioId: String) {

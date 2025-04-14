@@ -55,5 +55,6 @@ dependencies {
     implementation("com.github.bumptech.glide:glide:5.0.0-rc01")
     implementation("androidx.media:media:1.7.0")
     implementation("net.jthink:jaudiotagger:3.0.1")
+    implementation("com.google.code.gson:gson:2.9.0")
 
 }

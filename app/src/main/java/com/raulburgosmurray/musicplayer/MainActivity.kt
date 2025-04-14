@@ -27,6 +27,8 @@ import androidx.drawerlayout.widget.DrawerLayout
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.navigation.NavigationView
+import com.google.gson.GsonBuilder
+import com.google.gson.reflect.TypeToken
 import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.KEY_LAST_AUDIO
 import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.KEY_LAST_POSITION
 import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.PREFS_NAME
@@ -117,7 +119,7 @@ companion object{
             drawerLayout.closeDrawer(GravityCompat.START)
             true
         }
-
+        //Load last player audiobook
         val currentId =  Music.loadPlaybackState(applicationContext)?.let {
             val intent = Intent(this, PlayerActivity::class.java).apply {
             putExtra("index", musicAdapter.findIndexById(it))
@@ -125,6 +127,8 @@ companion object{
             }
             startActivity(intent)
         }
+        //Load favorites
+        Music.loadFavorites(applicationContext)
 
     }
 
@@ -224,7 +228,7 @@ companion object{
                             duration = durationC,
                             path = pathC,
                             artUri = artUriC,
-                            uri = uriC
+
                         )
 
                         if(File(music.path).exists())
@@ -247,6 +251,7 @@ companion object{
                     musicListPA[songPosition].id,
                     player.currentPosition
                 )
+                Music.saveFavoriteSongs(applicationContext)
                 Thread.sleep(500)
             }
 

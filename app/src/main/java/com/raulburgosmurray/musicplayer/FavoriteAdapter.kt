@@ -1,5 +1,6 @@
 package com.raulburgosmurray.musicplayer
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.view.LayoutInflater
@@ -40,4 +41,13 @@ class FavoriteAdapter(private val context: Context, private var musicList: Array
             ContextCompat.startActivity(context, intent, null)
         }
     }
+
+    @SuppressLint("NotifyDataSetChanged")
+    fun updateFavourites(newList: ArrayList<Music>){
+        musicList = ArrayList()
+        musicList.addAll(newList)
+        notifyDataSetChanged()
+    }
+
 }
+
