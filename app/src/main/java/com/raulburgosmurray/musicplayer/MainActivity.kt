@@ -86,7 +86,8 @@ companion object{
         }
 
         binding.favoritesBtn.setOnClickListener {
-            startActivity(Intent(this, FavoritesActivity::class.java))
+            val intent = Intent(this, FavoritesActivity::class.java)
+            startActivity(intent)
         }
 
         binding.playlistBtn.setOnClickListener {
@@ -181,7 +182,7 @@ companion object{
     @SuppressLint("Recycle", "Range")
     private fun getAllAudio(): ArrayList<Music>{
         val tempList = ArrayList<Music>()
-        val selection = MediaStore.Audio.Media.IS_MUSIC + " != 0 AND " + MediaStore.Audio.Media.MIME_TYPE + " LIKE 'audio/%' AND " + MediaStore.Audio.Media.ALBUM + " NOT LIKE 'WhatsApp%'"
+        val selection = MediaStore.Audio.Media.MIME_TYPE + " LIKE 'audio/%' AND " + MediaStore.Audio.Media.ALBUM + " NOT LIKE 'WhatsApp%'"
         val projection = arrayOf(
             MediaStore.Audio.Media._ID,
             MediaStore.Audio.Media.TITLE,
@@ -219,7 +220,7 @@ companion object{
                     val artUriC = Uri.withAppendedPath(uri, albumIdC).toString()
                     val uriC = Uri.withAppendedPath(uri, albumIdC)
 
-                    if (durationC > 0) {
+                    if (durationC > 10000 && !pathC.contains("WhatsApp")) {
                         val music = Music(
                             id = idC,
                             title = titleC,

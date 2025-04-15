@@ -76,12 +76,16 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
             if(isPlaying) {
                 pauseMusic()
                 musicService!!.mediaPlayer?.let { player ->
-                    Music.savePlaybackState(applicationContext,musicListPA[songPosition].id, player.currentPosition)
+                    //Music.savePlaybackState(applicationContext,musicListPA[songPosition].id, player.currentPosition)
+                    val currentPosition = player.currentPosition
+                    Music.savePlaybackState(applicationContext, musicListPA[songPosition].id, currentPosition)
                 }
 
             } else {
                 musicService!!.mediaPlayer?.let { _ ->
-                    Music.restorePlaybackState(applicationContext ,musicListPA[songPosition].id)
+                    //Music.restorePlaybackState(applicationContext ,musicListPA[songPosition].id)
+                    val savedPosition = Music.restorePlaybackState(applicationContext, musicListPA[songPosition].id)
+
                 }
                 playMusic()
             }
