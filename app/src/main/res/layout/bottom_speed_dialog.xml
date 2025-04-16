@@ -30,22 +30,22 @@
     </LinearLayout>
 
     <LinearLayout
-        android:id="@+id/speed075x"
+        android:id="@+id/speed07x"
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
         <ImageView
             android:layout_width="24dp"
             android:layout_height="24dp"
-            android:src="@drawable/speed_0_75x_icon"
+            android:src="@drawable/speed_0_7x_icon"
             app:tint="@color/cool_pink"
             android:layout_margin="8dp"
-            android:contentDescription="@string/play_speed_at_075x_lit"
+            android:contentDescription="@string/play_speed_at_07x_lit"
             />
         <TextView
-            android:id="@+id/speed075xText"
+            android:id="@+id/speed07xText"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:text="@string/play_speed_at_075x"
+            android:text="@string/play_speed_at_07x"
             android:textColor="@color/black"
             android:textSize="18dp"
             android:padding="8dp"
