@@ -7,26 +7,14 @@
     tools:context=".NowPlaying"
     android:background="@color/cool_pink">
 
-   <com.google.android.material.imageview.ShapeableImageView
-       android:id="@+id/songImgNP"
-       android:layout_width="70dp"
-       android:layout_height="50dp"
-       android:layout_marginHorizontal="10dp"
-       android:layout_marginVertical="5dp"
-       app:shapeAppearanceOverlay="@style/curved"
-       android:src="@drawable/music_player_icon_splash_screen"/>
-
-    <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
-        android:id="@+id/nextBtnNP"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignParentEnd="true"
-        app:icon="@drawable/next_icon"
-        app:iconTint="@color/white"
-        android:backgroundTint="@color/cool_pink"
-        android:layout_centerVertical="true"
-        app:iconSize="30dp"
-        android:layout_marginEnd="10dp"/>
+    <com.google.android.material.imageview.ShapeableImageView
+        android:id="@+id/songImgNP"
+        android:layout_width="70dp"
+        android:layout_height="50dp"
+        android:layout_marginHorizontal="10dp"
+        android:layout_marginVertical="5dp"
+        app:shapeAppearanceOverlay="@style/curved"
+        android:src="@drawable/music_player_icon_splash_screen"/>
 
     <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
         android:id="@+id/playPauseBtnNP"
@@ -34,11 +22,25 @@
         android:layout_height="wrap_content"
         app:icon="@drawable/play_icon"
         app:iconTint="@color/white"
-        android:backgroundTint="@color/cool_pink"
+        android:backgroundTint="@color/icon_tint_color"
         android:layout_centerVertical="true"
         app:iconSize="40dp"
-        android:layout_toStartOf="@+id/nextBtnNP"
-        android:layout_marginHorizontal="5dp"/>
+        android:layout_alignParentEnd="true"
+    android:layout_marginEnd="10dp" />
+
+    <!-- Botón de next a la izquierda del botón de play -->
+    <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+        android:id="@+id/nextBtnNP"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:icon="@drawable/next_icon"
+        app:iconTint="@color/white"
+        android:backgroundTint="@color/cool_pink"
+        android:layout_centerVertical="true"
+        app:iconSize="30dp"
+        android:layout_toStartOf="@id/playPauseBtnNP"
+    android:layout_marginEnd="5dp"
+    android:visibility="gone" />
 
     <TextView
         android:id="@+id/songNameNP"

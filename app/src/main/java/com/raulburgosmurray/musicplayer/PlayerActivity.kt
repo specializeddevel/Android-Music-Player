@@ -4,7 +4,10 @@ import android.app.ComponentCaller
 import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.res.ColorStateList
+import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.media.MediaPlayer
 import android.media.PlaybackParams
 import android.media.audiofx.AudioEffect
@@ -31,6 +34,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.raulburgosmurray.musicplayer.Music.Companion.formatDuration
 import com.raulburgosmurray.musicplayer.Music.Companion.setSongPosition
 import com.raulburgosmurray.musicplayer.databinding.ActivityPlayerBinding
+import com.raulburgosmurray.musicplayer.databinding.BottomSpeedDialogBinding
 
 class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCompletionListener {
 
@@ -90,6 +94,25 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
                 playMusic()
             }
         }
+
+        binding.replay10PA.setOnClickListener{
+            skipBackward(10000)
+        }
+
+        binding.replay10PA.setOnLongClickListener {
+            skipBackward(30000)
+            true
+        }
+
+        binding.replay60PA.setOnClickListener{
+            skipBackward(60000)
+        }
+
+        binding.replay60PA.setOnLongClickListener{
+            skipBackward(300000)
+            true
+        }
+
         binding.previusBtnPA.setOnClickListener{
             prevNextSong(false)
         }
@@ -97,6 +120,26 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         binding.nextBtnPA.setOnClickListener{
             prevNextSong(true)
         }
+
+        binding.forward10PA.setOnClickListener{
+            skipForward(10000)
+        }
+
+        binding.forward10PA.setOnLongClickListener {
+            skipForward(30000)
+            true
+        }
+
+        binding.forward60PA.setOnClickListener{
+            skipForward(60000)
+        }
+
+        binding.forward60PA.setOnLongClickListener{
+            skipForward(300000)
+            true
+        }
+
+
         binding.seekBarPA.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener{
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 if(fromUser) {
@@ -140,7 +183,8 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
                         min15 = false
                         min30 = false
                         min60 = false
-                        binding.timerBtnPA.setColorFilter(ContextCompat.getColor(this, R.color.cool_pink))
+                        val checkTimerIcon = ContextCompat.getDrawable(this, R.drawable.timer_icon)
+                        binding.timerBtnPA.setImageDrawable(checkTimerIcon)
                     }
                     .setNegativeButton("No") { dialog, _ ->
                         dialog.dismiss()
@@ -181,15 +225,73 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
 
     private fun setLayout(){
         fIndex = Music.favoriteChecker(musicListPA[songPosition].id)
-        Glide.with(this)
-            .load(musicListPA[songPosition].artUri)
-            .apply(RequestOptions().placeholder(R.drawable.ic_audiobook_cover).centerInside())
-            .into(binding.songImgPA)
         binding.songNamePA.text = musicListPA[songPosition].title
         if(repeat) binding.repeatBtnPA.setColorFilter(ContextCompat.getColor(this,R.color.purple_500))
-        if(min15 || min30 || min60) binding.timerBtnPA.setColorFilter(ContextCompat.getColor(this, R.color.purple_500))
+        if(min15 || min30 || min60) {
+            val checkTimerIcon = ContextCompat.getDrawable(this, R.drawable.timer_check)
+            binding.timerBtnPA.setImageDrawable(checkTimerIcon)
+        }
+
         if(isFavorite) binding.favoriteBtnPA.setImageResource(R.drawable.favourite_icon)
         else binding.favoriteBtnPA.setImageResource(R.drawable.favourite_empty_icon)
+
+        val img = Music.getImgArt(musicListPA[songPosition].path)
+        val image = Music.decodeImage(applicationContext, img)
+        binding.songImgPA.setImageBitmap(image)
+        val bgColor = Music.getDominantColor(image)
+        val optimalContrastColor = Music.getOptimalContrastColor(bgColor)
+        val intermediateColor = Music.getIntermediateColor(bgColor,optimalContrastColor)
+        val intermediateColor2 = Music.getIntermediateColor(bgColor,optimalContrastColor,0.8f)
+
+        val gradient = GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, intArrayOf(bgColor,optimalContrastColor))
+        binding.root.background = gradient
+        window?.statusBarColor = bgColor
+
+        binding.windowTitlePA.setTextColor(bgColor)
+        binding.backBtnPA.imageTintList = ColorStateList.valueOf(bgColor)
+        binding.favoriteBtnPA.imageTintList = ColorStateList.valueOf(bgColor)
+        binding.songNamePA.setTextColor(optimalContrastColor)
+        binding.tvSeekBarStart.setTextColor(optimalContrastColor)
+        binding.tvSeekBarEnd.setTextColor(optimalContrastColor)
+        binding.repeatBtnPA.imageTintList = ColorStateList.valueOf(optimalContrastColor)
+        binding.equalizerBtnPA.imageTintList = ColorStateList.valueOf(optimalContrastColor)
+        when {
+            speed == 0.5f -> { val playSpeedIcon = ContextCompat.getDrawable(this, R.drawable.speed_0_5x_icon)
+                binding.speedBtnPA.setImageDrawable(playSpeedIcon)
+            }
+            speed == 0.75f -> { val playSpeedIcon = ContextCompat.getDrawable(this, R.drawable.speed_0_75x_icon)
+                binding.speedBtnPA.setImageDrawable(playSpeedIcon)
+            }
+            speed == 1.0f -> { val playSpeedIcon = ContextCompat.getDrawable(this, R.drawable.speed_1x_icon)
+                binding.speedBtnPA.setImageDrawable(playSpeedIcon)
+            }
+            speed == 1.5f -> { val playSpeedIcon = ContextCompat.getDrawable(this, R.drawable.speed_1_5x_icon)
+                binding.speedBtnPA.setImageDrawable(playSpeedIcon)
+            }
+            speed == 2.0f -> { val playSpeedIcon = ContextCompat.getDrawable(this, R.drawable.speed_2x_icon)
+                binding.speedBtnPA.setImageDrawable(playSpeedIcon)
+            }
+            else -> {
+                val playSpeedIcon = ContextCompat.getDrawable(this, R.drawable.speed_icon)
+                binding.speedBtnPA.setImageDrawable(playSpeedIcon)
+            }
+        }
+        binding.timerBtnPA.imageTintList = ColorStateList.valueOf(optimalContrastColor)
+        binding.shareBtnPA.imageTintList = ColorStateList.valueOf(optimalContrastColor)
+        binding.speedBtnPA.imageTintList = ColorStateList.valueOf(optimalContrastColor)
+        binding.seekBarPA.thumbTintList = ColorStateList.valueOf(optimalContrastColor)
+        binding.seekBarPA.progressTintList = ColorStateList.valueOf(optimalContrastColor)
+        binding.seekBarPA.progressBackgroundTintList = ColorStateList.valueOf(optimalContrastColor)
+        binding.playPauseBtnPA.iconTint = ColorStateList.valueOf(intermediateColor2)
+        binding.playPauseBtnPA.setBackgroundColor(intermediateColor)
+        binding.forward10PA.iconTint = ColorStateList.valueOf(intermediateColor2)
+        binding.forward10PA.setBackgroundColor(intermediateColor)
+        binding.forward60PA.iconTint = ColorStateList.valueOf(intermediateColor2)
+        binding.forward60PA.setBackgroundColor(intermediateColor)
+        binding.replay10PA.iconTint = ColorStateList.valueOf(intermediateColor2)
+        binding.replay10PA.setBackgroundColor(intermediateColor)
+        binding.replay60PA.iconTint = ColorStateList.valueOf(intermediateColor2)
+        binding.replay60PA.setBackgroundColor(intermediateColor)
     }
 
     private fun createMediaPlayer(){
@@ -402,12 +504,14 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         dialog.show()
         dialog.findViewById<LinearLayout>(R.id.min_15)?.setOnClickListener{
             Toast.makeText(baseContext, R.string.min_15_lit, Toast.LENGTH_SHORT).show()
-            binding.timerBtnPA.setColorFilter(ContextCompat.getColor(this, R.color.purple_500))
+            val checkTimerIcon = ContextCompat.getDrawable(this, R.drawable.timer_check)
+            binding.timerBtnPA.setImageDrawable(checkTimerIcon)
             min15 = true
             Handler(Looper.getMainLooper()).postDelayed({
                 if (min15) {
                     min15=false
-                    binding.timerBtnPA.setColorFilter(ContextCompat.getColor(this, R.color.cool_pink))
+                    val checkTimerIcon = ContextCompat.getDrawable(this, R.drawable.timer_icon)
+                    binding.timerBtnPA.setImageDrawable(checkTimerIcon)
                     pauseMusic()
                 }
             }, (15*60000L))
@@ -415,12 +519,14 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         }
         dialog.findViewById<LinearLayout>(R.id.min_30)?.setOnClickListener{
             Toast.makeText(baseContext, R.string.min_30_lit, Toast.LENGTH_SHORT).show()
-            binding.timerBtnPA.setColorFilter(ContextCompat.getColor(this, R.color.purple_500))
+            val checkTimerIcon = ContextCompat.getDrawable(this, R.drawable.timer_check)
+            binding.timerBtnPA.setImageDrawable(checkTimerIcon)
             min30 = true
             Handler(Looper.getMainLooper()).postDelayed({
                 if (min30) {
                     min30=false
-                    binding.timerBtnPA.setColorFilter(ContextCompat.getColor(this, R.color.cool_pink))
+                    val checkTimerIcon = ContextCompat.getDrawable(this, R.drawable.timer_icon)
+                    binding.timerBtnPA.setImageDrawable(checkTimerIcon)
                     pauseMusic()
                 }
             }, (30*60000L))
@@ -428,12 +534,14 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         }
         dialog.findViewById<LinearLayout>(R.id.min_60)?.setOnClickListener{
             Toast.makeText(baseContext, R.string.min_60_lit, Toast.LENGTH_SHORT).show()
-            binding.timerBtnPA.setColorFilter(ContextCompat.getColor(this, R.color.purple_500))
+            val checkTimerIcon = ContextCompat.getDrawable(this, R.drawable.timer_check)
+            binding.timerBtnPA.setImageDrawable(checkTimerIcon)
             min60 = true
             Handler(Looper.getMainLooper()).postDelayed({
                 if (min60) {
                     min60=false
-                    binding.timerBtnPA.setColorFilter(ContextCompat.getColor(this, R.color.cool_pink))
+                    val checkTimerIcon = ContextCompat.getDrawable(this, R.drawable.timer_icon)
+                    binding.timerBtnPA.setImageDrawable(checkTimerIcon)
                     pauseMusic()
                 }
             }, (60*60000L))
@@ -443,29 +551,48 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
 
 
     private fun showBottomSheetSpeedDialog(){
+        lateinit var bindingDialog: BottomSpeedDialogBinding
+        bindingDialog = BottomSpeedDialogBinding.inflate(layoutInflater)
         val dialog = BottomSheetDialog(this@PlayerActivity)
         dialog.setContentView(R.layout.bottom_speed_dialog)
-        val speed1xText = dialog.findViewById<TextView>(R.id.speed1xText)
-        val speed15xText = dialog.findViewById<TextView>(R.id.speed15xText)
-        val speed2xText = dialog.findViewById<TextView>(R.id.speed2xText)
+        val speed075xText = bindingDialog.speed075xText
+        val speed05xText = bindingDialog.speed05xText
+        val speed1xText = bindingDialog.speed1xText
+        val speed15xText = bindingDialog.speed15xText
+        val speed2xText = bindingDialog.speed2xText
         when (speed) {
+            0.5f -> {
+                speed05xText?.setTextColor(ContextCompat.getColor(this, R.color.purple_700))
+                speed075xText?.setTextColor(ContextCompat.getColor(this, R.color.black))
+                speed15xText?.setTextColor(ContextCompat.getColor(this, R.color.black))
+                speed2xText?.setTextColor(ContextCompat.getColor(this, R.color.black))
+                speed1xText?.setTextColor(ContextCompat.getColor(this, R.color.black))
+            }
+            0.75f -> {
+                speed05xText?.setTextColor(ContextCompat.getColor(this, R.color.black))
+                speed075xText?.setTextColor(ContextCompat.getColor(this, R.color.purple_700))
+                speed15xText?.setTextColor(ContextCompat.getColor(this, R.color.black))
+                speed2xText?.setTextColor(ContextCompat.getColor(this, R.color.black))
+                speed1xText?.setTextColor(ContextCompat.getColor(this, R.color.black))
+            }
             1.0f -> {
+                speed05xText?.setTextColor(ContextCompat.getColor(this, R.color.black))
+                speed075xText?.setTextColor(ContextCompat.getColor(this, R.color.black))
                 speed15xText?.setTextColor(ContextCompat.getColor(this, R.color.black))
                 speed2xText?.setTextColor(ContextCompat.getColor(this, R.color.black))
                 speed1xText?.setTextColor(ContextCompat.getColor(this, R.color.purple_700))
             }
             1.5f -> {
-
-
-
+                speed05xText?.setTextColor(ContextCompat.getColor(this, R.color.black))
+                speed075xText?.setTextColor(ContextCompat.getColor(this, R.color.black))
                 speed15xText?.setTextColor(ContextCompat.getColor(this, R.color.purple_700))
                 speed2xText?.setTextColor(ContextCompat.getColor(this, R.color.black))
                 speed1xText?.setTextColor(ContextCompat.getColor(this, R.color.black))
 
             }
             2.0f -> {
-
-
+                speed05xText?.setTextColor(ContextCompat.getColor(this, R.color.black))
+                speed075xText?.setTextColor(ContextCompat.getColor(this, R.color.black))
                 speed15xText?.setTextColor(ContextCompat.getColor(this, R.color.black))
                 speed2xText?.setTextColor(ContextCompat.getColor(this, R.color.purple_700))
                 speed1xText?.setTextColor(ContextCompat.getColor(this, R.color.black))
@@ -474,23 +601,42 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         }
 
         dialog.show()
-        dialog.findViewById<LinearLayout>(R.id.speed1x)?.setOnClickListener{
-            Toast.makeText(baseContext, R.string.play_speed_at_1x_lit, Toast.LENGTH_SHORT).show()
-            speed=1.0f
-            playMusic()
+        dialog.findViewById<LinearLayout>(R.id.speed05x)?.setOnClickListener{
+            speed=0.5f
             dialog.dismiss()
+            val playSpeedIcon = ContextCompat.getDrawable(this, R.drawable.speed_0_5x_icon)
+            binding.speedBtnPA.setImageDrawable(playSpeedIcon)
+            playMusic()
+
+        }
+        dialog.findViewById<LinearLayout>(R.id.speed075x)?.setOnClickListener{
+            speed=0.75f
+            dialog.dismiss()
+            val playSpeedIcon = ContextCompat.getDrawable(this, R.drawable.speed_0_75x_icon)
+            binding.speedBtnPA.setImageDrawable(playSpeedIcon)
+            playMusic()
+
+        }
+        dialog.findViewById<LinearLayout>(R.id.speed1x)?.setOnClickListener{
+            speed=1.0f
+            dialog.dismiss()
+            val playSpeedIcon = ContextCompat.getDrawable(this, R.drawable.speed_1x_icon)
+            binding.speedBtnPA.setImageDrawable(playSpeedIcon)
+            playMusic()
         }
         dialog.findViewById<LinearLayout>(R.id.speed15x)?.setOnClickListener{
-            Toast.makeText(baseContext, R.string.play_speed_at_15x_lit, Toast.LENGTH_SHORT).show()
             speed=1.5f
-            playMusic()
             dialog.dismiss()
+            val playSpeedIcon = ContextCompat.getDrawable(this, R.drawable.speed_1_5x_icon)
+            binding.speedBtnPA.setImageDrawable(playSpeedIcon)
+            playMusic()
         }
         dialog.findViewById<LinearLayout>(R.id.speed2x)?.setOnClickListener{
-            Toast.makeText(baseContext, R.string.play_speed_at_2x_lit, Toast.LENGTH_SHORT).show()
             speed=2.0f
-            playMusic()
             dialog.dismiss()
+            val playSpeedIcon = ContextCompat.getDrawable(this, R.drawable.speed_2x_icon)
+            binding.speedBtnPA.setImageDrawable(playSpeedIcon)
+            playMusic()
         }
 
     }

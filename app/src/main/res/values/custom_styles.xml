@@ -6,4 +6,14 @@
     <style name="circle">
         <item name="cornerSize">50%</item>
     </style>
+    <style name="smallCircle">
+        <item name="cornerSize">50%</item>
+        <item name="cornerFamily">rounded</item>
+
+    </style>
+    <style name="roundedNoBorder" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">0dp</item> <!-- Sin bordes redondeados -->
+        <item name="strokeWidth">0dp</item> <!-- Sin borde -->
+    </style>
 </resources>
