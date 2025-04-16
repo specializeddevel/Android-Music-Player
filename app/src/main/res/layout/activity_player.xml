@@ -7,7 +7,8 @@
     android:layout_height="match_parent"
     tools:context=".PlayerActivity"
     android:orientation="vertical"
-    android:gravity="center">
+    android:gravity="center"
+    android:weightSum="5">
 
 <!--    First Row-->
     <LinearLayout
@@ -15,22 +16,24 @@
         android:layout_height="0dp"
         android:orientation="horizontal"
         android:gravity="center"
-        android:layout_weight="1">
+        android:layout_weight="0.8">
 
 <!--        Back Button-->
         <ImageButton
             android:id="@+id/backBtnPA"
-            android:layout_width="wrap_content"
-            android:layout_height="40dp"
-            android:src="@drawable/back_icon"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            android:src="@drawable/arrow_back_activity_icon"
             android:background="@android:color/transparent"
             android:layout_marginStart="5dp"
             app:tint="@color/black"
             android:contentDescription="@string/back_btn"
+            android:padding="10dp"
             />
 
 
         <TextView
+            android:id="@+id/windowTitlePA"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:text="@string/world_of_music"
@@ -38,32 +41,41 @@
             android:textSize="20sp"
             android:gravity="center"
             android:layout_weight="1"
+            android:textStyle="bold"
             tools:ignore="NestedWeights" />
 
         <ImageButton
             android:id="@+id/favoriteBtnPA"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
             android:src="@drawable/favourite_empty_icon"
             android:background="@android:color/transparent"
-            android:layout_marginEnd="15dp"
+            android:layout_marginEnd="20dp"
             app:tint="@android:color/holo_red_dark"
             android:contentDescription="@string/favorite_btn"/>
 
     </LinearLayout>
 
-    <com.google.android.material.imageview.ShapeableImageView
-        android:id="@+id/songImgPA"
-            android:layout_width="250dp"
-            android:layout_height="250dp"
-            android:layout_margin="10dp"
-        android:padding="5dp"
-        android:src="@drawable/music_player_icon_splash_screen"
-        app:shapeAppearanceOverlay="@style/curved"
-        app:strokeColor="@color/cool_blue"
-        app:strokeWidth="5dp"
+    <!-- Contenedor para la imagen con proporción cuadrada -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="3.5"
 
-        />
+        android:gravity="center">
+
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/songImgPA"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitCenter"
+            android:adjustViewBounds="true"
+            android:src="@drawable/music_player_icon_splash_screen"
+            app:shapeAppearanceOverlay="@style/roundedNoBorder"
+            android:layout_gravity="center"
+            android:padding="15dp"/>
+
+    </FrameLayout>
 
     <TextView
         android:id="@+id/songNamePA"
@@ -74,7 +86,7 @@
         android:textColor="@color/black"
         android:textSize="18sp"
         android:gravity="center"
-        android:layout_weight="1"/>
+        android:layout_weight="0.5"/>
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -82,7 +94,7 @@
         android:orientation="horizontal"
         android:layout_margin="18dp"
         android:gravity="center"
-        android:layout_weight="1">
+        android:layout_weight="0.2">
 
         <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
             android:id="@+id/previusBtnPA"
@@ -94,7 +106,35 @@
             android:backgroundTint="@color/cool_blue"
             app:iconTint="@color/white"
             android:contentDescription="@string/previous_btn"
+            android:visibility="gone"
             />
+
+        <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+            android:id="@+id/replay60PA"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:icon="@drawable/rewind_60"
+            app:iconSize="41dp"
+            app:shapeAppearanceOverlay="@style/circle"
+            android:backgroundTint="@color/cool_blue"
+            app:iconTint="@color/white"
+            android:contentDescription="@string/next_btn"
+            android:layout_marginRight="10dp"
+            />
+
+        <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+            android:id="@+id/replay10PA"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:icon="@drawable/rewind_10"
+            app:iconSize="41dp"
+            app:shapeAppearanceOverlay="@style/circle"
+            android:backgroundTint="@android:color/white"
+            app:iconTint="@color/black"
+            android:contentDescription="@string/next_btn"
+            />
+
+
 
         <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
             android:id="@+id/playPauseBtnPA"
@@ -108,6 +148,8 @@
             app:shapeAppearanceOverlay="@style/curved"
             android:contentDescription="@string/pause_play_btn"/>
 
+
+
         <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
             android:id="@+id/nextBtnPA"
             android:layout_width="wrap_content"
@@ -117,7 +159,34 @@
             app:shapeAppearanceOverlay="@style/circle"
             android:backgroundTint="@color/cool_blue"
             app:iconTint="@color/white"
-            android:contentDescription="@string/next_btn"/>
+            android:contentDescription="@string/next_btn"
+            android:visibility="gone"/>
+
+        <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+            android:id="@+id/forward10PA"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:icon="@drawable/fast_forward_10"
+            app:iconSize="41dp"
+            app:shapeAppearanceOverlay="@style/circle"
+            android:backgroundTint="@color/cool_blue"
+            app:iconTint="@color/white"
+            android:contentDescription="@string/previous_btn"
+            />
+
+        <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+            android:id="@+id/forward60PA"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:icon="@drawable/fast_forward_60"
+            app:iconSize="41dp"
+            app:shapeAppearanceOverlay="@style/circle"
+            android:backgroundTint="@color/cool_blue"
+            app:iconTint="@color/white"
+            android:contentDescription="@string/next_btn"
+            android:layout_marginLeft="10dp"
+            />
+
 
     </LinearLayout>
 
@@ -126,7 +195,7 @@
     android:layout_height="25sp"
     android:orientation="horizontal"
     android:layout_margin="20sp"
-    android:layout_weight="1"
+    android:layout_weight="0.4"
     android:gravity="center">
 
     <TextView
@@ -171,7 +240,7 @@
             android:background="@android:color/transparent"
             app:tint="@color/cool_pink"
             android:contentDescription="@string/repeat_btn"
-            android:layout_weight="1"
+            android:layout_weight="0.3"
             />
 
         <ImageButton
@@ -198,21 +267,20 @@
             android:id="@+id/shareBtnPA"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:src="@drawable/share_icon"
-            android:background="@android:color/transparent"
-            app:tint="@color/cool_pink"
-            android:contentDescription="@string/share_btn"
             android:layout_weight="1"
-            />
+            android:background="@android:color/transparent"
+            android:contentDescription="@string/share_btn"
+            android:src="@drawable/share_icon"
+            app:tint="@color/cool_pink" />
 
         <ImageButton
             android:id="@+id/speedBtnPA"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:src="@drawable/speed_icon"
+            android:src="@drawable/speed_1x_icon"
             android:background="@android:color/transparent"
             app:tint="@color/cool_pink"
-            android:contentDescription="@string/share_btn"
+            android:contentDescription="@string/play_speed_at_1x_lit"
             android:layout_weight="1"
             />
 
