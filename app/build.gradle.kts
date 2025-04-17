@@ -57,5 +57,6 @@ dependencies {
     implementation("androidx.media:media:1.7.0")
     implementation("net.jthink:jaudiotagger:3.0.1")
     implementation("com.google.code.gson:gson:2.9.0")
+    implementation ("io.github.ParkSangGwon:tedpermission-normal:3.4.2")
 
 }
