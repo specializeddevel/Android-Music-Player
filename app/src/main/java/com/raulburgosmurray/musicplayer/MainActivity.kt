@@ -1,14 +1,14 @@
 package com.raulburgosmurray.musicplayer
 
+import android.Manifest
 import android.annotation.SuppressLint
-import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
-import android.util.Log
+import android.provider.Settings
 import android.view.Menu
 import android.view.View
 import android.widget.Toast
@@ -17,7 +17,6 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
 import androidx.appcompat.widget.Toolbar
-import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -27,13 +26,8 @@ import androidx.drawerlayout.widget.DrawerLayout
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.navigation.NavigationView
-import com.google.gson.GsonBuilder
-import com.google.gson.reflect.TypeToken
-import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.KEY_LAST_AUDIO
-import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.KEY_LAST_POSITION
-import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.PREFS_NAME
+import com.gun0912.tedpermission.PermissionListener
 import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.musicListPA
-import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.musicService
 import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.songPosition
 import com.raulburgosmurray.musicplayer.databinding.ActivityMainBinding
 import java.io.File
@@ -41,7 +35,6 @@ import java.io.File
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
-    private lateinit var permissionManager: PermissionManager
     private lateinit var toogle: ActionBarDrawerToggle
     private lateinit var drawerLayout: DrawerLayout
     private lateinit var navigationView: NavigationView
@@ -49,23 +42,42 @@ class MainActivity : AppCompatActivity() {
 
     private var backPressedTime = 0L
 
-companion object{
-    lateinit var MusicListMA : ArrayList<Music>
-    lateinit var musicListSearch: ArrayList<Music>
-    lateinit var musicAdapter: MusicAdapter
-    var search = false
-}
+    private val REQUIRED_PERMISSIONS = arrayOf(
+        Manifest.permission.FOREGROUND_SERVICE,
+        Manifest.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK,
+        Manifest.permission.READ_EXTERNAL_STORAGE,
+        Manifest.permission.WRITE_EXTERNAL_STORAGE,
+        Manifest.permission.READ_MEDIA_AUDIO
+    )
+
+    private val permissionListener = object : PermissionListener {
+        override fun onPermissionGranted() {
+            // All permissions granted
+            initializeLayout()
+            permissionPassed()
+        }
+
+        override fun onPermissionDenied(deniedPermissions: MutableList<String>?) {
+            // Handle denied permissions
+            showPermissionDeniedDialog(deniedPermissions)
+        }
+    }
+
+    companion object{
+        lateinit var MusicListMA : ArrayList<Music>
+        lateinit var musicListSearch: ArrayList<Music>
+        lateinit var musicAdapter: MusicAdapter
+        var search = false
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        PermissionManager.checkAndRequestPermissions(this, permissionListener)
+    }
 
-        initializeLayout()
-
+    fun permissionPassed(){
         val nowPlaying = binding.nowPlaying
         val recyclerView = binding.musicRV
-
-
-
 
         nowPlaying.viewTreeObserver.addOnGlobalLayoutListener {
             if(nowPlaying.visibility==View.VISIBLE){
@@ -105,7 +117,7 @@ companion object{
                     builder.setTitle("Exit")
                         .setMessage("Do you want to close app?")
                         .setPositiveButton("Yes"){_,_ ->
-                             Music.exitApplication(applicationContext)
+                            Music.exitApplication(applicationContext)
                         }
 
                         .setNegativeButton("No") { dialog, _ ->
@@ -120,28 +132,58 @@ companion object{
             drawerLayout.closeDrawer(GravityCompat.START)
             true
         }
+        //Load favorites
+        Music.loadFavorites(applicationContext)
         //Load last player audiobook
-        val currentId =  Music.loadPlaybackState(applicationContext)?.let {
+        val currentId =  Music.getLastPlayedAudioId(applicationContext)?.let {
             val intent = Intent(this, PlayerActivity::class.java).apply {
-            putExtra("index", musicAdapter.findIndexById(it))
-            putExtra("class", "ContinuePlaying")
+                val index = musicAdapter.findIndexById(it)
+                if (index == -1) Music.exitApplication(applicationContext)
+                putExtra("index", musicAdapter.findIndexById(it))
+                putExtra("class", "ContinuePlaying")
             }
             startActivity(intent)
         }
-        //Load favorites
-        Music.loadFavorites(applicationContext)
-
     }
+
+    private fun showPermissionDeniedDialog(deniedPermissions: List<String>?) {
+        val message = buildString {
+            append("Inaccessible functionality:\n\n")
+            deniedPermissions?.forEach { permission ->
+                when (permission) {
+                    Manifest.permission.READ_MEDIA_AUDIO,
+                    Manifest.permission.READ_EXTERNAL_STORAGE ->
+                        append("• You will not be able to access audio files\n")
+
+                    Manifest.permission.FOREGROUND_SERVICE,
+                    Manifest.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK ->
+                        append("• You will not be able to reproduce in background\n")
+                }
+            }
+            append("\nDo you want to configure permissions now?")
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Required permissions")
+            .setMessage(message)
+            .setPositiveButton("Settings") { _, _ ->
+                openAppSettings()
+            }
+            .setNegativeButton("Not now", null)
+            .show()
+    }
+
+    private fun openAppSettings() {
+        startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.fromParts("package", packageName, null)
+        })
+    }
+
 
     private fun initializeLayout() {
         setTheme(R.style.coolPinkNav)
 
-        permissionManager = PermissionManager(this@MainActivity)
-        permissionManager.requestPermissions()
-
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
 
         //For Nav drawer
         //Makes the status bar transparent
@@ -230,7 +272,7 @@ companion object{
                             path = pathC,
                             artUri = artUriC,
 
-                        )
+                            )
 
                         if(File(music.path).exists())
                             tempList.add(music)
@@ -245,21 +287,21 @@ companion object{
 
     override fun onResume() {
 
-            PlayerActivity.musicService?.mediaPlayer?.let { player ->
+        PlayerActivity.musicService?.mediaPlayer?.let { player ->
 
-                Music.savePlaybackState(
-                    applicationContext,
-                    musicListPA[songPosition].id,
-                    player.currentPosition
-                )
-                Music.saveFavoriteSongs(applicationContext)
-                Thread.sleep(500)
-            }
+            Music.savePlaybackState(
+                applicationContext,
+                musicListPA[songPosition].id,
+                player.currentPosition
+            )
+            Music.saveFavoriteSongs(applicationContext)
+            Thread.sleep(500)
+        }
 
         super.onResume()
-  }
+    }
 
-   override fun onBackPressed() {
+    override fun onBackPressed() {
 
         if (backPressedTime + 2000 > System.currentTimeMillis()) {
             super.onBackPressed()
