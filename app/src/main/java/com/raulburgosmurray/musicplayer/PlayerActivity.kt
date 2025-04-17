@@ -57,12 +57,9 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
     }
 
     enum class SleepTimer(@StringRes val labelResId: Int, val millis: Long, val minutes: Int) {
-        /*MIN_15(R.string.min_15, 15 * 60 * 1000L, 15),
+        MIN_15(R.string.min_15, 15 * 60 * 1000L, 15),
         MIN_30(R.string.min_30, 30 * 60 * 1000L, 30),
-        MIN_60(R.string.min_60, 60 * 60 * 1000L, 60);*/
-        MIN_15(R.string.min_15, 5000, 15),
-        MIN_30(R.string.min_30, 10000, 30),
-        MIN_60(R.string.min_60, 15000, 60);
+        MIN_60(R.string.min_60, 60 * 60 * 1000L, 60);
 
         fun getDisplayName(context: Context): String {
             return context.getString(labelResId)
@@ -139,7 +136,6 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
             skipForward(300000)
             true
         }
-
 
         binding.seekBarPA.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener{
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
@@ -222,6 +218,7 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
     }
 
     private fun setLayout(){
+
         fIndex = Music.favoriteChecker(musicListPA[songPosition].id)
         binding.songNamePA.text = musicListPA[songPosition].title
         if(repeat) binding.repeatBtnPA.setColorFilter(ContextCompat.getColor(this,R.color.purple_500))

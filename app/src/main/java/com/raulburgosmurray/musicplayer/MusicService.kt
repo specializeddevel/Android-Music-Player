@@ -143,7 +143,6 @@ class MusicService: Service(), AudioManager.OnAudioFocusChangeListener {
             PlayerActivity.binding.tvSeekBarEnd.text = formatDuration(mediaPlayer.duration.toLong())
             PlayerActivity.binding.seekBarPA.progress = 0
             PlayerActivity.binding.seekBarPA.max = mediaPlayer.duration
-            //Music.restorePlaybackState(baseContext, PlayerActivity.musicListPA[songPosition].id)
             PlayerActivity.musicService!!.mediaPlayer?.let { player ->
                 Music.restorePlaybackState(applicationContext, PlayerActivity.musicListPA[PlayerActivity.songPosition].id)
             }

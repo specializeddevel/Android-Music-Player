@@ -120,16 +120,18 @@ companion object{
             drawerLayout.closeDrawer(GravityCompat.START)
             true
         }
+        //Load favorites
+        Music.loadFavorites(applicationContext)
         //Load last player audiobook
-        val currentId =  Music.loadPlaybackState(applicationContext)?.let {
+        val currentId =  Music.getLastPlayedAudioId(applicationContext)?.let {
             val intent = Intent(this, PlayerActivity::class.java).apply {
-            putExtra("index", musicAdapter.findIndexById(it))
-            putExtra("class", "ContinuePlaying")
+                val index = musicAdapter.findIndexById(it)
+                if (index == -1) Music.exitApplication(applicationContext)
+                putExtra("index", musicAdapter.findIndexById(it))
+                putExtra("class", "ContinuePlaying")
             }
             startActivity(intent)
         }
-        //Load favorites
-        Music.loadFavorites(applicationContext)
 
     }
 

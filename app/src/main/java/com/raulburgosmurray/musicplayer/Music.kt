@@ -309,14 +309,6 @@ data class Music(
             }
         }
 
-
-
-        fun loadPlaybackState(context: Context) : String? {
-           return Music.getLastPlayedAudioId(context)
-
-
-        }
-
         fun favoriteChecker(id: String): Int {
             PlayerActivity.isFavorite = false
             FavoritesActivity.favoriteSongs.forEachIndexed { index, music ->
