@@ -50,9 +50,9 @@ object PermissionManager {
             .setPermissionListener(listener)
             .setPermissions(*permissionsToRequest)
             .setRationaleTitle("Required permissions")
-            .setRationaleMessage("The application needs some permits to function properly, will be requested below")
+            .setRationaleMessage("This app requires access to your audio files on this device. Please grant the necessary permission to proceed.")
             .setDeniedTitle("Denied permissions")
-            .setDeniedMessage("If you reject permissions, the application may not work.\nPlease allow permissions opening settings")
+            .setDeniedMessage("If you don’t allow the required permissions, the app might not work properly. You can enable them anytime from your device settings")
             .setGotoSettingButton(true)
             .check()
     }
