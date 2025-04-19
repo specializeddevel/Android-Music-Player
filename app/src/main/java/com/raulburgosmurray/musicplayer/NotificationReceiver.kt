@@ -1,6 +1,5 @@
 package com.raulburgosmurray.musicplayer
 
-import android.app.Service.MODE_PRIVATE
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -9,10 +8,7 @@ import android.os.Build
 import com.bumptech.glide.Glide
 import com.bumptech.glide.request.RequestOptions
 import com.raulburgosmurray.musicplayer.NowPlaying.Companion.binding
-import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.KEY_LAST_AUDIO
-import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.KEY_LAST_POSITION
 import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.musicListPA
-import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.musicService
 import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.songPosition
 
 class NotificationReceiver: BroadcastReceiver() {

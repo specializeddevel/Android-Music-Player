@@ -7,7 +7,6 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.content.res.ColorStateList
 import android.graphics.Color
-import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.media.MediaPlayer
 import android.media.PlaybackParams
@@ -15,9 +14,10 @@ import android.media.audiofx.AudioEffect
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
+import android.os.CountDownTimer
 import android.os.IBinder
-import android.os.Looper
+import android.text.Html
+import android.view.View
 import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.TextView
@@ -34,6 +34,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.raulburgosmurray.musicplayer.Music.Companion.formatDuration
 import com.raulburgosmurray.musicplayer.Music.Companion.setSongPosition
 import com.raulburgosmurray.musicplayer.databinding.ActivityPlayerBinding
+import com.raulburgosmurray.musicplayer.databinding.BsSpeedSelectionBinding
 
 class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCompletionListener {
 
@@ -47,13 +48,10 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         var sleepMins = 0
         var speed = 1.0f
         var nowPlayingId: String = ""
-        // Constants for Sharedpreferences
-        val PREFS_NAME = "AudioPrefs"
-        val KEY_LAST_AUDIO = "last_audio"
-        val KEY_LAST_POSITION = "last_position"
         var isResumed = false
         var isFavorite = false
         var fIndex = -1
+        private var sleepTimer: CountDownTimer? = null
     }
 
     enum class SleepTimer(@StringRes val labelResId: Int, val millis: Long, val minutes: Int) {
@@ -168,26 +166,24 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
             }
         }
         binding.timerBtnPA.setOnClickListener {
-            if(sleepMins==0){
                 showBottomSheetDialog()
-            }
-            else {
+            //showTimmerBottomSheetDialog()
+        }
+
+        binding.textTimerOn.setOnClickListener {
                 val builder = MaterialAlertDialogBuilder(this)
-                builder.setTitle("Stop timer")
-                    .setMessage("Do you want to stop timer?")
-                    .setPositiveButton("Yes"){_,_ ->
-                        sleepMins=0
-                        val checkTimerIcon = ContextCompat.getDrawable(this, R.drawable.timer_icon)
-                        binding.timerBtnPA.setImageDrawable(checkTimerIcon)
+                builder.setTitle(getString(R.string.stop_timer))
+                    .setMessage(getString(R.string.do_you_want_to_cancel_the_timer))
+                    .setPositiveButton(R.string.yes){_,_ ->
+                        cancelSleepTimer()
                     }
-                    .setNegativeButton("No") { dialog, _ ->
+                    .setNegativeButton(R.string.no) { dialog, _ ->
                         dialog.dismiss()
                     }
                 val customDialog = builder.create()
                 customDialog.show()
                 customDialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(Color.RED)
                 customDialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(Color.RED)
-            }
         }
 
         binding.shareBtnPA.setOnClickListener {
@@ -195,7 +191,8 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
             shareIntent.action = Intent.ACTION_SEND
             shareIntent.type = "audio/*"
             shareIntent.putExtra(Intent.EXTRA_STREAM, Uri.parse(musicListPA[songPosition].path))
-            startActivity(Intent.createChooser(shareIntent, "Sharing your music file!"))
+            startActivity(Intent.createChooser(shareIntent,
+                getString(R.string.sharing_your_audiobook_file)))
         }
 
         binding.speedBtnPA.setOnClickListener {
@@ -246,20 +243,20 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         binding.tvSeekBarEnd.setTextColor(optimalContrastColor)
         binding.repeatBtnPA.imageTintList = ColorStateList.valueOf(optimalContrastColor)
         binding.equalizerBtnPA.imageTintList = ColorStateList.valueOf(optimalContrastColor)
-        when {
-            speed == 0.5f -> { val playSpeedIcon = ContextCompat.getDrawable(this, R.drawable.speed_0_5x_icon)
+        when (speed) {
+            0.5f -> { val playSpeedIcon = ContextCompat.getDrawable(this, R.drawable.speed_0_5x_icon)
                 binding.speedBtnPA.setImageDrawable(playSpeedIcon)
             }
-            speed == 0.75f -> { val playSpeedIcon = ContextCompat.getDrawable(this, R.drawable.speed_0_75x_icon)
+            0.75f -> { val playSpeedIcon = ContextCompat.getDrawable(this, R.drawable.speed_0_75x_icon)
                 binding.speedBtnPA.setImageDrawable(playSpeedIcon)
             }
-            speed == 1.0f -> { val playSpeedIcon = ContextCompat.getDrawable(this, R.drawable.speed_1x_icon)
+            1.0f -> { val playSpeedIcon = ContextCompat.getDrawable(this, R.drawable.speed_1x_icon)
                 binding.speedBtnPA.setImageDrawable(playSpeedIcon)
             }
-            speed == 1.5f -> { val playSpeedIcon = ContextCompat.getDrawable(this, R.drawable.speed_1_5x_icon)
+            1.5f -> { val playSpeedIcon = ContextCompat.getDrawable(this, R.drawable.speed_1_5x_icon)
                 binding.speedBtnPA.setImageDrawable(playSpeedIcon)
             }
-            speed == 2.0f -> { val playSpeedIcon = ContextCompat.getDrawable(this, R.drawable.speed_2x_icon)
+            2.0f -> { val playSpeedIcon = ContextCompat.getDrawable(this, R.drawable.speed_2x_icon)
                 binding.speedBtnPA.setImageDrawable(playSpeedIcon)
             }
             else -> {
@@ -267,23 +264,16 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
                 binding.speedBtnPA.setImageDrawable(playSpeedIcon)
             }
         }
-        lateinit var playSpeedIcon : Drawable
-        when{
-            sleepMins == 0 -> {
-                playSpeedIcon = ContextCompat.getDrawable(this, R.drawable.timer_icon)!!
-            }
-            sleepMins == SleepTimer.MIN_15.minutes -> {
-                playSpeedIcon = ContextCompat.getDrawable(this, R.drawable.rewind_15)!!
-            }
-            sleepMins == SleepTimer.MIN_30.minutes -> {
-                playSpeedIcon = ContextCompat.getDrawable(this, R.drawable.rewind_30)!!
-            }
-            sleepMins == SleepTimer.MIN_60.minutes -> {
-                playSpeedIcon = ContextCompat.getDrawable(this, R.drawable.rewind_60)!!
-            }
+        binding.timerBtnPA.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.timer_icon))
+        if(sleepMins==0) {
+            binding.timerBtnPA.visibility = View.VISIBLE
+            binding.textTimerOn.visibility = View.GONE
+        } else {
+            binding.timerBtnPA.visibility = View.GONE
+            binding.textTimerOn.visibility = View.VISIBLE
         }
-        binding.timerBtnPA.setImageDrawable(playSpeedIcon)
         binding.timerBtnPA.imageTintList = ColorStateList.valueOf(optimalContrastColor)
+        binding.textTimerOn.setTextColor(optimalContrastColor)
         binding.shareBtnPA.imageTintList = ColorStateList.valueOf(optimalContrastColor)
         binding.speedBtnPA.imageTintList = ColorStateList.valueOf(optimalContrastColor)
         binding.seekBarPA.thumbTintList = ColorStateList.valueOf(optimalContrastColor)
@@ -509,56 +499,98 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
             return
     }
 
+    private lateinit var bsSheetBinding: BsSpeedSelectionBinding
+
+    private fun showTimmerBottomSheetDialog() {
+        bsSheetBinding = BsSpeedSelectionBinding.inflate(layoutInflater)
+        val dialog = BottomSheetDialog(this).apply {
+            setContentView(bsSheetBinding.root)
+        }
+
+        dialog.show()
+    }
+
     private fun showBottomSheetDialog(){
         val dialog = BottomSheetDialog(this@PlayerActivity)
         dialog.setContentView(R.layout.bottom_sheet_dialog)
         dialog.show()
-        dialog.findViewById<LinearLayout>(R.id.min_15)?.setOnClickListener{
-            Toast.makeText(baseContext, R.string.min_15_lit, Toast.LENGTH_SHORT).show()
-            val checkTimerIcon = ContextCompat.getDrawable(this, R.drawable.rewind_15)
-            binding.timerBtnPA.setImageDrawable(checkTimerIcon)
-            sleepMins=SleepTimer.MIN_15.minutes
-            Handler(Looper.getMainLooper()).postDelayed({
-                if (sleepMins==SleepTimer.MIN_15.minutes) {
-                    sleepMins=0
-                    val checkTimerIcon = ContextCompat.getDrawable(this, R.drawable.timer_icon)
-                    binding.timerBtnPA.setImageDrawable(checkTimerIcon)
+        dialog.findViewById<LinearLayout>(R.id.min_15)?.setOnClickListener {
+            // Cancel previous timer if it exists
+            cancelSleepTimer()
+            binding.timerBtnPA.visibility = View.GONE
+            binding.textTimerOn.visibility = View.VISIBLE
+            sleepMins=15
+
+            val totalTimeMillis = SleepTimer.MIN_15.millis
+            sleepTimer = object : CountDownTimer(totalTimeMillis, 1000) {
+                override fun onTick(millisUntilFinished: Long) {
+                    // Update the textView with the remaining time
+                    binding.textTimerOn.text = String.format(Music.formatTime(millisUntilFinished))
+                }
+
+                override fun onFinish() {
+                    cancelSleepTimer()
                     pauseMusic()
                 }
-            }, (SleepTimer.MIN_15.millis))
+            }.start()
+
             dialog.dismiss()
         }
-        dialog.findViewById<LinearLayout>(R.id.min_30)?.setOnClickListener{
-            Toast.makeText(baseContext, R.string.min_30_lit, Toast.LENGTH_SHORT).show()
-            val checkTimerIcon = ContextCompat.getDrawable(this, R.drawable.rewind_30)
-            binding.timerBtnPA.setImageDrawable(checkTimerIcon)
-            sleepMins = SleepTimer.MIN_30.minutes
-            Handler(Looper.getMainLooper()).postDelayed({
-                if (sleepMins==SleepTimer.MIN_30.minutes) {
-                    sleepMins=0
-                    val checkTimerIcon = ContextCompat.getDrawable(this, R.drawable.timer_icon)
-                    binding.timerBtnPA.setImageDrawable(checkTimerIcon)
+        dialog.findViewById<LinearLayout>(R.id.min_30)?.setOnClickListener {
+            // Cancel previous timer if it exists
+            cancelSleepTimer()
+            binding.timerBtnPA.visibility = View.GONE
+            binding.textTimerOn.visibility = View.VISIBLE
+            sleepMins=30
+
+            val totalTimeMillis = SleepTimer.MIN_30.millis
+            sleepTimer = object : CountDownTimer(totalTimeMillis, 1000) {
+                override fun onTick(millisUntilFinished: Long) {
+                    // Update the textView with the remaining time
+                    binding.textTimerOn.text = String.format(Music.formatTime(millisUntilFinished))
+                }
+
+                override fun onFinish() {
+                   cancelSleepTimer()
                     pauseMusic()
                 }
-            }, (SleepTimer.MIN_30.millis))
+            }.start()
             dialog.dismiss()
         }
-        dialog.findViewById<LinearLayout>(R.id.min_60)?.setOnClickListener{
-            Toast.makeText(baseContext, R.string.min_60_lit, Toast.LENGTH_SHORT).show()
-            val checkTimerIcon = ContextCompat.getDrawable(this, R.drawable.rewind_60)
-            binding.timerBtnPA.setImageDrawable(checkTimerIcon)
-            sleepMins = SleepTimer.MIN_60.minutes
-            Handler(Looper.getMainLooper()).postDelayed({
-                if (sleepMins==SleepTimer.MIN_60.minutes) {
-                    sleepMins=0
-                    val checkTimerIcon = ContextCompat.getDrawable(this, R.drawable.timer_icon)
-                    binding.timerBtnPA.setImageDrawable(checkTimerIcon)
+        dialog.findViewById<LinearLayout>(R.id.min_60)?.setOnClickListener {
+            // Cancel previous timer if it exists
+            cancelSleepTimer()
+            binding.timerBtnPA.visibility = View.GONE
+            binding.textTimerOn.visibility = View.VISIBLE
+            sleepMins=60
+
+            val totalTimeMillis = SleepTimer.MIN_60.millis
+            sleepTimer = object : CountDownTimer(totalTimeMillis, 1000) {
+                override fun onTick(millisUntilFinished: Long) {
+                    // Update the textView with the remaining time
+                    binding.textTimerOn.text = Music.formatTime(millisUntilFinished)
+                }
+
+                override fun onFinish() {
+                    cancelSleepTimer()
                     pauseMusic()
                 }
-            }, (SleepTimer.MIN_60.millis))
+            }.start()
             dialog.dismiss()
         }
     }
+
+    fun cancelSleepTimer() {
+        sleepTimer?.cancel()
+        sleepMins = 0
+        sleepTimer = null
+        binding.textTimerOn.text = ""
+        val icon = ContextCompat.getDrawable(this, R.drawable.timer_icon)
+        binding.timerBtnPA.setImageDrawable(icon)
+        binding.textTimerOn.visibility = View.GONE
+        binding.timerBtnPA.visibility = View.VISIBLE
+    }
+
 
 
     private fun showBottomSheetSpeedDialog(){

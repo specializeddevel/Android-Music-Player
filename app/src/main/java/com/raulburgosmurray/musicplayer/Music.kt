@@ -3,25 +3,19 @@ package com.raulburgosmurray.musicplayer
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Color
 import android.media.MediaMetadataRetriever
-import android.net.Uri
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity.MODE_PRIVATE
-
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
-import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.KEY_LAST_AUDIO
-import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.KEY_LAST_POSITION
-import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.PREFS_NAME
+import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.musicListPA
 import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.musicService
+import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.songPosition
 import java.io.File
 import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
-
-import android.graphics.Color
-import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.musicListPA
-import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.songPosition
 
 data class Music(
     val id: String,
@@ -57,17 +51,6 @@ data class Music(
             }
         }
 
-        // Save the current position in shared preferences
-        fun savePlaybackStateInShared(context: Context, audioId: String, position: Int) {
-            val prefs = context.getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-            prefs.edit()
-                .putString(KEY_LAST_AUDIO, audioId)
-                .putInt(KEY_LAST_POSITION, position- backInMiliseconds)
-                .apply()
-        }
-
-
-
         // Recupera el estado desde el archivo JSON
         fun restorePlaybackState(context: Context, audioId: String): Int {
             return try {
@@ -88,16 +71,6 @@ data class Music(
             }
         }
 
-        fun restorePlaybackStateInShared(context: Context, audioId: String) {
-            val prefs = context.getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-            val lastAudioId = prefs.getString(KEY_LAST_AUDIO, null)
-            val lastPosition = prefs.getInt(KEY_LAST_POSITION, 0)
-
-            if (lastAudioId == audioId && lastPosition > 0) {
-                PlayerActivity.musicService!!.mediaPlayer.seekTo(lastPosition)
-            }
-        }
-
         // Obtiene el último audio reproducido (opcional)
         fun getLastPlayedAudioId(context: Context): String? {
             val files = getPlaybackStatesDir(context).listFiles()
@@ -114,6 +87,13 @@ data class Music(
                 String.format("%02d:%02d", minutes, seconds)
             }
         }
+
+        fun formatTime(millis: Long): String {
+            val minutes = millis / 1000 / 60
+            val seconds = (millis / 1000) % 60
+            return String.format("%02d:%02d", minutes, seconds)
+        }
+
 
         fun getImgArt(path: String): ByteArray? {
             val retriever = MediaMetadataRetriever()

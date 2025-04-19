@@ -148,27 +148,27 @@ class MainActivity : AppCompatActivity() {
 
     private fun showPermissionDeniedDialog(deniedPermissions: List<String>?) {
         val message = buildString {
-            append("Inaccessible functionality:\n\n")
+            append(getString(R.string.inaccessible_functionality))
             deniedPermissions?.forEach { permission ->
                 when (permission) {
                     Manifest.permission.READ_MEDIA_AUDIO,
                     Manifest.permission.READ_EXTERNAL_STORAGE ->
-                        append("• You will not be able to access audio files\n")
+                        append(getString(R.string.you_will_not_be_able_to_access_audio_files))
 
                     Manifest.permission.FOREGROUND_SERVICE,
                     Manifest.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK ->
-                        append("• You will not be able to reproduce in background\n")
+                        append(getString(R.string.you_will_not_be_able_to_reproduce_in_background))
                 }
             }
-            append("\nDo you want to configure permissions now?")
+            append(getString(R.string.do_you_want_to_configure_permissions_now))
         }
         MaterialAlertDialogBuilder(this)
-            .setTitle("Required permissions")
+            .setTitle(getString(R.string.required_permissions))
             .setMessage(message)
-            .setPositiveButton("Settings") { _, _ ->
+            .setPositiveButton(getString(R.string.settings)) { _, _ ->
                 openAppSettings()
             }
-            .setNegativeButton("Not now", null)
+            .setNegativeButton(getString(R.string.not_now), null)
             .show()
     }
 
@@ -210,7 +210,7 @@ class MainActivity : AppCompatActivity() {
         binding.musicRV.layoutManager = LinearLayoutManager(this@MainActivity)
         musicAdapter = MusicAdapter(this@MainActivity, MusicListMA)
         binding.musicRV.adapter = musicAdapter
-        binding.totalSongs.text = "Total Songs: " + musicAdapter.itemCount
+        binding.totalSongs.text = getString(R.string.total_songs) + " " + musicAdapter.itemCount
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.DrawerLayout)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())

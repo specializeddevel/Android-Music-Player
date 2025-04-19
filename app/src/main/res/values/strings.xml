@@ -3,7 +3,7 @@
     <string name="shuffle_btn">Shuffle</string>
     <string name="favourites_btn">Favorites</string>
     <string name="playlist_btn">Playlist</string>
-    <string name="total_songs">Total Songs</string>
+    <string name="total_songs">Total Songs: </string>
     <string name="world_of_music">World of Music</string>
     <string name="song_name">Song Name</string>
     <string name="back_btn">Back</string>
@@ -51,6 +51,19 @@
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>
     <string name="press_back_again_to_exit">Press back again to exit</string>
+    <string name="do_you_want_to_configure_permissions_now">\nDo you want to configure permissions now?</string>
+    <string name="you_will_not_be_able_to_access_audio_files">• You will not be able to access audio files\n</string>
+    <string name="you_will_not_be_able_to_reproduce_in_background">• You will not be able to reproduce in background\n</string>
+    <string name="inaccessible_functionality">Inaccessible functionality:\n\n</string>
+    <string name="required_permissions">Required permissions</string>
+    <string name="not_now">Not now</string>
+    <string name="stop_timer">Stop timer</string>
+    <string name="do_you_want_to_cancel_the_timer">Do you want to cancel the timer?</string>
+    <string name="sharing_your_audiobook_file">Sharing your audiobook file!</string>
 
+    <string name="timer_button_text_45"><![CDATA[
+    <font size="28" face="sans-serif-medium"><b>45</b></font><br/>
+    <font size="14">min</font>
+]]></string>
 
 </resources>
