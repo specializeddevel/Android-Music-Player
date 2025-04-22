@@ -14,25 +14,106 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Sleep timer"
-        android:textSize="32dp"
+        android:textSize="25dp"
         android:textStyle="bold"
         android:textColor="@color/white"
         android:paddingBottom="10dp"/>
 
-<LinearLayout
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:orientation="horizontal">
 
-        <include
-            layout="@layout/timer_button_custom"
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn45"
+            style="@style/MultilineTextButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            app:numberText="88"
-            app:unitText="minutos"
+            android:text="45\nmin"
+            />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn60"
+            style="@style/MultilineTextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="60\nmin"
+            />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn90"
+            style="@style/MultilineTextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="90\nmin"
+            />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn120"
+            style="@style/MultilineTextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="120\nmin"
+            />
+    </LinearLayout>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn5"
+            style="@style/MultilineTextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="5\nmin"
+            />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn10"
+            style="@style/MultilineTextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="10\nmin"
+            />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn15"
+            style="@style/MultilineTextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="15\nmin"
+            />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn30"
+            style="@style/MultilineTextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="30\nmin"
             />
 
 
+    </LinearLayout>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnChapEnd"
+            style="@style/MultilineTextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Chapter end"
+            />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnNone"
+            style="@style/MultilineTextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="None"
+            />
     </LinearLayout>
 </LinearLayout>

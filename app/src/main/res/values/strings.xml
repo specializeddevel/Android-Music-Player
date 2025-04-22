@@ -26,12 +26,22 @@
     <string name="about">About</string>
     <string name="exit">Exit</string>
     <string name="song_album">Song Album</string>
+    <string name="min_5">5 Minutes</string>
+    <string name="min_10">10 Minutes</string>
     <string name="min_15">15 Minutes</string>
     <string name="min_30">30 Minutes</string>
+    <string name="min_45">45 Minutes</string>
     <string name="min_60">60 Minutes</string>
+    <string name="min_90">90 Minutes</string>
+    <string name="min_120">120 Minutes</string>
+    <string name="min_5_lit">Music will stop after 5 minutes</string>
+    <string name="min_10_lit">Music will stop after 10 minutes</string>
     <string name="min_15_lit">Music will stop after 15 minutes</string>
     <string name="min_30_lit">Music will stop after 30 minutes</string>
+    <string name="min_45_lit">Music will stop after 60 minutes</string>
     <string name="min_60_lit">Music will stop after 60 minutes</string>
+    <string name="min_90_lit">Music will stop after 90 minutes</string>
+    <string name="min_120_lit">Music will stop after 120 minutes</string>
     <string name="play_speed_at_05x">Play speed at 0.5x</string>
     <string name="play_speed_at_07x">Play speed at 0.7x</string>
     <string name="play_speed_at_1x">Play speed at 1.0x</string>
@@ -61,9 +71,7 @@
     <string name="do_you_want_to_cancel_the_timer">Do you want to cancel the timer?</string>
     <string name="sharing_your_audiobook_file">Sharing your audiobook file!</string>
 
-    <string name="timer_button_text_45"><![CDATA[
-    <font size="28" face="sans-serif-medium"><b>45</b></font><br/>
-    <font size="14">min</font>
-]]></string>
+    <string name="min_endchap">Chapter end</string>
+    <string name="min_none">None</string>
 
 </resources>

@@ -24,26 +24,28 @@ data class Music(
     val artist: String,
     val duration: Long = 0,
     val path: String,
-    val artUri: String,
+    val artUri: String?,
+    val trackMore: String? = null,
+    val comment: String? = null
 
 ) {
     companion object {
 
-        var backInMiliseconds = 5000;
+        private const val BACK_IN_MILLISECONDS = 2000;
         private const val FOLDER_NAME = "playback_states"
         private val gson = Gson()
 
-        // Obtiene el directorio donde se guardarán los estados
+        //Obtains the directory where the states will be saved
         private fun getPlaybackStatesDir(context: Context): File {
             return File(context.filesDir, FOLDER_NAME).apply {
                 if (!exists()) mkdir()
             }
         }
 
-        // Guarda el estado en un archivo JSON
+        // Save the State in a JSON file
         fun savePlaybackState(context: Context, audioId: String, position: Int) {
             try {
-                val state = PlaybackState(audioId, position - backInMiliseconds)
+                val state = PlaybackState(audioId, position - BACK_IN_MILLISECONDS)
                 val file = File(getPlaybackStatesDir(context), "$audioId.json")
                 file.writeText(gson.toJson(state))
             } catch (e: Exception) {
@@ -51,7 +53,7 @@ data class Music(
             }
         }
 
-        // Recupera el estado desde el archivo JSON
+        // Recover the State from the JSON file
         fun restorePlaybackState(context: Context, audioId: String): Int {
             return try {
                 val file = File(getPlaybackStatesDir(context), "$audioId.json")
@@ -71,7 +73,7 @@ data class Music(
             }
         }
 
-        // Obtiene el último audio reproducido (opcional)
+        // Get the last audio reproduced
         fun getLastPlayedAudioId(context: Context): String? {
             val files = getPlaybackStatesDir(context).listFiles()
             return files?.maxByOrNull { it.lastModified() }?.nameWithoutExtension
@@ -101,127 +103,9 @@ data class Music(
             return retriever.embeddedPicture
         }
 
-        fun getDominantColor(bitmap: Bitmap, sampleSize: Int = 10): Int {
-            // Reduce size for analysis but maintain a representative sample
-            val scaledWidth = bitmap.width / sampleSize
-            val scaledHeight = bitmap.height / sampleSize
 
-            val scaledBitmap = Bitmap.createScaledBitmap(bitmap, scaledWidth, scaledHeight, false)
 
-            // Map to count the frequency of each color
-            val colorFrequency = mutableMapOf<Int, Int>()
-            var dominantColor = 0
-            var maxCount = 0
 
-            // Analyze pixels of the scaled image
-            for (x in 0 until scaledWidth) {
-                for (y in 0 until scaledHeight) {
-                    val pixel = scaledBitmap.getPixel(x, y)
-
-                    // Ignore completely transparent pixels
-                    if (Color.alpha(pixel) < 50) continue
-
-                    // Round the color to group similar tones
-                    val roundedColor = roundColor(pixel)
-
-                    // Update the frequency counter
-                    val count = colorFrequency.getOrDefault(roundedColor, 0) + 1
-                    colorFrequency[roundedColor] = count
-
-                    // Update the dominant color if we find one more frequent
-                    if (count > maxCount) {
-                        maxCount = count
-                        dominantColor = roundedColor
-                    }
-                }
-            }
-
-            scaledBitmap.recycle()
-            return dominantColor
-        }
-
-        private fun roundColor(color: Int): Int {
-            // Group color components to consider similar tones as equals
-            val tolerance = 20
-            val a = Color.alpha(color)
-            val r = (Color.red(color) / tolerance) * tolerance
-            val g = (Color.green(color) / tolerance) * tolerance
-            val b = (Color.blue(color) / tolerance) * tolerance
-            return Color.argb(a, r, g, b)
-        }
-
-        fun getInverseColor(color: Int): Int {
-            val alpha = Color.alpha(color)
-            val red = 255 - Color.red(color)
-            val green = 255 - Color.green(color)
-            val blue = 255 - Color.blue(color)
-            return Color.argb(alpha, red, green, blue)
-        }
-
-        fun getOptimalContrastColor(backgroundColor: Int): Int {
-            // Calcular luminancia relativa (según WCAG 2.1)
-            val luminance = calculateLuminance(backgroundColor)
-
-            // Determinar color óptimo basado en umbral de luminancia
-            return if (luminance > 0.179) {
-                Color.BLACK  // Usar negro para fondos claros
-            } else {
-                Color.WHITE  // Usar blanco para fondos oscuros
-            }
-        }
-
-        fun calculateLuminance(color: Int): Double {
-            val red = Color.red(color) / 255.0
-            val green = Color.green(color) / 255.0
-            val blue = Color.blue(color) / 255.0
-
-            // Aplicar factores de corrección gamma
-            val r = if (red <= 0.03928) red / 12.92 else Math.pow((red + 0.055) / 1.055, 2.4)
-            val g = if (green <= 0.03928) green / 12.92 else Math.pow((green + 0.055) / 1.055, 2.4)
-            val b = if (blue <= 0.03928) blue / 12.92 else Math.pow((blue + 0.055) / 1.055, 2.4)
-
-            // Fórmula de luminancia relativa WCAG
-            return 0.2126 * r + 0.7152 * g + 0.0722 * b
-        }
-
-        fun getIntermediateColor(color1: Int, color2: Int, ratio: Float = 0.5f): Int {
-            // Validar que el ratio esté entre 0 y 1
-            val clampedRatio = ratio.coerceIn(0f, 1f)
-
-            // Obtener componentes ARGB del primer color
-            val a1 = Color.alpha(color1)
-            val r1 = Color.red(color1)
-            val g1 = Color.green(color1)
-            val b1 = Color.blue(color1)
-
-            // Obtener componentes ARGB del segundo color
-            val a2 = Color.alpha(color2)
-            val r2 = Color.red(color2)
-            val g2 = Color.green(color2)
-            val b2 = Color.blue(color2)
-
-            // Calcular componentes intermedios
-            val a = (a1 + (a2 - a1) * clampedRatio).toInt()
-            val r = (r1 + (r2 - r1) * clampedRatio).toInt()
-            val g = (g1 + (g2 - g1) * clampedRatio).toInt()
-            val b = (b1 + (b2 - b1) * clampedRatio).toInt()
-
-            // Devolver el color resultante
-            return Color.argb(a, r, g, b)
-        }
-
-        fun decodeImage(context: Context, image: ByteArray?): Bitmap {
-            val img = Music.getImgArt(musicListPA[songPosition].path)
-            val image = if (img != null) {
-                BitmapFactory.decodeByteArray(img, 0, img.size)
-            } else {
-                BitmapFactory.decodeResource(
-                    context.resources,
-                    R.drawable.music_player_icon_splash_screen
-                )
-            }
-            return image
-        }
 
         fun exitApplication(context: Context) {
 
