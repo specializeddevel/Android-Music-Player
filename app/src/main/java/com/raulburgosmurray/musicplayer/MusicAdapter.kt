@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.MediaStore
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
@@ -26,6 +27,7 @@ class MusicAdapter(private val context: Context, private var musicList: ArrayLis
     class MyHolder(binding: MusicViewBinding): RecyclerView.ViewHolder(binding.root) {
         val title = binding.songNameMV
         val album = binding.songAlbumMV
+        val artist = binding.songArtistMV
         val image = binding.imageMV
         val duration = binding.songDuration
         val id = binding.songIdMV
@@ -47,7 +49,12 @@ class MusicAdapter(private val context: Context, private var musicList: ArrayLis
 
     override fun onBindViewHolder(holder: MyHolder, position: Int) {
         holder.title.text = musicList[position].title
-        holder.album.text = musicList[position].album
+        holder.artist.text = musicList[position].artist
+        if(musicList[position].album.isNullOrEmpty() || (musicList[position].album.trim().lowercase() == musicList[position].title.trim().lowercase())){
+            holder.album.visibility = View.GONE
+        } else {
+            holder.album.text = musicList[position].album
+        }
         holder.duration.text = Music.formatDuration(musicList[position].duration)
         Glide.with(context)
             .load(musicList[position].artUri)
@@ -59,7 +66,7 @@ class MusicAdapter(private val context: Context, private var musicList: ArrayLis
             holder.title.setTextColor(ContextCompat.getColor(context, R.color.cool_pink))
             currentlyPlayingHolder = holder
         } else {
-            holder.title.setTextColor(ContextCompat.getColor(context, R.color.black)) // or any default color
+            holder.title.setTextColor(ContextCompat.getColor(context, R.color.black))
         }
 
         holder.root.setOnClickListener {

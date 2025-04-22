@@ -59,4 +59,5 @@ dependencies {
     implementation("com.google.code.gson:gson:2.9.0")
     implementation ("io.github.ParkSangGwon:tedpermission-normal:3.4.2")
 
+
 }

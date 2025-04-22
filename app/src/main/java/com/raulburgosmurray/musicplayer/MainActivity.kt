@@ -2,6 +2,8 @@ package com.raulburgosmurray.musicplayer
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.ContentUris
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
@@ -9,6 +11,7 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.provider.Settings
+import android.util.Log
 import android.view.Menu
 import android.view.View
 import android.widget.Toast
@@ -30,6 +33,12 @@ import com.gun0912.tedpermission.PermissionListener
 import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.musicListPA
 import com.raulburgosmurray.musicplayer.PlayerActivity.Companion.songPosition
 import com.raulburgosmurray.musicplayer.databinding.ActivityMainBinding
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
+import org.jaudiotagger.audio.AudioFileIO
+import org.jaudiotagger.tag.FieldKey
 import java.io.File
 
 class MainActivity : AppCompatActivity() {
@@ -202,7 +211,7 @@ class MainActivity : AppCompatActivity() {
         search = false
 
         //For ReciclerView
-        MusicListMA = getAllAudio()
+        MusicListMA = getAllAudio(this)
 
 
         binding.musicRV.setHasFixedSize(true)
@@ -222,8 +231,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     @SuppressLint("Recycle", "Range")
-    private fun getAllAudio(): ArrayList<Music>{
+    fun getAllAudio(context: Context): ArrayList<Music> {
         val tempList = ArrayList<Music>()
+        val contentResolver = context.contentResolver
+
         val selection = MediaStore.Audio.Media.MIME_TYPE + " LIKE 'audio/%' AND " + MediaStore.Audio.Media.ALBUM + " NOT LIKE 'WhatsApp%'"
         val projection = arrayOf(
             MediaStore.Audio.Media._ID,
@@ -231,38 +242,38 @@ class MainActivity : AppCompatActivity() {
             MediaStore.Audio.Media.ALBUM,
             MediaStore.Audio.Media.ARTIST,
             MediaStore.Audio.Media.DURATION,
-            MediaStore.Audio.Media.DATE_ADDED,
             MediaStore.Audio.Media.DATA,
             MediaStore.Audio.Media.ALBUM_ID
         )
+
         val collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
         } else {
-            // For Android <10, use the traditional URI (may not include the SD card)
             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
         }
-        val cursor = this.contentResolver.query(
+
+        val cursor = contentResolver.query(
             collection,
             projection,
             selection,
             null,
             MediaStore.Audio.Media.DATE_ADDED + " DESC",
-            null)
-        if(cursor != null) {
+            null
+        )
+
+        if (cursor != null) {
             if (cursor.moveToFirst()) {
                 do {
-                    val titleC = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.TITLE)) ?: "Unknown"
-                    val idC = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media._ID)) ?: "Unknown"
-                    val albumC = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.ALBUM)) ?: "Unknown"
-                    val artistC = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.ARTIST)) ?: "Unknown"
-                    val durationC = cursor.getLong(cursor.getColumnIndex(MediaStore.Audio.Media.DURATION))
-                    val pathC = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.DATA))
-                    val albumIdC = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.ALBUM_ID)).toString()
-                    val uri = Uri.parse("content://media/external/audio/albumart")
-                    val artUriC = Uri.withAppendedPath(uri, albumIdC).toString()
-                    val uriC = Uri.withAppendedPath(uri, albumIdC)
+                    val titleC = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)) ?: "Unknown"
+                    val idC = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)) ?: "Unknown"
+                    val albumC = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)) ?: "Unknown"
+                    val artistC = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)) ?: "Unknown"
+                    val durationC = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION))
+                    val pathC = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA))
+                    val albumIdC = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)) ?: "0" //Evita errores si albumId es nulo
+                    val artUriC = ContentUris.withAppendedId(Uri.parse("content://media/external/audio/albumart"), albumIdC.toLong()).toString() //Use ContentUris to build album art Uri
 
-                    if (durationC > 10000 && !pathC.contains("WhatsApp")) {
+                    if (durationC > 10000 && !pathC.contains("WhatsApp") && File(pathC).exists()) {
                         val music = Music(
                             id = idC,
                             title = titleC,
@@ -270,19 +281,47 @@ class MainActivity : AppCompatActivity() {
                             artist = artistC,
                             duration = durationC,
                             path = pathC,
-                            artUri = artUriC,
-
-                            )
-
-                        if(File(music.path).exists())
-                            tempList.add(music)
+                            artUri = artUriC
+                        )
+                        tempList.add(music)
                     }
                 } while (cursor.moveToNext())
             }
             cursor.close()
         }
         tempList.sortBy { it.title }
-        return tempList
+
+        // Ahora, extrae los metadatos adicionales de cada archivo
+        val musicListWithMetadata = tempList.map { music ->
+            // Lanza una Coroutine para leer los metadatos de forma asíncrona
+            CoroutineScope(Dispatchers.IO).async {
+                try {
+                    val audioFile = AudioFileIO.read(File(music.path))
+                    val tag = audioFile.tag
+
+                    // Extrae el comentario
+                    val comment = tag.getFirst(FieldKey.COMMENT)
+
+                    // Intenta extraer "TRACK_MORE" (puede que no sea un FieldKey estándar)
+                    val trackMore = try {
+                        tag.getFirst("Track_More")
+                    } catch (e: Exception) {
+                        null // Si no existe el campo, devuelve null
+                    }
+
+                    // Devuelve un nuevo objeto Music con los metadatos adicionales
+
+                    music.copy(comment = comment, trackMore = trackMore)
+                } catch (e: Exception) {
+                    Log.e("AudioMetadata", "Error reading metadata from ${music.path}: ${e.message}")
+                    music // En caso de error, devuelve el objeto original sin metadatos
+                }
+            }
+        }.map { deferred ->
+            runBlocking { deferred.await() } // Espera a que cada coroutine termine
+        }
+
+        return ArrayList(musicListWithMetadata) // Devuelve la lista actualizada
     }
 
     override fun onResume() {
@@ -316,14 +355,6 @@ class MainActivity : AppCompatActivity() {
         Music.exitApplication(applicationContext)
         super.onDestroy()
     }
-
-    override fun onStart() {
-
-        super.onStart()
-
-    }
-
-
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         menuInflater.inflate(R.menu.search_view_menu, menu)

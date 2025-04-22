@@ -6,7 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.res.ColorStateList
-import android.graphics.Color
+import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.media.MediaPlayer
 import android.media.PlaybackParams
@@ -16,7 +16,11 @@ import android.os.Build
 import android.os.Bundle
 import android.os.CountDownTimer
 import android.os.IBinder
-import android.text.Html
+import android.text.Spannable
+import android.text.SpannableString
+import android.text.style.AbsoluteSizeSpan
+import android.text.style.StyleSpan
+import android.util.TypedValue
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.SeekBar
@@ -24,17 +28,21 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.annotation.StringRes
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.google.android.material.bottomsheet.BottomSheetDialog
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.button.MaterialButton
 import com.raulburgosmurray.musicplayer.Music.Companion.formatDuration
 import com.raulburgosmurray.musicplayer.Music.Companion.setSongPosition
 import com.raulburgosmurray.musicplayer.databinding.ActivityPlayerBinding
 import com.raulburgosmurray.musicplayer.databinding.BsSpeedSelectionBinding
+
+private const val ONE_MINUTE = 60000
+private const val TEN_SECONDS = 10000
+private const val THIRTY_SECONDS = 30000
+private const val FIVE_MINUTES = 300000
 
 class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCompletionListener {
 
@@ -55,9 +63,16 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
     }
 
     enum class SleepTimer(@StringRes val labelResId: Int, val millis: Long, val minutes: Int) {
+        MIN_END_CHAPTER(R.string.min_endchap, 0, -1),
+        MIN_NOME(R.string.min_none, 0, 0),
+        MIN_5(R.string.min_5, 5 * 60 * 1000L, 5),
+        MIN_10(R.string.min_10, 10 * 60 * 1000L, 10),
         MIN_15(R.string.min_15, 15 * 60 * 1000L, 15),
         MIN_30(R.string.min_30, 30 * 60 * 1000L, 30),
-        MIN_60(R.string.min_60, 60 * 60 * 1000L, 60);
+        MIN_45(R.string.min_45, 45 * 60 * 1000L, 45),
+        MIN_60(R.string.min_60, 60 * 60 * 1000L, 60),
+        MIN_90(R.string.min_90, 90 * 60 * 1000L, 90),
+        MIN_120(R.string.min_120, 120 * 60 * 1000L, 120);
 
         fun getDisplayName(context: Context): String {
             return context.getString(labelResId)
@@ -77,6 +92,7 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
             insets
         }
         initializeLayout()
+
         binding.backBtnPA.setOnClickListener{
             finish()
         }
@@ -92,20 +108,20 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         }
 
         binding.replay10PA.setOnClickListener{
-            skipBackward(10000)
+            skipBackward(TEN_SECONDS)
         }
 
         binding.replay10PA.setOnLongClickListener {
-            skipBackward(30000)
+            skipBackward(THIRTY_SECONDS)
             true
         }
 
         binding.replay60PA.setOnClickListener{
-            skipBackward(60000)
+            skipBackward(ONE_MINUTE)
         }
 
         binding.replay60PA.setOnLongClickListener{
-            skipBackward(300000)
+            skipBackward(FIVE_MINUTES)
             true
         }
 
@@ -118,20 +134,20 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         }
 
         binding.forward10PA.setOnClickListener{
-            skipForward(10000)
+            skipForward(TEN_SECONDS)
         }
 
         binding.forward10PA.setOnLongClickListener {
-            skipForward(30000)
+            skipForward(THIRTY_SECONDS)
             true
         }
 
         binding.forward60PA.setOnClickListener{
-            skipForward(60000)
+            skipForward(ONE_MINUTE)
         }
 
         binding.forward60PA.setOnLongClickListener{
-            skipForward(300000)
+            skipForward(FIVE_MINUTES)
             true
         }
 
@@ -166,24 +182,11 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
             }
         }
         binding.timerBtnPA.setOnClickListener {
-                showBottomSheetDialog()
-            //showTimmerBottomSheetDialog()
+            showTimmerBottomSheetDialog()
         }
 
         binding.textTimerOn.setOnClickListener {
-                val builder = MaterialAlertDialogBuilder(this)
-                builder.setTitle(getString(R.string.stop_timer))
-                    .setMessage(getString(R.string.do_you_want_to_cancel_the_timer))
-                    .setPositiveButton(R.string.yes){_,_ ->
-                        cancelSleepTimer()
-                    }
-                    .setNegativeButton(R.string.no) { dialog, _ ->
-                        dialog.dismiss()
-                    }
-                val customDialog = builder.create()
-                customDialog.show()
-                customDialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(Color.RED)
-                customDialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(Color.RED)
+            showTimmerBottomSheetDialog()
         }
 
         binding.shareBtnPA.setOnClickListener {
@@ -211,25 +214,27 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
                 FavoritesActivity.favoriteSongs.add(musicListPA[songPosition])
             }
             FavoritesActivity.favoritesChanged = true
+
         }
+
     }
 
     private fun setLayout(){
 
         fIndex = Music.favoriteChecker(musicListPA[songPosition].id)
-        binding.songNamePA.text = musicListPA[songPosition].title
+        binding.songNamePA.text = musicListPA[songPosition].comment
         if(repeat) binding.repeatBtnPA.setColorFilter(ContextCompat.getColor(this,R.color.purple_500))
 
         if(isFavorite) binding.favoriteBtnPA.setImageResource(R.drawable.favourite_icon)
         else binding.favoriteBtnPA.setImageResource(R.drawable.favourite_empty_icon)
 
         val img = Music.getImgArt(musicListPA[songPosition].path)
-        val image = Music.decodeImage(applicationContext, img)
+        val image = ColorUtilsImproved.decodeImage(applicationContext, img)
         binding.songImgPA.setImageBitmap(image)
-        val bgColor = Music.getDominantColor(image)
-        val optimalContrastColor = Music.getOptimalContrastColor(bgColor)
-        val intermediateColor = Music.getIntermediateColor(bgColor,optimalContrastColor)
-        val intermediateColor2 = Music.getIntermediateColor(bgColor,optimalContrastColor,0.8f)
+        val bgColor = ColorUtilsImproved.getDominantColor(image)
+        val optimalContrastColor = ColorUtilsImproved.getOptimalContrastColor(bgColor)
+        val intermediateColor =  ColorUtilsImproved.getDerivedColor(optimalContrastColor, 0.7f)
+        val intermediateColor2 = ColorUtilsImproved.getDerivedColor(bgColor, 0.7f)
 
         val gradient = GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, intArrayOf(bgColor,optimalContrastColor))
         binding.root.background = gradient
@@ -272,6 +277,7 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
             binding.timerBtnPA.visibility = View.GONE
             binding.textTimerOn.visibility = View.VISIBLE
         }
+
         binding.timerBtnPA.imageTintList = ColorStateList.valueOf(optimalContrastColor)
         binding.textTimerOn.setTextColor(optimalContrastColor)
         binding.shareBtnPA.imageTintList = ColorStateList.valueOf(optimalContrastColor)
@@ -289,6 +295,36 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         binding.replay10PA.setBackgroundColor(intermediateColor)
         binding.replay60PA.iconTint = ColorStateList.valueOf(intermediateColor2)
         binding.replay60PA.setBackgroundColor(intermediateColor)
+    }
+
+    fun MaterialButton.setMultiStyleText(texto: String, line1TextSize: Int = 18, line2TextSize: Int = 12) {
+
+        var text = texto.replace(" ","\n")
+        val parts = texto.split(" ").filter { it.isNotBlank() }
+
+         val spannable = SpannableString(text).apply {
+            // Apply bold to the first line
+            setSpan(StyleSpan(Typeface.BOLD), 0, parts[0].length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+
+            // Font size for first line
+            setSpan(AbsoluteSizeSpan(line1TextSize.spToPx(context)), 0, parts[0].length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+
+            // Font size for second linea
+             setSpan(StyleSpan(Typeface.NORMAL), parts[0].length, text.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+
+             setSpan(AbsoluteSizeSpan(line2TextSize.spToPx(context)),
+                parts[0].length, text.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+
+        this.text = spannable
+    }
+
+    fun Int.spToPx(context: Context): Int {
+        return TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_SP,
+            this.toFloat(),
+            context.resources.displayMetrics
+        ).toInt()
     }
 
     private fun createMediaPlayer(){
@@ -433,8 +469,6 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         createMediaPlayer()
     }
 
-
-
     private fun skipForward(miliSeconds:Int){
         PlayerActivity.musicService!!.mediaPlayer?.let { player ->
             val newPosition = player.currentPosition + miliSeconds
@@ -502,75 +536,94 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
     private lateinit var bsSheetBinding: BsSpeedSelectionBinding
 
     private fun showTimmerBottomSheetDialog() {
+
         bsSheetBinding = BsSpeedSelectionBinding.inflate(layoutInflater)
         val dialog = BottomSheetDialog(this).apply {
             setContentView(bsSheetBinding.root)
         }
-
+        bsSheetBinding.btn5.setMultiStyleText(SleepTimer.MIN_5.getDisplayName(this), 18, 12)
+        bsSheetBinding.btn10.setMultiStyleText(SleepTimer.MIN_10.getDisplayName(this), 18, 12)
+        bsSheetBinding.btn15.setMultiStyleText(SleepTimer.MIN_15.getDisplayName(this), 18, 12)
+        bsSheetBinding.btn30.setMultiStyleText(SleepTimer.MIN_30.getDisplayName(this), 18, 12)
+        bsSheetBinding.btn45.setMultiStyleText(SleepTimer.MIN_45.getDisplayName(this), 18, 12)
+        bsSheetBinding.btn60.setMultiStyleText(SleepTimer.MIN_60.getDisplayName(this), 18, 12)
+        bsSheetBinding.btn90.setMultiStyleText(SleepTimer.MIN_90.getDisplayName(this), 18, 12)
+        bsSheetBinding.btn120.setMultiStyleText(SleepTimer.MIN_120.getDisplayName(this), 18, 12)
+        resetSleepTimerButtons( sleepMins )
         dialog.show()
-    }
-
-    private fun showBottomSheetDialog(){
-        val dialog = BottomSheetDialog(this@PlayerActivity)
-        dialog.setContentView(R.layout.bottom_sheet_dialog)
-        dialog.show()
-        dialog.findViewById<LinearLayout>(R.id.min_15)?.setOnClickListener {
+        //5 min
+        bsSheetBinding.btn5.setOnClickListener {
             // Cancel previous timer if it exists
             cancelSleepTimer()
             binding.timerBtnPA.visibility = View.GONE
             binding.textTimerOn.visibility = View.VISIBLE
-            sleepMins=15
-
+            sleepMins=SleepTimer.MIN_5.minutes
+            val totalTimeMillis = SleepTimer.MIN_5.millis
+            sleepTimer = object : CountDownTimer(totalTimeMillis, 1000) {
+                override fun onTick(millisUntilFinished: Long) {
+                    // Update the textView with the remaining time
+                    binding.textTimerOn.text = String.format(Music.formatTime(millisUntilFinished))
+                }
+                override fun onFinish() {
+                    cancelSleepTimer()
+                    pauseMusic()
+                }
+            }.start()
+            dialog.dismiss()
+        }
+        //10 min
+        bsSheetBinding.btn10.setOnClickListener {
+            // Cancel previous timer if it exists
+            cancelSleepTimer()
+            binding.timerBtnPA.visibility = View.GONE
+            binding.textTimerOn.visibility = View.VISIBLE
+            sleepMins=SleepTimer.MIN_10.minutes
+            val totalTimeMillis = SleepTimer.MIN_10.millis
+            sleepTimer = object : CountDownTimer(totalTimeMillis, 1000) {
+                override fun onTick(millisUntilFinished: Long) {
+                    // Update the textView with the remaining time
+                    binding.textTimerOn.text = String.format(Music.formatTime(millisUntilFinished))
+                }
+                override fun onFinish() {
+                    cancelSleepTimer()
+                    pauseMusic()
+                }
+            }.start()
+            dialog.dismiss()
+        }
+        //15 min
+        bsSheetBinding.btn15.setOnClickListener {
+            // Cancel previous timer if it exists
+            cancelSleepTimer()
+            binding.timerBtnPA.visibility = View.GONE
+            binding.textTimerOn.visibility = View.VISIBLE
+            sleepMins=SleepTimer.MIN_15.minutes
             val totalTimeMillis = SleepTimer.MIN_15.millis
             sleepTimer = object : CountDownTimer(totalTimeMillis, 1000) {
                 override fun onTick(millisUntilFinished: Long) {
                     // Update the textView with the remaining time
                     binding.textTimerOn.text = String.format(Music.formatTime(millisUntilFinished))
                 }
-
                 override fun onFinish() {
                     cancelSleepTimer()
                     pauseMusic()
                 }
             }.start()
-
             dialog.dismiss()
         }
-        dialog.findViewById<LinearLayout>(R.id.min_30)?.setOnClickListener {
+        //30 min
+        bsSheetBinding.btn30.setOnClickListener {
             // Cancel previous timer if it exists
             cancelSleepTimer()
             binding.timerBtnPA.visibility = View.GONE
             binding.textTimerOn.visibility = View.VISIBLE
-            sleepMins=30
-
+            sleepMins=SleepTimer.MIN_30.minutes
             val totalTimeMillis = SleepTimer.MIN_30.millis
             sleepTimer = object : CountDownTimer(totalTimeMillis, 1000) {
                 override fun onTick(millisUntilFinished: Long) {
                     // Update the textView with the remaining time
                     binding.textTimerOn.text = String.format(Music.formatTime(millisUntilFinished))
                 }
-
-                override fun onFinish() {
-                   cancelSleepTimer()
-                    pauseMusic()
-                }
-            }.start()
-            dialog.dismiss()
-        }
-        dialog.findViewById<LinearLayout>(R.id.min_60)?.setOnClickListener {
-            // Cancel previous timer if it exists
-            cancelSleepTimer()
-            binding.timerBtnPA.visibility = View.GONE
-            binding.textTimerOn.visibility = View.VISIBLE
-            sleepMins=60
-
-            val totalTimeMillis = SleepTimer.MIN_60.millis
-            sleepTimer = object : CountDownTimer(totalTimeMillis, 1000) {
-                override fun onTick(millisUntilFinished: Long) {
-                    // Update the textView with the remaining time
-                    binding.textTimerOn.text = Music.formatTime(millisUntilFinished)
-                }
-
                 override fun onFinish() {
                     cancelSleepTimer()
                     pauseMusic()
@@ -578,19 +631,156 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
             }.start()
             dialog.dismiss()
         }
+        //45 min
+        bsSheetBinding.btn45.setOnClickListener {
+            // Cancel previous timer if it exists
+            cancelSleepTimer()
+            binding.timerBtnPA.visibility = View.GONE
+            binding.textTimerOn.visibility = View.VISIBLE
+            sleepMins=SleepTimer.MIN_45.minutes
+            val totalTimeMillis = SleepTimer.MIN_45.millis
+            sleepTimer = object : CountDownTimer(totalTimeMillis, 1000) {
+                override fun onTick(millisUntilFinished: Long) {
+                    // Update the textView with the remaining time
+                    binding.textTimerOn.text = String.format(Music.formatTime(millisUntilFinished))
+                }
+                override fun onFinish() {
+                    cancelSleepTimer()
+                    pauseMusic()
+                }
+            }.start()
+            dialog.dismiss()
+        }
+        //60 min
+        bsSheetBinding.btn60.setOnClickListener {
+            // Cancel previous timer if it exists
+            cancelSleepTimer()
+            binding.timerBtnPA.visibility = View.GONE
+            binding.textTimerOn.visibility = View.VISIBLE
+            sleepMins=SleepTimer.MIN_60.minutes
+            val totalTimeMillis = SleepTimer.MIN_60.millis
+            sleepTimer = object : CountDownTimer(totalTimeMillis, 1000) {
+                override fun onTick(millisUntilFinished: Long) {
+                    // Update the textView with the remaining time
+                    binding.textTimerOn.text = String.format(Music.formatTime(millisUntilFinished))
+                }
+                override fun onFinish() {
+                    cancelSleepTimer()
+                    pauseMusic()
+                }
+            }.start()
+            dialog.dismiss()
+        }
+        //90 min
+        bsSheetBinding.btn90.setOnClickListener {
+            // Cancel previous timer if it exists
+            cancelSleepTimer()
+            binding.timerBtnPA.visibility = View.GONE
+            binding.textTimerOn.visibility = View.VISIBLE
+            sleepMins=SleepTimer.MIN_90.minutes
+            val totalTimeMillis = SleepTimer.MIN_90.millis
+            sleepTimer = object : CountDownTimer(totalTimeMillis, 1000) {
+                override fun onTick(millisUntilFinished: Long) {
+                    // Update the textView with the remaining time
+                    binding.textTimerOn.text = String.format(Music.formatTime(millisUntilFinished))
+                }
+                override fun onFinish() {
+                    cancelSleepTimer()
+                    pauseMusic()
+                }
+            }.start()
+            dialog.dismiss()
+        }
+        //120 min
+        bsSheetBinding.btn120.setOnClickListener {
+            // Cancel previous timer if it exists
+            cancelSleepTimer()
+            binding.timerBtnPA.visibility = View.GONE
+            binding.textTimerOn.visibility = View.VISIBLE
+            sleepMins=SleepTimer.MIN_120.minutes
+            val totalTimeMillis = SleepTimer.MIN_120.millis
+            sleepTimer = object : CountDownTimer(totalTimeMillis, 1000) {
+                override fun onTick(millisUntilFinished: Long) {
+                    // Update the textView with the remaining time
+                    binding.textTimerOn.text = String.format(Music.formatTime(millisUntilFinished))
+                }
+                override fun onFinish() {
+                    cancelSleepTimer()
+                    pauseMusic()
+                }
+            }.start()
+            dialog.dismiss()
+        }
+        //Chapter end
+        bsSheetBinding.btnChapEnd.setOnClickListener {
+            // Cancel previous timer if it exists
+            cancelSleepTimer()
+            sleepMins = SleepTimer.MIN_END_CHAPTER.minutes
+            //TODO: Implement chapter end timer
+            dialog.dismiss()
+        }
+        //None
+        bsSheetBinding.btnNone.setOnClickListener {
+            cancelSleepTimer()
+            sleepMins = SleepTimer.MIN_NOME.minutes
+            dialog.dismiss()
+        }
+    }
+
+    private fun resetSleepTimerButtons(activeButton:Int) {
+        bsSheetBinding.btn5.setTextColor(ContextCompat.getColor(this, R.color.white))
+        bsSheetBinding.btn10.setTextColor(ContextCompat.getColor(this, R.color.white))
+        bsSheetBinding.btn15.setTextColor(ContextCompat.getColor(this, R.color.white))
+        bsSheetBinding.btn30.setTextColor(ContextCompat.getColor(this, R.color.white))
+        bsSheetBinding.btn45.setTextColor(ContextCompat.getColor(this, R.color.white))
+        bsSheetBinding.btn60.setTextColor(ContextCompat.getColor(this, R.color.white))
+        bsSheetBinding.btn90.setTextColor(ContextCompat.getColor(this, R.color.white))
+        bsSheetBinding.btn120.setTextColor(ContextCompat.getColor(this, R.color.white))
+        bsSheetBinding.btnChapEnd.setTextColor(ContextCompat.getColor(this, R.color.white))
+        bsSheetBinding.btnNone.setTextColor(ContextCompat.getColor(this, R.color.white))
+        when(activeButton){
+            SleepTimer.MIN_NOME.minutes -> {
+                bsSheetBinding.btnNone.setTextColor(ContextCompat.getColor(this, R.color.cool_blue))
+            }
+            SleepTimer.MIN_5.minutes -> {
+                bsSheetBinding.btn5.setTextColor(ContextCompat.getColor(this, R.color.cool_blue))
+            }
+            SleepTimer.MIN_10.minutes -> {
+                bsSheetBinding.btn10.setTextColor(ContextCompat.getColor(this, R.color.cool_blue))
+            }
+            SleepTimer.MIN_15.minutes -> {
+                bsSheetBinding.btn15.setTextColor(ContextCompat.getColor(this, R.color.cool_blue))
+            }
+            SleepTimer.MIN_30.minutes -> {
+                bsSheetBinding.btn30.setTextColor(ContextCompat.getColor(this, R.color.cool_blue))
+            }
+            SleepTimer.MIN_45.minutes -> {
+                bsSheetBinding.btn45.setTextColor(ContextCompat.getColor(this, R.color.cool_blue))
+            }
+            SleepTimer.MIN_60.minutes -> {
+                bsSheetBinding.btn60.setTextColor(ContextCompat.getColor(this, R.color.cool_blue))
+            }
+            SleepTimer.MIN_90.minutes -> {
+                bsSheetBinding.btn90.setTextColor(ContextCompat.getColor(this, R.color.cool_blue))
+            }
+            SleepTimer.MIN_120.minutes -> {
+                bsSheetBinding.btn120.setTextColor(ContextCompat.getColor(this, R.color.cool_blue))
+            }
+            SleepTimer.MIN_END_CHAPTER.minutes -> {
+                bsSheetBinding.btnChapEnd.setTextColor(ContextCompat.getColor(this, R.color.cool_blue))
+            }
+        }
     }
 
     fun cancelSleepTimer() {
         sleepTimer?.cancel()
-        sleepMins = 0
+        sleepMins = SleepTimer.MIN_NOME.minutes
         sleepTimer = null
         binding.textTimerOn.text = ""
-        val icon = ContextCompat.getDrawable(this, R.drawable.timer_icon)
-        binding.timerBtnPA.setImageDrawable(icon)
+        binding.timerBtnPA.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.timer_icon))
         binding.textTimerOn.visibility = View.GONE
         binding.timerBtnPA.visibility = View.VISIBLE
     }
-
 
 
     private fun showBottomSheetSpeedDialog(){
