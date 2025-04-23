@@ -1,6 +1,6 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
-    <style name="splash_screen" parent="Theme.MaterialComponents.Light.NoActionBar">
+    <style name="splash_screen" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="android:windowBackground">@drawable/splash_screen</item>
         <item name="android:forceDarkAllowed" tools:targetApi="q">false</item>
     </style>
@@ -10,7 +10,6 @@
     <!--    Background as well as text color for alert dialog buttons-->
     <attr name="dialogTextColor" format="color"/>
     <attr name="dialogBtnBackground" format="color"/>
-
 
     //Theme for Activities
     <style name="coolPink" parent="Theme.MaterialComponents.Light.NoActionBar">

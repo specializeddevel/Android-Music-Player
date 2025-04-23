@@ -31,7 +31,6 @@
             android:padding="10dp"
             />
 
-
         <TextView
             android:id="@+id/windowTitlePA"
             android:layout_width="0dp"
@@ -61,7 +60,6 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="3.5"
-
         android:gravity="center">
 
         <com.google.android.material.imageview.ShapeableImageView
@@ -95,6 +93,7 @@
             android:layout_weight="0.5"/>
     </ScrollView>
     <LinearLayout
+        android:id="@+id/playerControlsLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
@@ -247,6 +246,18 @@
             app:tint="@color/cool_pink"
             android:contentDescription="@string/repeat_btn"
             android:layout_weight="1"
+            android:visibility="gone"
+            />
+
+        <ImageButton
+            android:id="@+id/lockUIBtnPA"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/lock_open_outline"
+            android:background="@android:color/transparent"
+            app:tint="@color/cool_pink"
+            android:contentDescription="@string/repeat_btn"
+            android:layout_weight="1"
             />
 
         <ImageButton
@@ -257,9 +268,11 @@
             android:background="@android:color/transparent"
             app:tint="@color/cool_pink"
             android:contentDescription="@string/equalizer_btn"
-            android:layout_weight="1"/>
+            android:layout_weight="1"
+            />
 
         <LinearLayout
+            android:id="@+id/timerLayoutPA"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="vertical"

@@ -59,7 +59,13 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         var isResumed = false
         var isFavorite = false
         var fIndex = -1
+        var bgColor = 0
+        var optimalContrastColor = 0
+        var intermediateColor =  0
+        var intermediateColor2 = 0
+
         private var sleepTimer: CountDownTimer? = null
+        var interfaceLocked = false
     }
 
     enum class SleepTimer(@StringRes val labelResId: Int, val millis: Long, val minutes: Int) {
@@ -170,6 +176,20 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
             }
         }
 
+        binding.lockUIBtnPA.setOnClickListener{
+            if(interfaceLocked){
+                interfaceLocked = false
+                binding.lockUIBtnPA.setImageResource(R.drawable.lock_open_outline)
+                binding.lockUIBtnPA.imageTintList = ColorStateList.valueOf(optimalContrastColor)
+                alternateControlsStatusPA(show = true)
+            } else {
+                interfaceLocked = true
+                binding.lockUIBtnPA.setImageResource(R.drawable.lock_alert)
+                alternateControlsStatusPA(show = false)
+            }
+            binding.lockUIBtnPA.imageTintList = ColorStateList.valueOf(optimalContrastColor)
+        }
+
         binding.equalizerBtnPA.setOnClickListener {
             try {
                 val eqIntent = Intent(AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL)
@@ -178,7 +198,7 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
                 eqIntent.putExtra(AudioEffect.EXTRA_CONTENT_TYPE, AudioEffect.CONTENT_TYPE_MUSIC)
                 startActivityForResult(eqIntent, 13)
             } catch (e: Exception){
-                Toast.makeText(this, "Equalizer feature not supported!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Sorry, equalizer feature not supported in your device!", Toast.LENGTH_SHORT).show()
             }
         }
         binding.timerBtnPA.setOnClickListener {
@@ -231,10 +251,10 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         val img = Music.getImgArt(musicListPA[songPosition].path)
         val image = ColorUtilsImproved.decodeImage(applicationContext, img)
         binding.songImgPA.setImageBitmap(image)
-        val bgColor = ColorUtilsImproved.getDominantColor(image)
-        val optimalContrastColor = ColorUtilsImproved.getOptimalContrastColor(bgColor)
-        val intermediateColor =  ColorUtilsImproved.getDerivedColor(optimalContrastColor, 0.7f)
-        val intermediateColor2 = ColorUtilsImproved.getDerivedColor(bgColor, 0.7f)
+        bgColor = ColorUtilsImproved.getDominantColor(image)
+        optimalContrastColor = ColorUtilsImproved.getOptimalContrastColor(bgColor)
+        intermediateColor =  ColorUtilsImproved.getDerivedColor(optimalContrastColor, 0.7f)
+        intermediateColor2 = ColorUtilsImproved.getDerivedColor(bgColor, 0.7f)
 
         val gradient = GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, intArrayOf(bgColor,optimalContrastColor))
         binding.root.background = gradient
@@ -247,6 +267,7 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         binding.tvSeekBarStart.setTextColor(optimalContrastColor)
         binding.tvSeekBarEnd.setTextColor(optimalContrastColor)
         binding.repeatBtnPA.imageTintList = ColorStateList.valueOf(optimalContrastColor)
+        binding.lockUIBtnPA.imageTintList = ColorStateList.valueOf(optimalContrastColor)
         binding.equalizerBtnPA.imageTintList = ColorStateList.valueOf(optimalContrastColor)
         when (speed) {
             0.5f -> { val playSpeedIcon = ContextCompat.getDrawable(this, R.drawable.speed_0_5x_icon)
@@ -848,6 +869,50 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
             val playSpeedIcon = ContextCompat.getDrawable(this, R.drawable.speed_2x_icon)
             binding.speedBtnPA.setImageDrawable(playSpeedIcon)
             playMusic()
+        }
+    }
+
+    private fun alternateControlsStatusPA(show: Boolean){
+
+        if(show){
+            binding.backBtnPA.isEnabled = true
+            binding.favoriteBtnPA.isEnabled = true
+            binding.equalizerBtnPA.visibility = View.VISIBLE
+            binding.speedBtnPA.visibility = View.VISIBLE
+            if (sleepMins != 0) {
+                binding.timerLayoutPA.visibility = View.VISIBLE
+                binding.timerBtnPA.visibility = View.GONE
+                binding.textTimerOn.visibility = View.VISIBLE
+                binding.textTimerOn.isEnabled = true
+            } else {
+                binding.timerLayoutPA.visibility = View.VISIBLE
+                binding.timerBtnPA.visibility = View.VISIBLE
+                binding.textTimerOn.visibility = View.GONE
+                binding.textTimerOn.isEnabled = false
+            }
+            binding.shareBtnPA.visibility = View.VISIBLE
+            binding.seekBarPA.isEnabled = true
+            binding.playerControlsLayout.visibility = View.VISIBLE
+        } else {
+            binding.backBtnPA.isEnabled = false
+            binding.favoriteBtnPA.isEnabled = false
+            binding.equalizerBtnPA.visibility = View.GONE
+            binding.speedBtnPA.visibility = View.GONE
+            binding.timerBtnPA.visibility = View.GONE
+            if (sleepMins != 0) {
+                binding.timerLayoutPA.visibility = View.VISIBLE
+                binding.timerBtnPA.visibility = View.GONE
+                binding.textTimerOn.visibility = View.VISIBLE
+                binding.textTimerOn.isEnabled = false
+            } else {
+                binding.timerLayoutPA.visibility = View.GONE
+                binding.timerBtnPA.visibility = View.GONE
+                binding.textTimerOn.visibility = View.GONE
+                binding.textTimerOn.isEnabled = false
+            }
+            binding.shareBtnPA.visibility = View.GONE
+            binding.seekBarPA.isEnabled = false
+            binding.playerControlsLayout.visibility = View.INVISIBLE
         }
     }
 }
