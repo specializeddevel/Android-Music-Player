@@ -6,7 +6,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.res.ColorStateList
+import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.media.MediaPlayer
 import android.media.PlaybackParams
@@ -34,6 +36,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.shape.ShapeAppearanceModel
 import com.raulburgosmurray.musicplayer.Music.Companion.formatDuration
 import com.raulburgosmurray.musicplayer.Music.Companion.setSongPosition
 import com.raulburgosmurray.musicplayer.databinding.ActivityPlayerBinding
@@ -256,6 +259,7 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         intermediateColor =  ColorUtilsImproved.getDerivedColor(optimalContrastColor, 0.7f)
         intermediateColor2 = ColorUtilsImproved.getDerivedColor(bgColor, 0.7f)
 
+
         val gradient = GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, intArrayOf(bgColor,optimalContrastColor))
         binding.root.background = gradient
         window?.statusBarColor = bgColor
@@ -273,7 +277,7 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
             0.5f -> { val playSpeedIcon = ContextCompat.getDrawable(this, R.drawable.speed_0_5x_icon)
                 binding.speedBtnPA.setImageDrawable(playSpeedIcon)
             }
-            0.75f -> { val playSpeedIcon = ContextCompat.getDrawable(this, R.drawable.speed_0_75x_icon)
+            0.7f -> { val playSpeedIcon = ContextCompat.getDrawable(this, R.drawable.speed_0_7x_icon)
                 binding.speedBtnPA.setImageDrawable(playSpeedIcon)
             }
             1.0f -> { val playSpeedIcon = ContextCompat.getDrawable(this, R.drawable.speed_1x_icon)
@@ -326,7 +330,7 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
          val spannable = SpannableString(text).apply {
             // Apply bold to the first line
             setSpan(StyleSpan(Typeface.BOLD), 0, parts[0].length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-
+             setSpan(android.text.style.ForegroundColorSpan(intermediateColor2), 0, text.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
             // Font size for first line
             setSpan(AbsoluteSizeSpan(line1TextSize.spToPx(context)), 0, parts[0].length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
 
@@ -338,6 +342,8 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
         }
 
         this.text = spannable
+
+        this.setBackgroundColor(intermediateColor)
     }
 
     fun Int.spToPx(context: Context): Int {
@@ -554,14 +560,27 @@ class PlayerActivity : AppCompatActivity(), ServiceConnection, MediaPlayer.OnCom
             return
     }
 
+    override fun onBackPressed() {
+        if(!interfaceLocked) {
+            super.onBackPressed()
+        }
+    }
+
     private lateinit var bsSheetBinding: BsSpeedSelectionBinding
 
     private fun showTimmerBottomSheetDialog() {
 
         bsSheetBinding = BsSpeedSelectionBinding.inflate(layoutInflater)
+        window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        val bgDrawable = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            setColor(intermediateColor2)
+        }
+        bsSheetBinding.root.background = bgDrawable
         val dialog = BottomSheetDialog(this).apply {
             setContentView(bsSheetBinding.root)
         }
+        bsSheetBinding.dialogTitle.setTextColor(intermediateColor)
         bsSheetBinding.btn5.setMultiStyleText(SleepTimer.MIN_5.getDisplayName(this), 18, 12)
         bsSheetBinding.btn10.setMultiStyleText(SleepTimer.MIN_10.getDisplayName(this), 18, 12)
         bsSheetBinding.btn15.setMultiStyleText(SleepTimer.MIN_15.getDisplayName(this), 18, 12)
