@@ -11,6 +11,10 @@
         <item name="cornerFamily">rounded</item>
 
     </style>
+    <style name="audiobookCover">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">24dp</item>
+    </style>
     <style name="roundedNoBorder" parent="">
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">0dp</item> <!-- Sin bordes redondeados -->

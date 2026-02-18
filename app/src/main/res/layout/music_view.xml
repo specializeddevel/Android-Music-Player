@@ -1,93 +1,105 @@
 <?xml version="1.0" encoding="utf-8"?>
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="105dp"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    app:cardCornerRadius="15dp"
-    android:layout_marginBottom="5dp"
-    app:cardElevation="4dp"
-    app:strokeWidth="1dp"
-    app:strokeColor="#CCCCCC">
+    android:layout_width="match_parent"
+    android:layout_height="100dp"
+    android:layout_marginHorizontal="12dp"
+    android:layout_marginVertical="6dp"
+    app:cardBackgroundColor="@color/white"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="2dp"
+    app:strokeWidth="0dp">
 
-    <com.google.android.material.imageview.ShapeableImageView
-        android:id="@+id/imageMV"
-        android:layout_width="90dp"
-        android:layout_height="90dp"
-        app:shapeAppearanceOverlay="@style/curved"
-        android:layout_marginStart="15dp"
-        android:layout_marginVertical="5dp"/>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="10dp">
 
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/imageMV"
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:scaleType="centerCrop"
+            app:shapeAppearanceOverlay="@style/audiobookCover"
+            android:src="@drawable/music_player_icon_splash_screen" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/songNameMV"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                tools:text="Título del Audiolibro" />
+
+            <TextView
+                android:id="@+id/songArtistMV"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:layout_marginTop="2dp"
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp"
+                tools:text="Autor del libro" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <ProgressBar
+                    android:id="@+id/progressMV"
+                    style="@android:style/Widget.ProgressBar.Horizontal"
+                    android:layout_width="0dp"
+                    android:layout_height="4dp"
+                    android:layout_weight="1"
+                    android:progress="30"
+                    android:progressTint="@color/accent_book"
+                    android:progressBackgroundTint="#E0E0E0" />
+
+                <TextView
+                    android:id="@+id/progressTextMV"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="30%"
+                    android:textColor="@color/primary_light_book"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/songDuration"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            tools:text="12:45" />
+
+    </LinearLayout>
+
+    <!-- Mantener ID oculto para compatibilidad con código existente -->
     <TextView
         android:id="@+id/songIdMV"
-        android:layout_width="wrap_content"
-        android:layout_height="35dp"
-        android:layout_toStartOf="@id/songDuration"
-        android:layout_toEndOf="@id/imageMV"
-        android:gravity="center_vertical"
-        android:singleLine="true"
-        android:text="@string/song_name"
-        android:textColor="?colorOnPrimary"
-        android:layout_marginStart="70dp"
-        android:layout_marginEnd="70dp"
-        android:visibility="gone"/>
-
-    <TextView
-        android:id="@+id/songNameMV"
-        android:layout_width="wrap_content"
-        android:layout_height="25dp"
-        android:layout_toStartOf="@id/songDuration"
-        android:layout_toEndOf="@id/imageMV"
-        android:gravity="center_vertical"
-        android:singleLine="true"
-        android:text="@string/song_name"
-        android:textColor="?colorOnPrimary"
-        android:layout_marginStart="115dp"
-        android:layout_marginEnd="70dp"
-        android:layout_marginTop="10dp"
-        tools:text="Song name"
-        tools:textColor="@color/black"/>
-
-    <TextView
-        android:id="@+id/songArtistMV"
-        android:layout_width="wrap_content"
-        android:layout_height="25dp"
-        android:layout_toStartOf="@id/imageMV"
-        android:layout_toEndOf="@id/songDuration"
-        android:layout_marginTop="35dp"
-        android:gravity="center_vertical"
-        android:singleLine="true"
-        android:text="@string/song_name"
-        android:textColor="?colorOnPrimary"
-        android:layout_marginStart="115dp"
-        android:layout_marginEnd="70dp"
-        tools:text="Song artist"
-        tools:textColor="@color/black"/>
-
-    <TextView
-        android:id="@+id/songAlbumMV"
-        android:layout_width="wrap_content"
-        android:layout_height="25dp"
-        android:text="@string/song_name"
-        android:layout_toEndOf="@id/imageMV"
-        android:layout_toStartOf="@id/songDuration"
-        android:layout_marginTop="60dp"
-        android:gravity="center_vertical"
-        android:singleLine="true"
-        android:layout_marginStart="115dp"
-        android:layout_marginEnd="70dp"
-        tools:text="Song album"
-        tools:textColor="@color/black"/>
-
-    <TextView
-        android:id="@+id/songDuration"
-        android:layout_width="70dp"
-        android:layout_height="match_parent"
-        android:text="@string/start_tv"
-        android:layout_alignParentEnd="true"
-        android:gravity="right|center_vertical"
-        android:layout_gravity="end"
-        android:textColor="?colorOnPrimary"
-        android:layout_marginHorizontal="15dp"/>
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
 
 </com.google.android.material.card.MaterialCardView>
