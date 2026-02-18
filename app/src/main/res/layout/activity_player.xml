@@ -5,331 +5,272 @@
     android:id="@+id/DrawerLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".PlayerActivity"
     android:orientation="vertical"
-    android:gravity="center"
-    android:weightSum="5">
+    android:background="@color/background_paper"
+    tools:context=".PlayerActivity">
 
-<!--    First Row-->
-    <LinearLayout
+    <!-- Header Section -->
+    <RelativeLayout
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:orientation="horizontal"
-        android:gravity="center"
-        android:layout_weight="0.8">
+        android:layout_height="?attr/actionBarSize"
+        android:layout_marginTop="24dp"
+        android:paddingHorizontal="16dp">
 
-<!--        Back Button-->
         <ImageButton
             android:id="@+id/backBtnPA"
-            android:layout_width="50dp"
-            android:layout_height="50dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_alignParentStart="true"
+            android:layout_centerVertical="true"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="12dp"
             android:src="@drawable/arrow_back_activity_icon"
-            android:background="@android:color/transparent"
-            android:layout_marginStart="5dp"
-            app:tint="@color/black"
-            android:contentDescription="@string/back_btn"
-            android:padding="10dp"
-            />
+            app:tint="@color/primary_book"
+            android:contentDescription="@string/back_btn" />
 
         <TextView
             android:id="@+id/windowTitlePA"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerInParent="true"
             android:text="@string/world_of_music"
-            android:textColor="@color/black"
-            android:textSize="20sp"
-            android:gravity="center"
-            android:layout_weight="1"
-            android:textStyle="bold"
-            tools:ignore="NestedWeights" />
+            android:textColor="@color/primary_book"
+            android:textSize="18sp"
+            android:textStyle="bold" />
 
         <ImageButton
             android:id="@+id/favoriteBtnPA"
-            android:layout_width="50dp"
-            android:layout_height="50dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="12dp"
             android:src="@drawable/favourite_empty_icon"
-            android:background="@android:color/transparent"
-            android:layout_marginEnd="20dp"
-            app:tint="@android:color/holo_red_dark"
-            android:contentDescription="@string/favorite_btn"/>
+            app:tint="@color/accent_book"
+            android:contentDescription="@string/favorite_btn" />
+    </RelativeLayout>
 
-    </LinearLayout>
-
-    <!-- Contenedor para la imagen con proporción cuadrada -->
-    <FrameLayout
+    <!-- Cover Art Section -->
+    <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="3.5"
-        android:gravity="center">
+        android:layout_weight="1"
+        android:layout_margin="32dp"
+        app:cardCornerRadius="24dp"
+        app:cardElevation="12dp">
 
         <com.google.android.material.imageview.ShapeableImageView
             android:id="@+id/songImgPA"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:scaleType="fitCenter"
-            android:adjustViewBounds="true"
-            android:src="@drawable/music_player_icon_splash_screen"
-            app:shapeAppearanceOverlay="@style/roundedNoBorder"
-            android:layout_gravity="center"
-            android:padding="15dp"/>
+            android:scaleType="centerCrop"
+            android:src="@drawable/music_player_icon_splash_screen" />
+    </com.google.android.material.card.MaterialCardView>
 
-    </FrameLayout>
-
-    <ScrollView
+    <!-- Book Info Section -->
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_marginHorizontal="20dp"
-        android:layout_weight="0.5"
-        android:fillViewport="true">
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="32dp"
+        android:paddingBottom="16dp">
+
         <TextView
             android:id="@+id/songNamePA"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginHorizontal="20dp"
+            android:ellipsize="end"
+            android:maxLines="2"
             android:text="@string/song_name"
-            android:textColor="@color/black"
-            android:textSize="18sp"
-            android:gravity="start"
-            android:layout_weight="0.5"/>
-    </ScrollView>
+            android:textColor="@color/text_primary"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/authorNamePA"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Desconocido"
+            android:textColor="@color/text_secondary"
+            android:textSize="16sp"
+            android:layout_marginTop="4dp" />
+    </LinearLayout>
+
+    <!-- Progress Section -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="16dp">
+
+        <androidx.appcompat.widget.AppCompatSeekBar
+            android:id="@+id/seekBarPA"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingVertical="8dp"
+            android:progressTint="@color/accent_book"
+            android:thumbTint="@color/accent_book" />
+
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="16dp">
+
+            <TextView
+                android:id="@+id/tvSeekBarStart"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentStart="true"
+                android:text="00:00"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/tvSeekBarEnd"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:text="--:--"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+        </RelativeLayout>
+    </LinearLayout>
+
+    <!-- Main Controls Section -->
     <LinearLayout
         android:id="@+id/playerControlsLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_margin="18dp"
         android:gravity="center"
-        android:layout_weight="0.2">
+        android:orientation="horizontal"
+        android:paddingVertical="16dp">
 
-        <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
-            android:id="@+id/previusBtnPA"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            app:icon="@drawable/previous_icon"
-            app:iconSize="30dp"
-            app:shapeAppearanceOverlay="@style/circle"
-            android:backgroundTint="@color/cool_blue"
-            app:iconTint="@color/white"
-            android:contentDescription="@string/previous_btn"
-            android:visibility="gone"
-            />
-
-        <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+        <ImageButton
             android:id="@+id/replay60PA"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            app:icon="@drawable/rewind_60"
-            app:iconSize="41dp"
-            app:shapeAppearanceOverlay="@style/circle"
-            android:backgroundTint="@color/cool_blue"
-            app:iconTint="@color/white"
-            android:contentDescription="@string/next_btn"
-            android:layout_marginRight="10dp"
-            />
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="12dp"
+            android:src="@drawable/rewind_60"
+            app:tint="@color/primary_light_book" />
 
-        <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+        <ImageButton
             android:id="@+id/replay10PA"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            app:icon="@drawable/rewind_10"
-            app:iconSize="41dp"
-            app:shapeAppearanceOverlay="@style/circle"
-            android:backgroundTint="@android:color/white"
-            app:iconTint="@color/black"
-            android:contentDescription="@string/next_btn"
-            />
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="12dp"
+            android:src="@drawable/rewind_10"
+            app:tint="@color/primary_book" />
 
-
-
-        <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/playPauseBtnPA"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginHorizontal="25dp"
-            android:backgroundTint="@android:color/holo_red_dark"
-            app:icon="@drawable/pause_icon"
-            app:iconSize="40dp"
-            app:iconTint="@color/white"
-            app:shapeAppearanceOverlay="@style/curved"
-            android:contentDescription="@string/pause_play_btn"/>
+            android:layout_marginHorizontal="24dp"
+            android:backgroundTint="@color/accent_book"
+            android:src="@drawable/play_icon"
+            app:fabSize="auto"
+            app:maxImageSize="48dp"
+            app:tint="@color/white" />
 
-
-
-        <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
-            android:id="@+id/nextBtnPA"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            app:icon="@drawable/next_icon"
-            app:iconSize="30dp"
-            app:shapeAppearanceOverlay="@style/circle"
-            android:backgroundTint="@color/cool_blue"
-            app:iconTint="@color/white"
-            android:contentDescription="@string/next_btn"
-            android:visibility="gone"/>
-
-        <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+        <ImageButton
             android:id="@+id/forward10PA"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            app:icon="@drawable/fast_forward_10"
-            app:iconSize="41dp"
-            app:shapeAppearanceOverlay="@style/circle"
-            android:backgroundTint="@color/cool_blue"
-            app:iconTint="@color/white"
-            android:contentDescription="@string/previous_btn"
-            />
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="12dp"
+            android:src="@drawable/fast_forward_10"
+            app:tint="@color/primary_book" />
 
-        <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+        <ImageButton
             android:id="@+id/forward60PA"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            app:icon="@drawable/fast_forward_60"
-            app:iconSize="41dp"
-            app:shapeAppearanceOverlay="@style/circle"
-            android:backgroundTint="@color/cool_blue"
-            app:iconTint="@color/white"
-            android:contentDescription="@string/next_btn"
-            android:layout_marginLeft="10dp"
-            />
-
-
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="12dp"
+            android:src="@drawable/fast_forward_60"
+            app:tint="@color/primary_light_book" />
     </LinearLayout>
 
-<LinearLayout
-    android:layout_width="match_parent"
-    android:layout_height="25sp"
-    android:orientation="horizontal"
-    android:layout_margin="20sp"
-    android:layout_weight="0.4"
-    android:gravity="center">
-
-    <TextView
-        android:id="@+id/tvSeekBarStart"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textColor="@color/black"
-        android:textSize="15sp"
-        android:text="@string/start_tv"
-        android:gravity="center"/>
-
-    <androidx.appcompat.widget.AppCompatSeekBar
-        android:id="@+id/seekBarPA"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        tools:ignore="NestedWeights" />
-
-
-    <TextView
-        android:id="@+id/tvSeekBarEnd"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textColor="@color/black"
-        android:textSize="15sp"
-        android:text="@string/end_tv"
-        android:gravity="center"/>
-
-</LinearLayout>
-
+    <!-- Bottom Options Section -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:gravity="center"
         android:orientation="horizontal"
-        >
-
-        <ImageButton
-            android:id="@+id/repeatBtnPA"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:src="@drawable/repeat_icon"
-            android:background="@android:color/transparent"
-            app:tint="@color/cool_pink"
-            android:contentDescription="@string/repeat_btn"
-            android:layout_weight="1"
-            android:visibility="gone"
-            />
-
-        <ImageButton
-            android:id="@+id/lockUIBtnPA"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:src="@drawable/lock_open_outline"
-            android:background="@android:color/transparent"
-            app:tint="@color/cool_pink"
-            android:contentDescription="@string/repeat_btn"
-            android:layout_weight="1"
-            />
-
-        <ImageButton
-            android:id="@+id/equalizerBtnPA"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:src="@drawable/equalizer_icon"
-            android:background="@android:color/transparent"
-            app:tint="@color/cool_pink"
-            android:contentDescription="@string/equalizer_btn"
-            android:layout_weight="1"
-            />
-
-        <LinearLayout
-            android:id="@+id/timerLayoutPA"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:layout_gravity="center"
-            android:layout_weight="1"
-            >
-        <ImageButton
-            android:id="@+id/timerBtnPA"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:src="@drawable/timer_icon"
-            android:background="@android:color/transparent"
-            app:tint="@color/cool_pink"
-            android:contentDescription="@string/timer_btn"
-            android:layout_weight="1"
-            android:layout_gravity="center"
-            android:visibility="visible"/>
-            <TextView
-                android:id="@+id/textTimerOn"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textColor="@color/black"
-                android:textSize="18sp"
-                android:text="--:--"
-                android:textStyle="bold"
-                android:visibility="gone"
-                android:layout_gravity="center"
-                android:layout_weight="1"/>
-        </LinearLayout>
-
-        <ImageButton
-            android:id="@+id/shareBtnPA"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/share_btn"
-            android:src="@drawable/share_icon"
-            app:tint="@color/cool_pink" />
+        android:paddingBottom="32dp">
 
         <ImageButton
             android:id="@+id/speedBtnPA"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:src="@drawable/speed_1x_icon"
-            android:background="@android:color/transparent"
-            app:tint="@color/cool_pink"
-            android:contentDescription="@string/play_speed_at_1x_lit"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:layout_weight="1"
-            />
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/speed_1x_icon"
+            app:tint="@color/primary_light_book" />
 
+        <ImageButton
+            android:id="@+id/timerBtnPA"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/timer_icon"
+            app:tint="@color/primary_light_book" />
 
+        <ImageButton
+            android:id="@+id/lockUIBtnPA"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/lock_open_outline"
+            app:tint="@color/primary_light_book" />
 
+        <ImageButton
+            android:id="@+id/shareBtnPA"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/share_icon"
+            app:tint="@color/primary_light_book" />
 
-
-
+        <ImageButton
+            android:id="@+id/equalizerBtnPA"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/equalizer_icon"
+            app:tint="@color/primary_light_book" />
     </LinearLayout>
 
+    <!-- Oculto para lógica de Timer -->
+    <TextView
+        android:id="@+id/textTimerOn"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+
+    <ImageButton
+        android:id="@+id/repeatBtnPA"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+    
+    <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+        android:id="@+id/previusBtnPA"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+
+    <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+        android:id="@+id/nextBtnPA"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
 
 </LinearLayout>
