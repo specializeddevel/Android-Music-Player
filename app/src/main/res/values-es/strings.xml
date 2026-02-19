@@ -1,3 +1,4 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Litera</string>
     <string name="shuffle_btn">Aleatorio</string>
@@ -68,18 +69,14 @@
     <string name="sharing_your_audiobook_file">¡Compartiendo tu audiolibro!</string>
     <string name="min_endchap">Fin de capítulo</string>
     <string name="min_none">Ninguno</string>
-
-    <!-- UI Strings -->
     <string name="search_placeholder">Buscar libros...</string>
-    <string name="sort_title">Nombre (A-Z)</string>
+    <string name="sort_title">Título (A-Z)</string>
     <string name="sort_artist">Autor</string>
     <string name="sort_progress">Avance</string>
     <string name="sort_recent">Recientes</string>
     <string name="added_to_queue">Añadido a la cola: %1$s</string>
     <string name="no_favorites_yet">Aún no tienes favoritos</string>
     <string name="my_favorites">Mis Favoritos</string>
-    
-    <!-- Settings -->
     <string name="appearance">Apariencia</string>
     <string name="dynamic_colors">Colores Dinámicos</string>
     <string name="dynamic_colors_desc">Adaptar el color de la interfaz a la portada del libro actual.</string>
@@ -90,8 +87,6 @@
     <string name="audiobook_folder">Carpeta de Audiolibros</string>
     <string name="scanning_all_memory">Escaneando toda la memoria</string>
     <string name="about_app">Sobre la App</string>
-
-    <!-- Player Strings -->
     <string name="undo_seek">DESHACER SALTO</string>
     <string name="manual_bookmarks">Marcadores Manuales</string>
     <string name="no_bookmarks_yet">No has guardado marcadores todavía.</string>
@@ -114,8 +109,6 @@
     <string name="unknown_title">Sin título</string>
     <string name="unknown_artist">Autor desconocido</string>
     <string name="view_in_folder">Ver en Carpeta</string>
-
-    <!-- Shake to Extend -->
     <string name="shake_to_extend">Agitar para Extender</string>
     <string name="shake_to_extend_desc">Agitar el móvil en el último minuto para reiniciar el tiempo.</string>
     <string name="vibration_warning">Vibración de Aviso</string>
@@ -126,4 +119,37 @@
     <string name="share_file_warning_title">Compartir archivo pesado</string>
     <string name="share_file_warning_message">Los audiolibros suelen ser archivos muy grandes. El proceso de preparación para compartir puede tardar un momento dependiendo del tamaño. ¿Deseas continuar?</string>
     <string name="confirm">Confirmar</string>
+    <string name="send">Enviar</string>
+    <string name="receive">Recibir</string>
+    <string name="retry">Reintentar</string>
+    <string name="address">Dirección: %1$s</string>
+    <string name="manual">Manual</string>
+    <string name="camera">Cámara</string>
+    <string name="permission">Permiso</string>
+    <string name="your_ip">Tu IP: %1$s</string>
+    <string name="finish_and_exit">Finalizar y Salir</string>
+    <string name="welcome_title">¡Bienvenido a Litera!</string>
+    <string name="welcome_desc">Para empezar, necesitamos que selecciones la carpeta donde guardas tus audiolibros.</string>
+    <string name="select_folder">Seleccionar Carpeta</string>
+    <string name="onboarding_note">Podrás cambiar esto más tarde en Ajustes.</string>
+    <string name="book_detected">Libro detectado</string>
+    <string name="existing_book_msg">Se ha detectado ‘%1$s’ en tu biblioteca. ¿Qué deseas hacer?</string>
+    <string name="sync_progress_only">Solo Sincronizar Progreso (Instantáneo)</string>
+    <string name="download_full_book">Descargar Libro Completo</string>
+    <string name="sending">Enviando: %1$s</string>
+    <string name="receiving">Recibiendo: %1$s</string>
+    <string name="book_sent">¡Libro enviado con éxito!</string>
+    <string name="book_received">¡Libro recibido en Inbox!</string>
+    <string name="synced_via_qr">¡Sincronizado vía QR!</string>
+    <string name="connecting">Conectando...</string>
+    <string name="waiting_receiver">Esperando al receptor...</string>
+    <string name="qr_generated">QR Generado. Escanéalo.</string>
+    <string name="cloud_sync">Sincronización Cloud</string>
+    <string name="cloud_sync_desc">Sincroniza tu progreso en Google Drive para no perder nunca tu avance.</string>
+    <string name="connect_google_drive">Conectar Google Drive</string>
+    <string name="last_sync">Última sincronización</string>
+    <string name="never">Nunca</string>
+    <string name="sync_now">Sincronizar ahora</string>
+    <string name="stop_sleep_timer">Detener Temporizador</string>
+    <string name="playback_speed_selector">Velocidad de reproducción</string>
 </resources>

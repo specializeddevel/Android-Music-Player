@@ -588,7 +588,8 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
             override fun onFinish() { 
                 stopShakeDetection()
                 _uiState.value = _uiState.value.copy(isShakeWaiting = false)
-                togglePlayPause()
+                controller?.pause()
+                logAction("Temporizador finalizado")
                 cancelSleepTimer() 
             }
         }.start()

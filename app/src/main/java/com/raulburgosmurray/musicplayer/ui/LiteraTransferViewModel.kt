@@ -1,4 +1,4 @@
-package com.raulburgosmurray.musicplayer.ui
+﻿package com.raulburgosmurray.musicplayer.ui
 
 import android.app.Application
 import android.net.Uri
@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.documentfile.provider.DocumentFile
 import com.raulburgosmurray.musicplayer.data.AppDatabase
 import com.raulburgosmurray.musicplayer.data.AudiobookProgress
+import com.raulburgosmurray.musicplayer.R
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -49,7 +50,7 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
 
     fun resetTransferState() {
         _uiState.value = _uiState.value.copy(
-            isDownloading = false, downloadProgress = 0f, transferStatus = "Listo",
+            isDownloading = false, downloadProgress = 0f, transferStatus = getApplication<Application>().getString(R.string.open),
             error = null, pendingProgress = null, pendingBookTitle = null,
             showConflictDialog = false, targetIp = null
         )
@@ -80,7 +81,7 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
                     if (bookProgress != null) { put("p", bookProgress.lastPosition); put("d", bookProgress.duration) }
                 }
 
-                _uiState.value = _uiState.value.copy(qrData = qrJson.toString(), isServerRunning = true, transferStatus = "Escanea el código QR")
+                _uiState.value = _uiState.value.copy(qrData = qrJson.toString(), isServerRunning = true, transferStatus = getApplication<Application>().getString(R.string.qr_generated))
 
                 val pm = getApplication<Application>().getSystemService(Application.POWER_SERVICE) as PowerManager
                 val wm = getApplication<Application>().getSystemService(Application.WIFI_SERVICE) as WifiManager
@@ -103,15 +104,15 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
                 socket.tcpNoDelay = true
                 val output = DataOutputStream(BufferedOutputStream(socket.outputStream))
                 val input = DataInputStream(BufferedInputStream(socket.inputStream))
+                val context = getApplication<Application>()
                 
-                // Enviar confirmación de libro al conectar
                 output.writeUTF(title); output.flush()
                 
                 val response = input.readUTF()
                 if (response == "FILE") {
                     var fileSize = 0L; var fileName = "audiobook.mp3"
                     if (path.startsWith("content://")) {
-                        getApplication<Application>().contentResolver.query(Uri.parse(path), null, null, null, null)?.use { cursor ->
+                        context.contentResolver.query(Uri.parse(path), null, null, null, null)?.use { cursor ->
                             if (cursor.moveToFirst()) {
                                 fileSize = cursor.getLong(cursor.getColumnIndexOrThrow(android.provider.OpenableColumns.SIZE))
                                 fileName = cursor.getString(cursor.getColumnIndexOrThrow(android.provider.OpenableColumns.DISPLAY_NAME))
@@ -121,9 +122,9 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
                     
                     output.writeUTF(fileName); output.writeLong(fileSize); output.flush()
                     
-                    withContext(Dispatchers.Main) { _uiState.value = _uiState.value.copy(transferStatus = "Enviando: $title") }
+                    withContext(Dispatchers.Main) { _uiState.value = _uiState.value.copy(transferStatus = context.getString(R.string.sending, title)) }
 
-                    val inputStream: InputStream = if (path.startsWith("content://")) { getApplication<Application>().contentResolver.openInputStream(Uri.parse(path))!! } else { FileInputStream(File(path)) }
+                    val inputStream: InputStream = if (path.startsWith("content://")) { context.contentResolver.openInputStream(Uri.parse(path))!! } else { FileInputStream(File(path)) }
                     inputStream.use { i ->
                         val buffer = ByteArray(65536); var bytesRead: Int
                         while (i.read(buffer).also { bytesRead = it } != -1) { output.write(buffer, 0, bytesRead) }
@@ -131,7 +132,7 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
                     output.flush()
                 }
                 socket.close()
-                withContext(Dispatchers.Main) { _uiState.value = _uiState.value.copy(transferStatus = "¡Libro enviado!") }
+                withContext(Dispatchers.Main) { _uiState.value = _uiState.value.copy(transferStatus = context.getString(R.string.book_sent)) }
             } catch (e: Exception) { withContext(Dispatchers.Main) { _uiState.value = _uiState.value.copy(error = "Fallo: ${e.message}") } }
             finally { try { socket.close() } catch (e: Exception) {} }
         }
@@ -139,6 +140,7 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
 
     fun processScannedData(qrString: String, libraryUri: String?) {
         if (_uiState.value.isDownloading || _uiState.value.showConflictDialog) return
+        val context = getApplication<Application>()
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val json = JSONObject(qrString); val ip = json.getString("ip"); val title = json.getString("t"); val author = json.getString("a")
@@ -159,23 +161,25 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
 
     fun handleUserDecision(decision: String, libraryUri: String?) {
         val targetIp = _uiState.value.targetIp; val progress = _uiState.value.pendingProgress
+        val context = getApplication<Application>()
         _uiState.value = _uiState.value.copy(showConflictDialog = false)
         viewModelScope.launch(Dispatchers.IO) {
             when (decision) {
                 "PROGRESS" -> {
                     if (progress != null) database.progressDao().saveProgress(progress)
-                    withContext(Dispatchers.Main) { _uiState.value = _uiState.value.copy(transferStatus = "¡Sincronizado vía QR!") }
+                    withContext(Dispatchers.Main) { _uiState.value = _uiState.value.copy(transferStatus = context.getString(R.string.synced_via_qr)) }
                 }
                 "FILE" -> { if (targetIp != null) receiveFromIp(targetIp, libraryUri) }
-                "CANCEL" -> { withContext(Dispatchers.Main) { _uiState.value = _uiState.value.copy(transferStatus = "Cancelado") } }
+                "CANCEL" -> { withContext(Dispatchers.Main) { _uiState.value = _uiState.value.copy(transferStatus = context.getString(R.string.cancel)) } }
             }
         }
     }
 
     fun receiveFromIp(ipAndPort: String, targetRootUri: String?) {
+        val context = getApplication<Application>()
         viewModelScope.launch(Dispatchers.IO) {
             val cleanUrl = ipAndPort.replace("http://", "").replace("/", "").trim()
-            _uiState.value = _uiState.value.copy(isDownloading = true, transferStatus = "Conectando...", error = null)
+            _uiState.value = _uiState.value.copy(isDownloading = true, transferStatus = context.getString(R.string.connecting), error = null)
             var socket: Socket? = null
             try {
                 val parts = cleanUrl.split(":"); socket = Socket(); socket.connect(InetSocketAddress(parts[0], parts[1].toInt()), 10000); socket.soTimeout = 60000
@@ -183,7 +187,7 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
                 val output = DataOutputStream(BufferedOutputStream(socket.outputStream))
                 
                 val bookTitle = input.readUTF()
-                withContext(Dispatchers.Main) { _uiState.value = _uiState.value.copy(transferStatus = "Recibiendo: $bookTitle") }
+                withContext(Dispatchers.Main) { _uiState.value = _uiState.value.copy(transferStatus = context.getString(R.string.receiving, bookTitle)) }
                 
                 output.writeUTF("FILE"); output.flush()
                 
@@ -216,7 +220,7 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
             }
         }
         if (finalPath != null && !finalPath.startsWith("content://")) MediaScannerConnection.scanFile(context, arrayOf(finalPath), null, null)
-        withContext(Dispatchers.Main) { _uiState.value = _uiState.value.copy(isDownloading = false, transferStatus = "¡Libro recibido!", downloadProgress = 1f) }
+        withContext(Dispatchers.Main) { _uiState.value = _uiState.value.copy(isDownloading = false, transferStatus = context.getString(R.string.book_received), downloadProgress = 1f) }
     }
 
     private fun getLocalIpAddress(): String {
