@@ -24,6 +24,10 @@ import kotlinx.coroutines.launch
 
 class PlaybackService : MediaSessionService() {
 
+    companion object {
+        const val SYNC_ACTION = "com.raulburgosmurray.musicplayer.SYNC_PROGRESS"
+    }
+
     private var mediaSession: MediaSession? = null
     private var player: ExoPlayer? = null
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -102,11 +106,18 @@ class PlaybackService : MediaSessionService() {
         val p = player ?: return
         serviceScope.launch(Dispatchers.IO) {
             try {
-                val progress = database.progressDao().getProgress(mediaId) ?: return@launch
+                val progress = database.progressDao().getProgress(mediaId)
                 launch(Dispatchers.Main) {
                     val currentPlayer = player ?: return@launch
-                    if (Math.abs(currentPlayer.currentPosition - progress.lastPosition) > 1000) {
-                        currentPlayer.seekTo(progress.lastPosition)
+                    if (progress != null) {
+                        if (Math.abs(currentPlayer.currentPosition - progress.lastPosition) > 1000) {
+                            currentPlayer.seekTo(progress.lastPosition)
+                        }
+                        // Restaurar la velocidad guardada (mínimo 0.1 para evitar errores)
+                        currentPlayer.setPlaybackSpeed(progress.playbackSpeed.coerceAtLeast(0.1f))
+                    } else {
+                        // Libro nuevo: resetear velocidad a 1.0f por defecto
+                        currentPlayer.setPlaybackSpeed(1.0f)
                     }
                 }
             } catch (e: Exception) {
@@ -196,6 +207,7 @@ class PlaybackService : MediaSessionService() {
         val currentMediaItem = p.currentMediaItem ?: return
         val position = p.currentPosition
         val duration = p.duration
+        val speed = p.playbackParameters.speed
         
         if (duration <= 0 || position < 0) return
         
@@ -211,9 +223,16 @@ class PlaybackService : MediaSessionService() {
                         mediaId = currentMediaItem.mediaId, 
                         lastPosition = position, 
                         duration = duration,
-                        lastPauseTimestamp = pauseToSave
+                        lastPauseTimestamp = pauseToSave,
+                        playbackSpeed = speed
                     )
                 )
+                
+                // Si estamos pausando, notificamos a la app que debe sincronizar con la nube
+                if (isPausing) {
+                    val syncIntent = Intent(SYNC_ACTION)
+                    sendBroadcast(syncIntent)
+                }
             } catch (e: Exception) {
                 Log.e("PlaybackService", "Error guardando progreso", e)
             }

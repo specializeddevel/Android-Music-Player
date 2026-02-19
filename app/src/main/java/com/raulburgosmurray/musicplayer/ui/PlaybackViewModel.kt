@@ -5,6 +5,19 @@ import android.content.ComponentName
 import android.content.Context
 import android.util.Log
 import android.graphics.BitmapFactory
+import android.hardware.Sensor
+import android.hardware.SensorManager
+import android.os.Vibrator
+import android.os.VibrationEffect
+import android.os.Build
+import android.os.VibratorManager
+import android.media.AudioManager
+import android.media.ToneGenerator
+import android.media.AudioAttributes
+import android.net.Uri
+import android.widget.Toast
+import androidx.core.content.FileProvider
+import java.io.File
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
@@ -22,6 +35,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import android.os.CountDownTimer
+import android.content.Intent
 
 import com.raulburgosmurray.musicplayer.data.AppDatabase
 import com.raulburgosmurray.musicplayer.data.FavoriteBook
@@ -29,6 +43,7 @@ import com.raulburgosmurray.musicplayer.data.Bookmark
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.first
 
 import com.raulburgosmurray.musicplayer.Chapter
 import com.raulburgosmurray.musicplayer.HistoryAction
@@ -52,7 +67,9 @@ data class PlaybackState(
     val bookmarks: List<Bookmark> = emptyList(),
     val lastPositionBeforeSeek: Long? = null,
     val history: List<HistoryAction> = emptyList(),
-    val dominantColor: Int? = null
+    val dominantColor: Int? = null,
+    val isShakeWaiting: Boolean = false,
+    val currentMusicDetails: com.raulburgosmurray.musicplayer.Music? = null
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -64,6 +81,9 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
     private var controller: MediaController? = null
     private var progressJob: Job? = null
     private var sleepTimer: CountDownTimer? = null
+    private var originalTimerMinutes: Int = 0
+    private var sensorManager: SensorManager? = null
+    private var shakeDetector: com.raulburgosmurray.musicplayer.ShakeDetector? = null
     private val database = AppDatabase.getDatabase(application)
 
     private val _uiState = MutableStateFlow(PlaybackState())
@@ -72,9 +92,84 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
     private var isQueueLoaded = false
     private var pendingBooksToLoadQueue: List<com.raulburgosmurray.musicplayer.Music>? = null
 
+    // Shake Preferences
+    private var isShakeSettingEnabled = true
+    private var isVibrationEnabled = true
+    private var isSoundEnabled = false
+
     init {
         observeFavoriteStatus()
         observeBookmarks()
+    }
+
+    fun updateShakePreferences(enabled: Boolean, vibration: Boolean, sound: Boolean) {
+        isShakeSettingEnabled = enabled
+        isVibrationEnabled = vibration
+        isSoundEnabled = sound
+    }
+
+    private fun playWarningSound() {
+        if (!isSoundEnabled) return
+        try {
+            // Usar STREAM_ALARM para asegurar que se oiga
+            val toneGen = ToneGenerator(AudioManager.STREAM_ALARM, 80)
+            toneGen.startTone(ToneGenerator.TONE_CDMA_PIP, 300)
+        } catch (e: Exception) {
+            Log.e("PlaybackVM", "Error al reproducir sonido de aviso", e)
+        }
+    }
+
+    private fun vibrate() {
+        if (!isVibrationEnabled) return
+        val context = getApplication<Application>().applicationContext
+        val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+            vibratorManager.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // Usar atributos de alarma para mayor prioridad
+            val attributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+            vibrator.vibrate(VibrationEffect.createOneShot(500, VibrationEffect.DEFAULT_AMPLITUDE), attributes)
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(500)
+        }
+    }
+
+    private fun startShakeDetection() {
+        if (shakeDetector != null) return
+        val context = getApplication<Application>().applicationContext
+        sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        val accelerometer = sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        
+        shakeDetector = com.raulburgosmurray.musicplayer.ShakeDetector {
+            Log.d("PlaybackVM", "Agitado confirmado, extendiendo...")
+            extendSleepTimer()
+        }
+        
+        // Usar DELAY_GAME para mayor frecuencia de muestreo
+        sensorManager?.registerListener(shakeDetector, accelerometer, SensorManager.SENSOR_DELAY_GAME)
+    }
+
+    private fun stopShakeDetection() {
+        sensorManager?.unregisterListener(shakeDetector)
+        shakeDetector = null
+    }
+
+    private fun extendSleepTimer() {
+        stopShakeDetection()
+        vibrate()
+        playWarningSound()
+        viewModelScope.launch(Dispatchers.Main) {
+            startSleepTimer(originalTimerMinutes)
+        }
     }
 
     private fun observeBookmarks() {
@@ -211,18 +306,27 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
         }
     }
 
-    private var lastScannedPath: String? = null
+    private var lastScannedUri: String? = null
 
-    private fun extractChapters(path: String) {
+    private fun extractChapters(uriString: String) {
+        val uri = android.net.Uri.parse(uriString)
         viewModelScope.launch(Dispatchers.IO) {
             val chaptersList = mutableListOf<Chapter>()
             val retriever = android.media.MediaMetadataRetriever()
+            val context = getApplication<Application>().applicationContext
             try {
-                retriever.setDataSource(path)
+                if (uriString.startsWith("content://")) {
+                    context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
+                        retriever.setDataSource(pfd.fileDescriptor)
+                    }
+                } else {
+                    retriever.setDataSource(uriString)
+                }
+                // Aquí iría la lógica de extracción de capítulos (si la hubiera)
             } catch (e: Exception) {
-                Log.e("PlaybackVM", "Error al extraer capítulos", e)
+                Log.e("PlaybackVM", "Error al extraer capítulos de $uriString", e)
             } finally {
-                retriever.release()
+                try { retriever.release() } catch (e: Exception) {}
             }
             withContext(Dispatchers.Main) {
                 _uiState.value = _uiState.value.copy(chapters = chaptersList)
@@ -286,6 +390,19 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
         }
     }
 
+    private fun updateCurrentMusicDetails(mediaId: String?) {
+        if (mediaId == null) {
+            _uiState.value = _uiState.value.copy(currentMusicDetails = null)
+            return
+        }
+        viewModelScope.launch {
+            val cachedBook = withContext(Dispatchers.IO) {
+                database.cachedBookDao().getAllBooks().first().find { it.id == mediaId }
+            }
+            _uiState.value = _uiState.value.copy(currentMusicDetails = cachedBook?.toMusic())
+        }
+    }
+
     private fun setupController() {
         val player = controller ?: return
         player.addListener(object : Player.Listener {
@@ -302,11 +419,12 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
                     chapters = emptyList(),
                     dominantColor = null
                 )
+                updateCurrentMusicDetails(mediaItem?.mediaId)
                 updateDominantColor(mediaItem?.mediaMetadata?.artworkUri)
-                mediaItem?.localConfiguration?.uri?.path?.let { path ->
-                    if (path != lastScannedPath) {
-                        extractChapters(path)
-                        lastScannedPath = path
+                mediaItem?.localConfiguration?.uri?.toString()?.let { uriString ->
+                    if (uriString != lastScannedUri) {
+                        extractChapters(uriString)
+                        lastScannedUri = uriString
                     }
                 }
             }
@@ -321,6 +439,10 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
                     isReady = playbackState == Player.STATE_READY,
                     duration = player.duration
                 )
+            }
+
+            override fun onPlaybackParametersChanged(playbackParameters: androidx.media3.common.PlaybackParameters) {
+                _uiState.value = _uiState.value.copy(playbackSpeed = playbackParameters.speed)
             }
 
             override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
@@ -338,6 +460,7 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
             isReady = player.playbackState == Player.STATE_READY
         )
         updatePlaylistState()
+        updateCurrentMusicDetails(player.currentMediaItem?.mediaId)
         updateDominantColor(player.currentMediaItem?.mediaMetadata?.artworkUri)
         if (player.isPlaying) startProgressUpdate()
     }
@@ -438,23 +561,44 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
     }
 
     fun startSleepTimer(minutes: Int) {
-        sleepTimer?.cancel()
-        _uiState.value = _uiState.value.copy(sleepTimerMinutes = minutes)
+        cancelSleepTimer()
+        originalTimerMinutes = minutes
+        _uiState.value = _uiState.value.copy(sleepTimerMinutes = minutes, isShakeWaiting = false)
+        
+        var hasWarned = false
+
         sleepTimer = object : CountDownTimer(minutes * 60 * 1000L, 1000) {
             override fun onTick(millisUntilFinished: Long) {
                 val minsRemaining = (millisUntilFinished / 1000 / 60).toInt() + 1
                 if (_uiState.value.sleepTimerMinutes != minsRemaining) {
                     _uiState.value = _uiState.value.copy(sleepTimerMinutes = minsRemaining)
                 }
+
+                // Zona de advertencia: últimos 30 segundos
+                if (millisUntilFinished <= 30000 && !hasWarned) {
+                    hasWarned = true
+                    vibrate()
+                    playWarningSound()
+                    if (isShakeSettingEnabled) {
+                        _uiState.value = _uiState.value.copy(isShakeWaiting = true)
+                        startShakeDetection()
+                    }
+                }
             }
-            override fun onFinish() { togglePlayPause(); cancelSleepTimer() }
+            override fun onFinish() { 
+                stopShakeDetection()
+                _uiState.value = _uiState.value.copy(isShakeWaiting = false)
+                togglePlayPause()
+                cancelSleepTimer() 
+            }
         }.start()
     }
 
     fun cancelSleepTimer() {
+        stopShakeDetection()
         sleepTimer?.cancel()
         sleepTimer = null
-        _uiState.value = _uiState.value.copy(sleepTimerMinutes = 0)
+        _uiState.value = _uiState.value.copy(sleepTimerMinutes = 0, isShakeWaiting = false)
     }
 
     private var pendingPlaylist: Pair<List<MediaItem>, Int>? = null
@@ -468,6 +612,69 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
             player.play()
         } else {
             pendingPlaylist = Pair(mediaItems, startIndex)
+        }
+    }
+
+    fun shareProgress(context: Context) {
+        val state = _uiState.value
+        val title = state.currentMediaItem?.mediaMetadata?.title ?: "Audiolibro"
+        val artist = state.currentMediaItem?.mediaMetadata?.artist ?: "Desconocido"
+        val position = com.raulburgosmurray.musicplayer.Music.formatDuration(state.currentPosition)
+        val duration = com.raulburgosmurray.musicplayer.Music.formatDuration(state.duration)
+        val percentage = if (state.duration > 0) (state.currentPosition * 100 / state.duration).toInt() else 0
+
+        val shareText = "🎧 Estoy escuchando '$title' de $artist en mi reproductor. \n¡Voy por el minuto $position de $duration ($percentage%)! 📖✨"
+        
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, "Avance de audiolibro")
+            putExtra(Intent.EXTRA_TEXT, shareText)
+        }
+        
+        val chooser = Intent.createChooser(intent, "Compartir avance")
+        chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(chooser)
+    }
+
+    fun shareFile(context: Context) {
+        val state = _uiState.value
+        val currentMediaItem = state.currentMediaItem
+        
+        // Intentar obtener la URI desde el MediaItem o desde los detalles de música
+        val uriToShare: Uri? = currentMediaItem?.localConfiguration?.uri 
+            ?: state.currentMusicDetails?.path?.let { 
+                if (it.startsWith("content://")) Uri.parse(it) else Uri.fromFile(File(it))
+            }
+
+        if (uriToShare == null) {
+            Toast.makeText(context, "No se encontró el archivo para compartir", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        try {
+            val finalUri: Uri = if (uriToShare.scheme == "content") {
+                uriToShare
+            } else {
+                val file = File(uriToShare.path ?: "")
+                if (!file.exists()) {
+                    Toast.makeText(context, "Archivo físico no encontrado", Toast.LENGTH_SHORT).show()
+                    return
+                }
+                FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            }
+
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "audio/*"
+                putExtra(Intent.EXTRA_STREAM, finalUri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+
+            val chooser = Intent.createChooser(intent, "Compartir audiolibro")
+            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(chooser)
+        } catch (e: Exception) {
+            Log.e("PlaybackVM", "Error al compartir archivo", e)
+            Toast.makeText(context, "Error al compartir: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 

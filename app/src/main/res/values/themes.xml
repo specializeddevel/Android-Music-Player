@@ -2,6 +2,8 @@
     <!-- Base application theme. -->
     <style name="splash_screen" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="android:windowBackground">@drawable/splash_screen</item>
+        <item name="android:statusBarColor">#4E342E</item>
+        <item name="android:navigationBarColor">#4E342E</item>
         <item name="android:forceDarkAllowed" tools:targetApi="q">false</item>
     </style>
 
