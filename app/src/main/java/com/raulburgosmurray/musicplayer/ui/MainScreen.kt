@@ -1,4 +1,4 @@
-package com.raulburgosmurray.musicplayer.ui
+﻿package com.raulburgosmurray.musicplayer.ui
 
 import android.Manifest
 import android.content.Context
@@ -94,11 +94,11 @@ fun MainScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
                 actions = {
-                    IconButton(onClick = onReceiveClick) { Icon(Icons.Default.Wifi, contentDescription = "Recibir") }
-                    IconButton(onClick = { mainViewModel.loadBooks(settingsViewModel.libraryRootUri.value) }) { Icon(Icons.Default.Refresh, contentDescription = "Actualizar") }
+                    IconButton(onClick = onReceiveClick) { Icon(Icons.Default.Wifi, contentDescription = stringResource(R.string.receive)) }
+                    IconButton(onClick = { mainViewModel.loadBooks(settingsViewModel.libraryRootUri.value) }) { Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.open)) }
                     IconButton(onClick = { settingsViewModel.setLayoutMode(if (layoutMode == LayoutMode.LIST) LayoutMode.GRID else LayoutMode.LIST) }) { Icon(if (layoutMode == LayoutMode.LIST) Icons.Default.GridView else Icons.AutoMirrored.Filled.ViewList, contentDescription = "Vista") }
                     Box {
-                        IconButton(onClick = { showSortMenu = true }) { Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Ordenar") }
+                        IconButton(onClick = { showSortMenu = true }) { Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = stringResource(R.string.sort_title)) }
                         DropdownMenu(expanded = showSortMenu, onDismissRequest = { showSortMenu = false }) {
                             DropdownMenuItem(text = { Text(stringResource(R.string.sort_title)) }, leadingIcon = { if (currentSortOrder == SortOrder.TITLE) Icon(Icons.Default.Check, null) }, onClick = { settingsViewModel.setSortOrder(SortOrder.TITLE); showSortMenu = false })
                             DropdownMenuItem(text = { Text(stringResource(R.string.sort_artist)) }, leadingIcon = { if (currentSortOrder == SortOrder.ARTIST) Icon(Icons.Default.Check, null) }, onClick = { settingsViewModel.setSortOrder(SortOrder.ARTIST); showSortMenu = false })
@@ -106,8 +106,8 @@ fun MainScreen(
                             DropdownMenuItem(text = { Text(stringResource(R.string.sort_recent)) }, leadingIcon = { if (currentSortOrder == SortOrder.RECENT) Icon(Icons.Default.Check, null) }, onClick = { settingsViewModel.setSortOrder(SortOrder.RECENT); showSortMenu = false })
                         }
                     }
-                    IconButton(onClick = onFavoritesClick) { Icon(Icons.Default.Favorite, contentDescription = "Favoritos", tint = if (favoriteIds.isNotEmpty()) androidx.compose.ui.graphics.Color.Red else LocalContentColor.current) }
-                    IconButton(onClick = onSettingsClick) { Icon(Icons.Default.Settings, contentDescription = "Ajustes") }
+                    IconButton(onClick = onFavoritesClick) { Icon(Icons.Default.Favorite, contentDescription = stringResource(R.string.favourites_btn), tint = if (favoriteIds.isNotEmpty()) androidx.compose.ui.graphics.Color.Red else LocalContentColor.current) }
+                    IconButton(onClick = onSettingsClick) { Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings)) }
                 }
             )
         },
@@ -201,9 +201,15 @@ fun androidx.compose.animation.SharedTransitionScope.BookGridItem(book: Music, i
                 else BookPlaceholder(title = book.title, modifier = Modifier.fillMaxSize())
             }
             Surface(modifier = Modifier.fillMaxWidth().align(Alignment.BottomCenter), color = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.6f)) {
-                Column(modifier = Modifier.padding(8.dp).heightIn(max = 60.dp).verticalScroll(rememberScrollState())) {
+                Column(modifier = Modifier.padding(8.dp).heightIn(max = 70.dp).verticalScroll(rememberScrollState())) {
                     Text(text = book.title, style = MaterialTheme.typography.labelLarge, color = androidx.compose.ui.graphics.Color.White, fontWeight = FontWeight.Bold)
                     Text(text = book.artist, style = MaterialTheme.typography.labelSmall, color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.8f))
+                    val currentPos = (progress * book.duration).toLong()
+                    Text(
+                        text = if (progress > 0f) "${Music.formatDuration(currentPos)} / ${Music.formatDuration(book.duration)}" else Music.formatDuration(book.duration),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f)
+                    )
                 }
             }
             IconButton(onClick = onAddToQueue, modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(32.dp).background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.4f), RoundedCornerShape(12.dp))) { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = null, tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(18.dp)) }
@@ -227,7 +233,7 @@ fun androidx.compose.animation.SharedTransitionScope.MiniPlayer(state: PlaybackS
                 Text(text = currentItem.mediaMetadata.title?.toString() ?: stringResource(R.string.unknown_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.basicMarquee())
                 Text(text = currentItem.mediaMetadata.artist?.toString() ?: stringResource(R.string.unknown_artist), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, modifier = Modifier.basicMarquee())
             }
-            IconButton(onClick = onTogglePlay) { Icon(if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, contentDescription = "Play/Pause", modifier = Modifier.size(32.dp), tint = MaterialTheme.colorScheme.primary) }
+            IconButton(onClick = onTogglePlay) { Icon(if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, contentDescription = stringResource(R.string.pause_play_btn), modifier = Modifier.size(32.dp), tint = MaterialTheme.colorScheme.primary) }
         }
         val progress = if (state.duration > 0) state.currentPosition.toFloat() / state.duration.toFloat() else 0f
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomStart) { LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(3.dp), color = MaterialTheme.colorScheme.primary, trackColor = androidx.compose.ui.graphics.Color.Transparent) }
@@ -251,8 +257,14 @@ fun androidx.compose.animation.SharedTransitionScope.BookListItem(book: Music, i
                         if (isFavorite) { Spacer(modifier = Modifier.width(8.dp)); Icon(Icons.Default.Favorite, contentDescription = null, tint = androidx.compose.ui.graphics.Color.Red, modifier = Modifier.size(16.dp)) }
                     }
                     Text(text = book.artist, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary, maxLines = 1)
+                    val currentPos = (progress * book.duration).toLong()
+                    Text(
+                        text = if (progress > 0f) "${Music.formatDuration(currentPos)} / ${Music.formatDuration(book.duration)}" else Music.formatDuration(book.duration),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
                 }
-                IconButton(onClick = onAddToQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Cola", tint = MaterialTheme.colorScheme.primary) }
+                IconButton(onClick = onAddToQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = stringResource(R.string.playlist_btn), tint = MaterialTheme.colorScheme.primary) }
                 Icon(Icons.Default.PlayCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
             }
             if (progress > 0f) LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(4.dp), color = MaterialTheme.colorScheme.primary, trackColor = androidx.compose.ui.graphics.Color.Transparent)

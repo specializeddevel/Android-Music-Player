@@ -1,4 +1,4 @@
-package com.raulburgosmurray.musicplayer
+﻿package com.raulburgosmurray.musicplayer
 
 import android.os.Bundle
 import android.widget.Toast
@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
@@ -160,12 +161,13 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
+                    val exitMessage = stringResource(R.string.press_back_again_to_exit)
                     BackHandler(enabled = currentRoute == "main") {
                         if (System.currentTimeMillis() - backPressedTime < 2000) {
                             startService(android.content.Intent(this@MainActivity, PlaybackService::class.java).apply { action = ApplicationClass.EXIT })
                             playbackViewModel.releaseController()
                             finish()
-                        } else { backPressedTime = System.currentTimeMillis(); Toast.makeText(this@MainActivity, "Cerrar app", Toast.LENGTH_SHORT).show() }
+                        } else { backPressedTime = System.currentTimeMillis(); Toast.makeText(this@MainActivity, exitMessage, Toast.LENGTH_SHORT).show() }
                     }
                     
                     androidx.compose.animation.SharedTransitionLayout {
@@ -199,29 +201,29 @@ class MainActivity : ComponentActivity() {
                                 if (state.showConflictDialog) {
                                     AlertDialog(
                                         onDismissRequest = { transferViewModel.handleUserDecision("CANCEL", libraryUri) },
-                                        title = { Text("Libro detectado") },
-                                        text = { Text("Ya tienes '${state.pendingBookTitle}'. Â¿QuÃ© deseas hacer?") },
+                                        title = { Text(stringResource(R.string.book_detected)) },
+                                        text = { Text(stringResource(R.string.existing_book_msg, state.pendingBookTitle ?: "")) },
                                         confirmButton = {
                                             Column {
-                                                Button(onClick = { transferViewModel.handleUserDecision("PROGRESS", libraryUri) }, modifier = Modifier.fillMaxWidth()) { Text("Sincronizar Progreso (InstantÃ¡neo)") }
+                                                Button(onClick = { transferViewModel.handleUserDecision("PROGRESS", libraryUri) }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.sync_progress_only)) }
                                                 Spacer(Modifier.height(8.dp))
-                                                Button(onClick = { transferViewModel.handleUserDecision("FILE", libraryUri) }, modifier = Modifier.fillMaxWidth()) { Text("Descargar Libro Completo") }
+                                                Button(onClick = { transferViewModel.handleUserDecision("FILE", libraryUri) }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.download_full_book)) }
                                             }
                                         },
                                         dismissButton = {
-                                            TextButton(onClick = { transferViewModel.handleUserDecision("CANCEL", libraryUri) }) { Text("Cancelar") }
+                                            TextButton(onClick = { transferViewModel.handleUserDecision("CANCEL", libraryUri) }) { Text(stringResource(R.string.cancel)) }
                                         }
                                     )
                                 }
 
-                                Scaffold(topBar = { TopAppBar(title = { Text(if (bookId != null) "Enviar" else "Recibir") }, navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } }) }) { padding ->
+                                Scaffold(topBar = { TopAppBar(title = { Text(if (bookId != null) stringResource(R.string.send) else stringResource(R.string.receive)) }, navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } }) }) { padding ->
                                     Column(modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                                         if (state.isDownloading) {
                                             LinearProgressIndicator(progress = { state.downloadProgress }, modifier = Modifier.fillMaxWidth().height(12.dp))
                                             Text("${(state.downloadProgress * 100).toInt()}%")
                                         } else if (bookId != null) {
                                             if (state.error != null) {
-                                                Text(state.error!!, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center); Button(onClick = { transferViewModel.startServer(bookId) }) { Text("Reintentar") }
+                                                Text(state.error!!, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center); Button(onClick = { transferViewModel.startServer(bookId) }) { Text(stringResource(R.string.retry)) }
                                             } else if (state.isServerRunning) {
                                                 state.qrData?.let { data ->
                                                     val qrBitmap = remember(data) {
@@ -235,12 +237,12 @@ class MainActivity : ComponentActivity() {
                                                     }
                                                     qrBitmap?.let { Image(bitmap = it.asImageBitmap(), contentDescription = "QR", modifier = Modifier.size(280.dp)) }
                                                 }
-                                                Text("Muestra este cÃ³digo al otro dispositivo")
+                                                Text(stringResource(R.string.qr_generated))
                                             } else { CircularProgressIndicator() }
                                         } else if (isManualEntry) {
                                             OutlinedTextField(value = targetIpText, onValueChange = { targetIpText = it }, label = { Text("IP:Puerto") }, modifier = Modifier.fillMaxWidth())
-                                            Button(onClick = { transferViewModel.receiveFromIp(targetIpText, libraryUri) }, modifier = Modifier.fillMaxWidth()) { Text("Conectar") }
-                                            TextButton(onClick = { isManualEntry = false }) { Text("CÃ¡mara") }
+                                            Button(onClick = { transferViewModel.receiveFromIp(targetIpText, libraryUri) }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.connecting)) }
+                                            TextButton(onClick = { isManualEntry = false }) { Text(stringResource(R.string.camera)) }
                                         } else {
                                             if (hasCameraPermission) {
                                                 Box(modifier = Modifier.size(320.dp).padding(8.dp)) {
@@ -263,11 +265,11 @@ class MainActivity : ComponentActivity() {
                                                         }, ContextCompat.getMainExecutor(ctx)); previewView
                                                     }, modifier = Modifier.fillMaxSize())
                                                 }
-                                                Button(onClick = { isManualEntry = true }, modifier = Modifier.fillMaxWidth()) { Text("Manual") }
-                                            } else { Button(onClick = { launcher.launch(Manifest.permission.CAMERA) }) { Text("Permiso") } }
+                                                Button(onClick = { isManualEntry = true }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.manual)) }
+                                            } else { Button(onClick = { launcher.launch(Manifest.permission.CAMERA) }) { Text(stringResource(R.string.permission)) } }
                                         }
                                         Spacer(Modifier.height(24.dp))
-                                        Text("Tu IP: ${state.localIp}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
+                                        Text(stringResource(R.string.your_ip, state.localIp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
                                         state.transferStatus?.let { Text(it, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) }
                                         state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                                         Spacer(Modifier.height(32.dp))
@@ -279,7 +281,7 @@ class MainActivity : ComponentActivity() {
                                         ) {
                                             Icon(Icons.Default.Close, null)
                                             Spacer(Modifier.width(8.dp))
-                                            Text("Finalizar y Salir", fontWeight = FontWeight.Bold)
+                                            Text(stringResource(R.string.finish_and_exit), fontWeight = FontWeight.Bold)
                                         }
                                     }
                                 }

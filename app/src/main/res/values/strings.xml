@@ -1,3 +1,4 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Litera</string>
     <string name="shuffle_btn">Shuffle</string>
@@ -52,8 +53,6 @@
     <string name="play_speed_at_1x_lit">The book will be played at 1.0x</string>
     <string name="play_speed_at_15x_lit">The book will be played at 1.5x</string>
     <string name="play_speed_at_2x_lit">The book will be played at 2.0x</string>
-
-    <!--    titles, messages or dialogs texts-->
     <string name="yes">Yes</string>
     <string name="no">No</string>
     <string name="text_dialog_permissions">Previously some permissions have been rejected. Do you want to open settings to grant them now?</string>
@@ -68,21 +67,16 @@
     <string name="stop_timer">Stop timer</string>
     <string name="do_you_want_to_cancel_the_timer">Do you want to cancel the timer?</string>
     <string name="sharing_your_audiobook_file">Sharing your audiobook file!</string>
-
     <string name="min_endchap">Chapter end</string>
     <string name="min_none">None</string>
-
-    <!-- UI Strings -->
     <string name="search_placeholder">Search books...</string>
-    <string name="sort_title">Sort by Name (A-Z)</string>
-    <string name="sort_artist">Sort by Author</string>
-    <string name="sort_progress">Sort by Progress</string>
-    <string name="sort_recent">Sort by Recent</string>
+    <string name="sort_title">Title (A-Z)</string>
+    <string name="sort_artist">Author</string>
+    <string name="sort_progress">Progress</string>
+    <string name="sort_recent">Recent</string>
     <string name="added_to_queue">Added to queue: %1$s</string>
     <string name="no_favorites_yet">No favorites yet</string>
     <string name="my_favorites">My Favorites</string>
-    
-    <!-- Settings -->
     <string name="appearance">Appearance</string>
     <string name="dynamic_colors">Dynamic Colors</string>
     <string name="dynamic_colors_desc">Adapt the interface color to the current book cover.</string>
@@ -93,8 +87,6 @@
     <string name="audiobook_folder">Audiobook Folder</string>
     <string name="scanning_all_memory">Scanning all memory</string>
     <string name="about_app">About App</string>
-
-    <!-- Player Strings -->
     <string name="undo_seek">UNDO SEEK</string>
     <string name="manual_bookmarks">Manual Bookmarks</string>
     <string name="no_bookmarks_yet">No bookmarks saved yet.</string>
@@ -117,8 +109,6 @@
     <string name="unknown_title">Untitled</string>
     <string name="unknown_artist">Unknown Author</string>
     <string name="view_in_folder">View in Folder</string>
-
-    <!-- Shake to Extend -->
     <string name="shake_to_extend">Shake to Extend</string>
     <string name="shake_to_extend_desc">Shake your phone during the last minute to restart the timer.</string>
     <string name="vibration_warning">Vibration Warning</string>
@@ -126,10 +116,40 @@
     <string name="sound_warning">Sound Warning</string>
     <string name="sound_warning_desc">Play a soft beep before stopping the audio.</string>
     <string name="shake_visual_prompt">SHAKE TO EXTEND!</string>
-    <string name="share_title">Compartir</string>
-    <string name="share_progress">Compartir avance</string>
-    <string name="share_file">Compartir archivo</string>
     <string name="share_file_warning_title">Share large file</string>
     <string name="share_file_warning_message">Audiobooks are usually very large files. Preparing to share may take a moment depending on the size. Do you want to continue?</string>
     <string name="confirm">Confirm</string>
+    <string name="send">Send</string>
+    <string name="receive">Receive</string>
+    <string name="retry">Retry</string>
+    <string name="address">Address: %1$s</string>
+    <string name="manual">Manual</string>
+    <string name="camera">Camera</string>
+    <string name="permission">Permission</string>
+    <string name="your_ip">Your IP: %1$s</string>
+    <string name="finish_and_exit">Finish and Exit</string>
+    <string name="welcome_title">Welcome to Litera!</string>
+    <string name="welcome_desc">To start, we need you to select the folder where you store your audiobooks.</string>
+    <string name="select_folder">Select Folder</string>
+    <string name="onboarding_note">You can change this later in Settings.</string>
+    <string name="book_detected">Book Detected</string>
+    <string name="existing_book_msg">%1$s detected in your library. What do you want to do?</string>
+    <string name="sync_progress_only">Sync Progress Only (Instant)</string>
+    <string name="download_full_book">Download Full Book</string>
+    <string name="sending">Sending: %1$s</string>
+    <string name="receiving">Receiving: %1$s</string>
+    <string name="book_sent">Book sent successfully!</string>
+    <string name="book_received">Book received in Inbox!</string>
+    <string name="synced_via_qr">Synced via QR!</string>
+    <string name="connecting">Connecting...</string>
+    <string name="waiting_receiver">Waiting for receiver...</string>
+    <string name="qr_generated">QR Generated. Scan it.</string>
+    <string name="cloud_sync">Cloud Sync</string>
+    <string name="cloud_sync_desc">Sync your progress on Google Drive to never lose your progress.</string>
+    <string name="connect_google_drive">Connect Google Drive</string>
+    <string name="last_sync">Last sync</string>
+    <string name="never">Never</string>
+    <string name="sync_now">Sync now</string>
+    <string name="stop_sleep_timer">Stop Sleep Timer</string>
+    <string name="playback_speed_selector">Playback Speed</string>
 </resources>

@@ -1,4 +1,4 @@
-package com.raulburgosmurray.musicplayer.ui
+﻿package com.raulburgosmurray.musicplayer.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalSharedTransitionApi
@@ -9,6 +9,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
@@ -83,7 +86,7 @@ fun PlayerScreen(
     val timerIcon = Icons.Default.Timer
     val timerOffIcon = Icons.Default.TimerOff
     
-    // Usar iconos estÃ¡ndar de Material que siempre funcionan
+    // Usar iconos estándar de Material que siempre funcionan
     val skipNextIcon = Icons.Default.FastForward
     val skipPreviousIcon = Icons.Default.FastRewind
     val undoIcon = Icons.AutoMirrored.Filled.Undo
@@ -91,13 +94,13 @@ fun PlayerScreen(
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp).verticalScroll(rememberScrollState())) {
         Spacer(Modifier.height(16.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "AtrÃ¡s") }
+            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back_btn)) }
             Row {
-                IconButton(onClick = { showHistorySheet = true }) { Icon(Icons.Default.History, contentDescription = "Historial") }
-                IconButton(onClick = { showQueueSheet = true }) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, contentDescription = "Cola") }
+                IconButton(onClick = { showHistorySheet = true }) { Icon(Icons.Default.History, contentDescription = stringResource(R.string.activity_history)) }
+                IconButton(onClick = { showQueueSheet = true }) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, contentDescription = stringResource(R.string.playlist_btn)) }
                 IconButton(onClick = { showDetailsSheet = true }) { Icon(Icons.Default.Info, contentDescription = "Detalles") }
-                IconButton(onClick = { showShareFileConfirmation = true }) { Icon(Icons.Default.Share, "Compartir Archivo") }
-                IconButton(onClick = { currentItem?.mediaId?.let { onTransferClick(it) } }) { Icon(Icons.Default.Wifi, "Transferir") }
+                IconButton(onClick = { showShareFileConfirmation = true }) { Icon(Icons.Default.Share, stringResource(R.string.share_btn)) }
+                IconButton(onClick = { currentItem?.mediaId?.let { onTransferClick(it) } }) { Icon(Icons.Default.Wifi, stringResource(R.string.send)) }
             }
         }
 
@@ -121,7 +124,7 @@ fun PlayerScreen(
                     Text(text = currentItem?.mediaMetadata?.title?.toString() ?: stringResource(R.string.unknown_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     Text(text = currentMediaItemArtist(currentItem), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.secondary)
                 }
-                IconButton(onClick = { viewModel.toggleFavorite() }) { Icon(if (state.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, contentDescription = "Favorito", tint = if (state.isFavorite) Color.Red else LocalContentColor.current) }
+                IconButton(onClick = { viewModel.toggleFavorite() }) { Icon(if (state.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, contentDescription = stringResource(R.string.favorite_btn), tint = if (state.isFavorite) Color.Red else LocalContentColor.current) }
             }
 
             Spacer(Modifier.height(24.dp))
@@ -165,11 +168,11 @@ fun PlayerScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(if (activeTimerMinutes > 0) timerIcon else timerOffIcon, null, modifier = Modifier.size(24.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text(text = if (activeTimerMinutes > 0) "${activeTimerMinutes}m" else "Timer", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(text = if (activeTimerMinutes > 0) "${activeTimerMinutes}m" else stringResource(R.string.timer_btn), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         }
                         if (state.isShakeWaiting) {
                             Text(
-                                text = "¡Sacude para ampliar!",
+                                text = stringResource(R.string.shake_visual_prompt),
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f)
@@ -196,20 +199,34 @@ fun PlayerScreen(
 
 @Composable
 fun currentMediaItemArtist(item: androidx.media3.common.MediaItem?): String {
-    return item?.mediaMetadata?.artist?.toString() ?: "Desconocido"
+    return item?.mediaMetadata?.artist?.toString() ?: stringResource(R.string.unknown_artist)
 }
 
 @Composable
 fun SpeedSelectorContent(currentSpeed: Float, onSpeedSelected: (Float) -> Unit) {
     val speeds = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f)
     Column(modifier = Modifier.fillMaxWidth().padding(24.dp).padding(bottom = 32.dp)) {
-        Text("Velocidad de reproducciÃ³n", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(16.dp))
-        speeds.forEach { speed ->
-            Surface(onClick = { onSpeedSelected(speed) }, color = if (speed == currentSpeed) MaterialTheme.colorScheme.primaryContainer else Color.Transparent, shape = RoundedCornerShape(12.dp)) {
-                Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("${speed}x", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                    if (speed == currentSpeed) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
+        Text(stringResource(R.string.playback_speed_selector), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(24.dp))
+        
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(3),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            items(speeds) { speed ->
+                val isSelected = speed == currentSpeed
+                Surface(
+                    onClick = { onSpeedSelected(speed) },
+                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.height(60.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text("${speed}x", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
@@ -218,21 +235,43 @@ fun SpeedSelectorContent(currentSpeed: Float, onSpeedSelected: (Float) -> Unit) 
 
 @Composable
 fun TimerSelectorContent(activeTimerMinutes: Int, onTimerSelected: (Int) -> Unit, onCancelTimer: () -> Unit) {
-    val options = listOf(5, 15, 30, 45, 60)
+    val options = listOf(5, 10, 15, 30, 45, 60)
     Column(modifier = Modifier.fillMaxWidth().padding(24.dp).padding(bottom = 32.dp)) {
-        Text("Temporizador de apagado", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(16.dp))
-        options.forEach { mins ->
-            Surface(onClick = { onTimerSelected(mins) }, color = if (mins == activeTimerMinutes) MaterialTheme.colorScheme.primaryContainer else Color.Transparent, shape = RoundedCornerShape(12.dp)) {
-                Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("$mins minutos", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                    if (mins == activeTimerMinutes) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
+        Text(stringResource(R.string.sleep_timer_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(24.dp))
+        
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(3),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            items(options) { mins ->
+                val isSelected = mins == activeTimerMinutes
+                Surface(
+                    onClick = { onTimerSelected(mins) },
+                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.height(60.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text("${mins}m", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
+        
         if (activeTimerMinutes > 0) {
-            Spacer(Modifier.height(8.dp))
-            Button(onClick = onCancelTimer, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer)) { Text("Cancelar Temporizador") }
+            Spacer(Modifier.height(24.dp))
+            Button(
+                onClick = onCancelTimer,
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error, contentColor = MaterialTheme.colorScheme.onError),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text(stringResource(R.string.stop_sleep_timer), fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
@@ -240,18 +279,28 @@ fun TimerSelectorContent(activeTimerMinutes: Int, onTimerSelected: (Int) -> Unit
 @Composable
 fun HistorySelectorContent(history: List<com.raulburgosmurray.musicplayer.HistoryAction>, onActionSelected: (com.raulburgosmurray.musicplayer.HistoryAction) -> Unit) {
     Column(modifier = Modifier.fillMaxWidth().padding(24.dp).padding(bottom = 32.dp)) {
-        Text("Historial reciente", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.activity_history_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(16.dp))
-        if (history.isEmpty()) { Text("No hay acciones recientes", color = MaterialTheme.colorScheme.secondary) }
-        else {
-            LazyColumn { items(history) { action ->
-                Surface(onClick = { onActionSelected(action) }, shape = RoundedCornerShape(12.dp)) {
-                    Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Column(modifier = Modifier.weight(1f)) { Text(action.label, fontWeight = FontWeight.Bold); Text(formatDuration(action.audioPositionMs), style = MaterialTheme.typography.bodySmall) }
-                        Icon(Icons.AutoMirrored.Filled.Undo, null, tint = MaterialTheme.colorScheme.primary)
+        if (history.isEmpty()) {
+            Text(stringResource(R.string.no_activity_yet), color = MaterialTheme.colorScheme.secondary)
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(history) { action ->
+                    Card(
+                        onClick = { onActionSelected(action) },
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    ) {
+                        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(action.label, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge)
+                                Text(formatDuration(action.audioPositionMs), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                            }
+                            Icon(Icons.AutoMirrored.Filled.Undo, null, tint = MaterialTheme.colorScheme.primary)
+                        }
                     }
                 }
-            } }
+            }
         }
     }
 }
@@ -259,7 +308,7 @@ fun HistorySelectorContent(history: List<com.raulburgosmurray.musicplayer.Histor
 @Composable
 fun QueueSelectorContent(playlist: List<androidx.media3.common.MediaItem>, currentIndex: Int, onItemClicked: (Int) -> Unit, onRemoveItem: (Int) -> Unit, onMoveUp: (Int) -> Unit, onMoveDown: (Int) -> Unit) {
     Column(modifier = Modifier.fillMaxWidth().padding(24.dp).padding(bottom = 32.dp)) {
-        Text("Cola de reproducciÃ³n", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.playback_queue_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(16.dp))
         LazyColumn(modifier = Modifier.weight(1f, false).heightIn(max = 400.dp)) {
             items(playlist.size) { index ->
@@ -267,7 +316,7 @@ fun QueueSelectorContent(playlist: List<androidx.media3.common.MediaItem>, curre
                 Surface(onClick = { onItemClicked(index) }, color = if (index == currentIndex) MaterialTheme.colorScheme.primaryContainer else Color.Transparent, shape = RoundedCornerShape(12.dp)) {
                     Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("${index + 1}", modifier = Modifier.width(24.dp), style = MaterialTheme.typography.labelSmall)
-                        Column(modifier = Modifier.weight(1f)) { Text(item.mediaMetadata.title?.toString() ?: "Sin tÃ­tulo", fontWeight = if (index == currentIndex) FontWeight.Bold else FontWeight.Normal); Text(item.mediaMetadata.artist?.toString() ?: "Desconocido", style = MaterialTheme.typography.bodySmall) }
+                        Column(modifier = Modifier.weight(1f)) { Text(item.mediaMetadata.title?.toString() ?: stringResource(R.string.unknown_title), fontWeight = if (index == currentIndex) FontWeight.Bold else FontWeight.Normal); Text(item.mediaMetadata.artist?.toString() ?: stringResource(R.string.unknown_artist), style = MaterialTheme.typography.bodySmall) }
                         IconButton(onClick = { onRemoveItem(index) }) { Icon(Icons.Default.RemoveCircleOutline, null, tint = MaterialTheme.colorScheme.error) }
                     }
                 }
@@ -303,9 +352,9 @@ fun BookPlaceholder(title: String, modifier: Modifier = Modifier) {
 @Composable
 fun BookmarkSelectorContent(bookmarks: List<com.raulburgosmurray.musicplayer.data.Bookmark>, onBookmarkSelected: (com.raulburgosmurray.musicplayer.data.Bookmark) -> Unit, onDeleteBookmark: (Int) -> Unit) {
     Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
-        Text("Marcadores manuales", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.manual_bookmarks), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(16.dp))
-        if (bookmarks.isEmpty()) { Text("No hay marcadores aÃºn", color = MaterialTheme.colorScheme.secondary) }
+        if (bookmarks.isEmpty()) { Text(stringResource(R.string.no_bookmarks_yet), color = MaterialTheme.colorScheme.secondary) }
         else {
             LazyColumn { items(bookmarks) { bookmark ->
                 Surface(onClick = { onBookmarkSelected(bookmark) }, shape = RoundedCornerShape(12.dp)) {
@@ -322,9 +371,9 @@ fun BookmarkSelectorContent(bookmarks: List<com.raulburgosmurray.musicplayer.dat
 @Composable
 fun ChapterSelectorContent(chapters: List<com.raulburgosmurray.musicplayer.Chapter>, currentPosition: Long, onChapterSelected: (com.raulburgosmurray.musicplayer.Chapter) -> Unit) {
     Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
-        Text("CapÃ­tulos", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.chapters), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(16.dp))
-        if (chapters.isEmpty()) { Text("No se detectaron capÃ­tulos", color = MaterialTheme.colorScheme.secondary) }
+        if (chapters.isEmpty()) { Text(stringResource(R.string.no_chapters_detected), color = MaterialTheme.colorScheme.secondary) }
         else {
             LazyColumn { items(chapters) { chapter ->
                 Surface(onClick = { onChapterSelected(chapter) }, shape = RoundedCornerShape(12.dp)) {
@@ -340,8 +389,8 @@ fun ChapterSelectorContent(chapters: List<com.raulburgosmurray.musicplayer.Chapt
 @Composable
 fun AddBookmarkDialog(currentPosition: Long, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
     var note by remember { mutableStateOf("") }
-    AlertDialog(onDismissRequest = onDismiss, title = { Text("AÃ±adir Marcador") },
-        text = { Column { Text("Guardar posiciÃ³n: ${formatDuration(currentPosition)}"); Spacer(Modifier.height(8.dp)); OutlinedTextField(value = note, onValueChange = { note = it }, label = { Text("Nota (opcional)") }, modifier = Modifier.fillMaxWidth()) } },
-        confirmButton = { Button(onClick = { onConfirm(note) }) { Text("Guardar") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } })
+    AlertDialog(onDismissRequest = onDismiss, title = { Text(stringResource(R.string.add_bookmark)) },
+        text = { Column { Text(stringResource(R.string.save_position_label, formatDuration(currentPosition))); Spacer(Modifier.height(8.dp)); OutlinedTextField(value = note, onValueChange = { note = it }, label = { Text(stringResource(R.string.note_label)) }, modifier = Modifier.fillMaxWidth()) } },
+        confirmButton = { Button(onClick = { onConfirm(note) }) { Text(stringResource(R.string.save)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } })
 }

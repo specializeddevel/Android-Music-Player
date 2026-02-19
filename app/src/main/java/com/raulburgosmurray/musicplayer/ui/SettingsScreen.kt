@@ -1,4 +1,4 @@
-package com.raulburgosmurray.musicplayer.ui
+﻿package com.raulburgosmurray.musicplayer.ui
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -87,14 +87,14 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState())
         ) {
             // Cloud Sync Section
-            Text("Sincronización Cloud", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 16.dp))
+            Text(stringResource(R.string.cloud_sync), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 16.dp))
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f))
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     if (userAccount == null) {
-                        Text("Sincroniza tu progreso en Google Drive para no perder nunca tu avance.", style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.cloud_sync_desc), style = MaterialTheme.typography.bodyMedium)
                         Spacer(Modifier.height(12.dp))
                         Button(
                             onClick = {
@@ -109,7 +109,7 @@ fun SettingsScreen(
                         ) {
                             Icon(Icons.Default.CloudUpload, null)
                             Spacer(Modifier.width(8.dp))
-                            Text("Conectar Google Drive")
+                            Text(stringResource(R.string.connect_google_drive))
                         }
                     } else {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -131,9 +131,9 @@ fun SettingsScreen(
                         
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Column {
-                                Text("Última sincronización", style = MaterialTheme.typography.labelMedium)
+                                Text(stringResource(R.string.last_sync), style = MaterialTheme.typography.labelMedium)
                                 Text(
-                                    if (lastSyncTime > 0) SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault()).format(Date(lastSyncTime)) else "Nunca",
+                                    if (lastSyncTime > 0) SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault()).format(Date(lastSyncTime)) else stringResource(R.string.never),
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                             }
@@ -142,7 +142,7 @@ fun SettingsScreen(
                                 enabled = !isSyncing
                             ) {
                                 if (isSyncing) CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
-                                else Text("Sincronizar ahora")
+                                else Text(stringResource(R.string.sync_now))
                             }
                         }
                     }
