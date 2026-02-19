@@ -18,6 +18,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.raulburgosmurray.musicplayer.Music
 
+import androidx.compose.ui.res.stringResource
+import com.raulburgosmurray.musicplayer.R
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun FavoritesScreen(
@@ -33,13 +36,17 @@ fun FavoritesScreen(
     val bookProgress by mainViewModel.bookProgress.collectAsState()
     val playbackState by playbackViewModel.uiState.collectAsState()
 
+    var selectedBookForDetails by remember { mutableStateOf<Music?>(null) }
+    val detailsSheetState = rememberModalBottomSheetState()
+    var showDetailsSheet by remember { mutableStateOf(false) }
+
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Mis Favoritos", fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.my_favorites), fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back_btn))
                     }
                 }
             )
@@ -71,7 +78,7 @@ fun FavoritesScreen(
                     )
                     Spacer(Modifier.height(16.dp))
                     Text(
-                        "Aún no tienes favoritos",
+                        stringResource(R.string.no_favorites_yet),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.secondary
                     )
@@ -92,11 +99,24 @@ fun FavoritesScreen(
                             keyPrefix = "fav",
                             animatedVisibilityScope = animatedVisibilityScope,
                             onAddToQueue = { playbackViewModel.addToQueue(book) },
+                            onLongClick = {
+                                selectedBookForDetails = book
+                                showDetailsSheet = true
+                            },
                             onClick = { onBookClick(book) }
                         )
                     }
                 }
             }
+        }
+    }
+
+    if (showDetailsSheet && selectedBookForDetails != null) {
+        ModalBottomSheet(
+            onDismissRequest = { showDetailsSheet = false },
+            sheetState = detailsSheetState
+        ) {
+            BookDetailsContent(book = selectedBookForDetails!!, allBooks = favoriteBooks)
         }
     }
 }

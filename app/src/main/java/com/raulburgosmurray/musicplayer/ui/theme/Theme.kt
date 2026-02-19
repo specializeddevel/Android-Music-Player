@@ -32,21 +32,23 @@ fun MusicPlayerTheme(
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
-        // 1. Si hay un color de portada y el usuario quiere colores dinámicos
+        // 1. Prioridad: Si hay un color de portada (Seed Color)
         seedColor != null && dynamicColor -> {
-            if (darkTheme) dynamicDarkColorScheme(LocalContext.current).copy(primary = seedColor) 
-            else dynamicLightColorScheme(LocalContext.current).copy(primary = seedColor)
-            // Nota: Para una implementación más profunda de seedColor se usaColorScheme(fromSeed)
-            // Pero por simplicidad ahora usaremos esto.
-            if (darkTheme) darkColorScheme(primary = seedColor) else lightColorScheme(primary = seedColor)
+            // Generamos un esquema basado en el color de la portada de forma manual (Compatible con todas las versiones)
+            if (darkTheme) {
+                darkColorScheme(primary = seedColor, onPrimary = Color.White, primaryContainer = seedColor.copy(alpha = 0.3f))
+            } else {
+                lightColorScheme(primary = seedColor, onPrimary = Color.White, primaryContainer = seedColor.copy(alpha = 0.1f))
+            }
         }
         
-        // 2. Colores dinámicos del sistema (Android 12+)
+        // 2. Colores dinámicos del sistema (SOLO Android 12+)
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
 
+        // 3. Esquemas por defecto
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
     }

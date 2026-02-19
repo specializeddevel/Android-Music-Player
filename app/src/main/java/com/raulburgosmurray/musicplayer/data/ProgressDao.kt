@@ -13,6 +13,9 @@ interface ProgressDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun saveProgress(progress: AudiobookProgress)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(progressList: List<AudiobookProgress>)
+
     @Query("SELECT * FROM audiobook_progress ORDER BY lastUpdated DESC")
     suspend fun getAllProgress(): List<AudiobookProgress>
 

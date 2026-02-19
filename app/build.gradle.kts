@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.ksp)
     alias(libs.plugins.compose.compiler)
+    id("org.jetbrains.kotlin.plugin.serialization") version "2.0.21"
 }
 
 android {
@@ -39,6 +40,14 @@ android {
     buildFeatures{
         viewBinding = true
         compose = true
+    }
+
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "META-INF/INDEX.LIST"
+            excludes += "META-INF/DEPENDENCIES"
+        }
     }
 }
 
@@ -84,10 +93,30 @@ dependencies {
     implementation("com.github.bumptech.glide:glide:5.0.0-rc01")
     implementation("net.jthink:jaudiotagger:3.0.1")
     implementation("com.google.code.gson:gson:2.9.0")
-    implementation ("io.github.ParkSangGwon:tedpermission-normal:3.4.2")
-
+    implementation("io.github.ParkSangGwon:tedpermission-normal:3.4.2")
+    implementation("androidx.documentfile:documentfile:1.0.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
+    
+    // QR & Camera
+    implementation("com.google.zxing:core:3.5.3")
+    implementation(libs.barcode.scanning)
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+            
+    // Google Drive & Auth
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
+    implementation("com.google.http-client:google-http-client-gson:1.44.1")
+    implementation("com.google.api-client:google-api-client-android:2.2.0")
+    implementation("com.google.http-client:google-http-client-android:1.44.1")
+    implementation("com.google.apis:google-api-services-drive:v3-rev20240521-2.0.0")
+                
     // Test
     testImplementation(libs.junit)
+    testImplementation(libs.mockk)
+    testImplementation(libs.turbine)
+    testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 }

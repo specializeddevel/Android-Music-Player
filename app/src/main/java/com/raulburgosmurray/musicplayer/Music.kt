@@ -26,6 +26,8 @@ data class Music(
     val duration: Long = 0,
     val path: String,
     val artUri: String?,
+    val fileSize: Long = 0,
+    val fileName: String = "",
     val trackMore: String? = null,
     val comment: String? = null
 ) {
@@ -37,9 +39,19 @@ data class Music(
             .setArtworkUri(artUri?.let { android.net.Uri.parse(it) })
             .build()
         
+        val uri = try {
+            if (path.startsWith("content://")) {
+                android.net.Uri.parse(path)
+            } else {
+                android.net.Uri.fromFile(File(path))
+            }
+        } catch (e: Exception) {
+            android.net.Uri.parse(path)
+        }
+
         return MediaItem.Builder()
             .setMediaId(id)
-            .setUri(android.net.Uri.fromFile(File(path)))
+            .setUri(uri)
             .setMediaMetadata(metadata)
             .build()
     }
