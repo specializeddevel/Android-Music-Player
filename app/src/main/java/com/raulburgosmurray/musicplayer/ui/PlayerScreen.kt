@@ -1,4 +1,4 @@
-﻿package com.raulburgosmurray.musicplayer.ui
+package com.raulburgosmurray.musicplayer.ui
 
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
@@ -8,6 +8,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -115,7 +117,7 @@ fun PlayerScreen(
 @Composable
 fun PortraitPlayerContent(state: PlaybackState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit) {
     val currentItem = state.currentMediaItem
-    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp).verticalScroll(rememberScrollState())) {
+    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp).verticalScroll(rememberScrollState()).statusBarsPadding().navigationBarsPadding()) {
         Spacer(Modifier.height(16.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back_btn)) }
@@ -141,6 +143,7 @@ fun PortraitPlayerContent(state: PlaybackState, viewModel: PlaybackViewModel, sh
         }
         Spacer(Modifier.height(32.dp))
         PlayerControls(state, viewModel, onShowSpeed, onShowTimer)
+        Spacer(Modifier.height(16.dp))
     }
 }
 
@@ -148,7 +151,7 @@ fun PortraitPlayerContent(state: PlaybackState, viewModel: PlaybackViewModel, sh
 @Composable
 fun LandscapePlayerContent(state: PlaybackState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit) {
     val currentItem = state.currentMediaItem
-    Row(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+    Row(modifier = Modifier.fillMaxSize().padding(16.dp).statusBarsPadding().navigationBarsPadding()) {
         Box(modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(24.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
             with(sharedTransitionScope) {
                 if (currentItem?.mediaMetadata?.artworkUri != null) {
@@ -183,6 +186,7 @@ fun PlayerControls(state: PlaybackState, viewModel: PlaybackViewModel, onShowSpe
     val duration = state.duration
     val position = state.currentPosition
     val activeTimerMinutes = state.sleepTimerMinutes
+    val showUndoButton = state.lastPositionBeforeSeek != null
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(text = currentItem?.mediaMetadata?.title?.toString() ?: stringResource(R.string.unknown_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -193,6 +197,19 @@ fun PlayerControls(state: PlaybackState, viewModel: PlaybackViewModel, onShowSpe
             Text(text = formatDuration(position), style = MaterialTheme.typography.labelSmall)
             Text(text = formatDuration(state.duration), style = MaterialTheme.typography.labelSmall)
         }
+        if (showUndoButton) {
+            Spacer(Modifier.height(8.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                TextButton(
+                    onClick = { viewModel.undoSeek() },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Deshacer", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
         Spacer(Modifier.height(16.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { viewModel.skipBackward(30000L) }) { Icon(painter = painterResource(id = R.drawable.rewind_30), null, modifier = Modifier.size(32.dp)) }
@@ -201,12 +218,12 @@ fun PlayerControls(state: PlaybackState, viewModel: PlaybackViewModel, onShowSpe
             IconButton(onClick = { viewModel.skipForward(10000L) }) { Icon(Icons.Default.Forward10, null, modifier = Modifier.size(40.dp)) }
             IconButton(onClick = { viewModel.skipForward(30000L) }) { Icon(painter = painterResource(id = R.drawable.fast_forward_10), null, modifier = Modifier.size(32.dp)) }
         }
-        Spacer(Modifier.height(24.dp))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            Surface(onClick = onShowSpeed, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.height(48.dp).weight(1f).padding(horizontal = 4.dp)) {
+        Spacer(Modifier.height(32.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Surface(onClick = onShowSpeed, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.height(52.dp).weight(1f)) {
                 Box(contentAlignment = Alignment.Center) { Text("${state.playbackSpeed}x", fontWeight = FontWeight.Bold) }
             }
-            Surface(onClick = onShowTimer, shape = RoundedCornerShape(16.dp), color = if (activeTimerMinutes > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.height(48.dp).weight(1f).padding(horizontal = 4.dp)) {
+            Surface(onClick = onShowTimer, shape = RoundedCornerShape(16.dp), color = if (activeTimerMinutes > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.height(52.dp).weight(1f)) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                     Text(if (activeTimerMinutes > 0) "${activeTimerMinutes}m" else stringResource(R.string.timer_btn), fontWeight = FontWeight.Bold)
                     if (state.isShakeWaiting) Text(stringResource(R.string.shake_visual_prompt), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold)

@@ -1,4 +1,4 @@
-﻿package com.raulburgosmurray.musicplayer.ui
+package com.raulburgosmurray.musicplayer.ui
 
 import android.Manifest
 import android.content.Context
@@ -70,10 +70,11 @@ fun MainScreen(
     onSettingsClick: () -> Unit,
     onReceiveClick: () -> Unit = {}
 ) {
-    val books by mainViewModel.books.collectAsState()
+val books by mainViewModel.books.collectAsState()
     val favoriteIds by mainViewModel.favoriteIds.collectAsState()
     val bookProgress by mainViewModel.bookProgress.collectAsState()
     val isLoading by mainViewModel.isLoading.collectAsState()
+    val scanProgress by mainViewModel.scanProgress.collectAsState()
     val playbackState by playbackViewModel.uiState.collectAsState()
     val currentSortOrder by mainViewModel.sortOrder.collectAsState()
     val layoutMode by settingsViewModel.layoutMode.collectAsState()
@@ -118,11 +119,64 @@ fun MainScreen(
             )
         },
         bottomBar = { if (playbackState.currentMediaItem != null) { with(sharedTransitionScope) { MiniPlayer(state = playbackState, animatedVisibilityScope = animatedVisibilityScope, onTogglePlay = { playbackViewModel.togglePlayPause() }, onClick = onMiniPlayerClick) } } }
-    ) { padding ->
+) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            SearchBar(inputField = { SearchBarDefaults.InputField(query = searchQuery, onQueryChange = { searchQuery = it }, onSearch = { }, expanded = false, onExpandedChange = { }, placeholder = { Text(stringResource(R.string.search_placeholder)) }, leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) }) }, expanded = false, onExpandedChange = { }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {}
-            Box(modifier = Modifier.fillMaxSize()) {
-                if (isLoading && books.isEmpty()) { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() } } else {
+            SearchBar(inputField = { SearchBarDefaults.InputField(query = searchQuery, onQueryChange = { searchQuery = it }, onSearch = { }, expanded = false, onExpandedChange = { }, placeholder = { Text(stringResource(R.string.search_placeholder)) }, leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) }) }, expanded = false, onExpandedChange = { }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {}
+Box(modifier = Modifier.fillMaxSize()) {
+                if (isLoading && books.isEmpty()) {
+                    Column(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                        CircularProgressIndicator()
+                        Spacer(Modifier.height(16.dp))
+                        val (current, total) = scanProgress
+                        if (total > 0) {
+                            Text("Escaneando: $current / $total archivos", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
+                            Spacer(Modifier.height(8.dp))
+                            LinearProgressIndicator(progress = { current.toFloat() / total.toFloat() }, modifier = Modifier.width(200.dp))
+                        } else {
+                            Text("Cargando biblioteca...", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
+                        }
+                    }
+                } else if (books.isEmpty()) {
+                    // Empty state when no books are found
+                    Column(
+                        modifier = Modifier.fillMaxSize().padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FolderOpen,
+                            contentDescription = null,
+                            modifier = Modifier.size(120.dp),
+                            tint = MaterialTheme.colorScheme.secondary
+                        )
+                        Spacer(Modifier.height(24.dp))
+                        Text(
+                            text = "No hay audiolibros",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            text = "Agrega archivos de audio a tu carpeta seleccionada para comenzar",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.secondary,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(Modifier.height(24.dp))
+                        Button(
+                            onClick = { mainViewModel.loadBooks(settingsViewModel.libraryRootUri.value) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            )
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Escanear carpeta")
+                        }
+                    }
+                } else {
                     if (layoutMode == LayoutMode.LIST) {
                         LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             items(filteredBooks) { book -> with(sharedTransitionScope) { BookListItem(book = book, isFavorite = favoriteIds.contains(book.id), progress = bookProgress[book.id] ?: 0f, animatedVisibilityScope = animatedVisibilityScope, onAddToQueue = { playbackViewModel.addToQueue(book); scope.launch { snackbarHostState.showSnackbar(message = context.getString(R.string.added_to_queue, book.title), duration = SnackbarDuration.Short) } }, onLongClick = { selectedBookForDetails = book; showDetailsSheet = true }, onClick = { onBookClick(book) }) } }
