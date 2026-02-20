@@ -28,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -136,6 +137,12 @@ class MainActivity : ComponentActivity() {
             val playbackState by playbackViewModel.uiState.collectAsState()
             val isDynamicEnabled by settingsViewModel.isDynamicThemingEnabled.collectAsState()
             val libraryUri by settingsViewModel.libraryRootUri.collectAsState()
+            val themeMode by settingsViewModel.themeMode.collectAsState()
+            val isDark = when (themeMode) {
+                com.raulburgosmurray.musicplayer.ui.ThemeMode.DARK   -> true
+                com.raulburgosmurray.musicplayer.ui.ThemeMode.LIGHT  -> false
+                com.raulburgosmurray.musicplayer.ui.ThemeMode.SYSTEM -> isSystemInDarkTheme()
+            }
             
             // CONECTAR PREFERENCIAS DE SHAKE
             val isShakeEnabled by settingsViewModel.isShakeEnabled.collectAsState()
@@ -146,7 +153,7 @@ class MainActivity : ComponentActivity() {
                 playbackViewModel.updateShakePreferences(isShakeEnabled, isVibrationEnabled, isSoundEnabled)
             }
 
-            MusicPlayerTheme(dynamicColor = isDynamicEnabled, seedColor = if (isDynamicEnabled && playbackState.dominantColor != null) Color(playbackState.dominantColor!!) else null) {
+            MusicPlayerTheme(darkTheme = isDark, dynamicColor = isDynamicEnabled, seedColor = if (isDynamicEnabled && playbackState.dominantColor != null) Color(playbackState.dominantColor!!) else null) {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     val navController = rememberNavController()
                     val navBackStackEntry by navController.currentBackStackEntryAsState()

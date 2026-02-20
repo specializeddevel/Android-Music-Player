@@ -152,4 +152,8 @@
     <string name="sync_now">Sync now</string>
     <string name="stop_sleep_timer">Stop Sleep Timer</string>
     <string name="playback_speed_selector">Playback Speed</string>
+    <string name="theme_mode">App Theme</string>
+    <string name="theme_system">System</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
 </resources>

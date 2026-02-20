@@ -152,4 +152,8 @@
     <string name="sync_now">Sincronizar ahora</string>
     <string name="stop_sleep_timer">Detener Temporizador</string>
     <string name="playback_speed_selector">Velocidad de reproducción</string>
+    <string name="theme_mode">Tema de la aplicación</string>
+    <string name="theme_system">Sistema</string>
+    <string name="theme_light">Claro</string>
+    <string name="theme_dark">Oscuro</string>
 </resources>
