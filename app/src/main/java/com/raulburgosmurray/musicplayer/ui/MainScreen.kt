@@ -1,8 +1,9 @@
-﻿package com.raulburgosmurray.musicplayer.ui
+package com.raulburgosmurray.musicplayer.ui
 
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Color
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -32,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
@@ -68,13 +70,18 @@ fun MainScreen(
     onSettingsClick: () -> Unit,
     onReceiveClick: () -> Unit = {}
 ) {
-    val books by mainViewModel.books.collectAsState()
+val books by mainViewModel.books.collectAsState()
     val favoriteIds by mainViewModel.favoriteIds.collectAsState()
     val bookProgress by mainViewModel.bookProgress.collectAsState()
     val isLoading by mainViewModel.isLoading.collectAsState()
+    val scanProgress by mainViewModel.scanProgress.collectAsState()
     val playbackState by playbackViewModel.uiState.collectAsState()
     val currentSortOrder by mainViewModel.sortOrder.collectAsState()
     val layoutMode by settingsViewModel.layoutMode.collectAsState()
+    
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val isTablet = configuration.smallestScreenWidthDp >= 600
     
     val context = LocalContext.current
     var searchQuery by remember { mutableStateOf("") }
@@ -112,17 +119,77 @@ fun MainScreen(
             )
         },
         bottomBar = { if (playbackState.currentMediaItem != null) { with(sharedTransitionScope) { MiniPlayer(state = playbackState, animatedVisibilityScope = animatedVisibilityScope, onTogglePlay = { playbackViewModel.togglePlayPause() }, onClick = onMiniPlayerClick) } } }
-    ) { padding ->
+) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            SearchBar(inputField = { SearchBarDefaults.InputField(query = searchQuery, onQueryChange = { searchQuery = it }, onSearch = { }, expanded = false, onExpandedChange = { }, placeholder = { Text(stringResource(R.string.search_placeholder)) }, leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) }) }, expanded = false, onExpandedChange = { }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {}
-            Box(modifier = Modifier.fillMaxSize()) {
-                if (isLoading && books.isEmpty()) { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() } } else {
+            SearchBar(inputField = { SearchBarDefaults.InputField(query = searchQuery, onQueryChange = { searchQuery = it }, onSearch = { }, expanded = false, onExpandedChange = { }, placeholder = { Text(stringResource(R.string.search_placeholder)) }, leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) }) }, expanded = false, onExpandedChange = { }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {}
+Box(modifier = Modifier.fillMaxSize()) {
+                if (isLoading && books.isEmpty()) {
+                    Column(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                        CircularProgressIndicator()
+                        Spacer(Modifier.height(16.dp))
+                        val (current, total) = scanProgress
+                        if (total > 0) {
+                            Text("Escaneando: $current / $total archivos", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
+                            Spacer(Modifier.height(8.dp))
+                            LinearProgressIndicator(progress = { current.toFloat() / total.toFloat() }, modifier = Modifier.width(200.dp))
+                        } else {
+                            Text("Cargando biblioteca...", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
+                        }
+                    }
+                } else if (books.isEmpty()) {
+                    // Empty state when no books are found
+                    Column(
+                        modifier = Modifier.fillMaxSize().padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FolderOpen,
+                            contentDescription = null,
+                            modifier = Modifier.size(120.dp),
+                            tint = MaterialTheme.colorScheme.secondary
+                        )
+                        Spacer(Modifier.height(24.dp))
+                        Text(
+                            text = "No hay audiolibros",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            text = "Agrega archivos de audio a tu carpeta seleccionada para comenzar",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.secondary,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(Modifier.height(24.dp))
+                        Button(
+                            onClick = { mainViewModel.loadBooks(settingsViewModel.libraryRootUri.value) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            )
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Escanear carpeta")
+                        }
+                    }
+                } else {
                     if (layoutMode == LayoutMode.LIST) {
                         LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             items(filteredBooks) { book -> with(sharedTransitionScope) { BookListItem(book = book, isFavorite = favoriteIds.contains(book.id), progress = bookProgress[book.id] ?: 0f, animatedVisibilityScope = animatedVisibilityScope, onAddToQueue = { playbackViewModel.addToQueue(book); scope.launch { snackbarHostState.showSnackbar(message = context.getString(R.string.added_to_queue, book.title), duration = SnackbarDuration.Short) } }, onLongClick = { selectedBookForDetails = book; showDetailsSheet = true }, onClick = { onBookClick(book) }) } }
                         }
                     } else {
-                        LazyVerticalGrid(columns = GridCells.Fixed(2), modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        // AJUSTE DINÁMICO DE COLUMNAS: Solo 4 si es tableta Y horizontal. En móvil horizontal 3.
+                        val columns = when {
+                            isTablet && isLandscape -> 4
+                            isTablet -> 3
+                            isLandscape -> 3
+                            else -> 2
+                        }
+                        LazyVerticalGrid(columns = GridCells.Fixed(columns), modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                             items(filteredBooks) { book -> with(sharedTransitionScope) { BookGridItem(book = book, isFavorite = favoriteIds.contains(book.id), progress = bookProgress[book.id] ?: 0f, animatedVisibilityScope = animatedVisibilityScope, onAddToQueue = { playbackViewModel.addToQueue(book); scope.launch { snackbarHostState.showSnackbar(message = context.getString(R.string.added_to_queue, book.title), duration = SnackbarDuration.Short) } }, onLongClick = { selectedBookForDetails = book; showDetailsSheet = true }, onClick = { onBookClick(book) }) } }
                         }
                     }
@@ -155,7 +222,7 @@ fun BookDetailsContent(book: Music, allBooks: List<Music> = emptyList()) {
                 DetailRow(icon = Icons.Default.Description, label = "Nombre del archivo", value = book.fileName)
                 DetailRow(icon = Icons.Default.Folder, label = "Ubicación", value = book.path)
                 DetailRow(icon = Icons.Default.SdCard, label = "Tamaño", value = formatFileSize(book.fileSize))
-                DetailRow(icon = Icons.Default.Timer, label = "Duración", value = Music.formatDuration(book.duration))
+                DetailRow(icon = Icons.Default.Timer, label = "Duración", value = formatDuration(book.duration))
                 DetailRow(icon = Icons.Default.AudioFile, label = "Formato", value = book.path.substringAfterLast(".").uppercase())
             }
         }
@@ -206,7 +273,7 @@ fun androidx.compose.animation.SharedTransitionScope.BookGridItem(book: Music, i
                     Text(text = book.artist, style = MaterialTheme.typography.labelSmall, color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.8f))
                     val currentPos = (progress * book.duration).toLong()
                     Text(
-                        text = if (progress > 0f) "${Music.formatDuration(currentPos)} / ${Music.formatDuration(book.duration)}" else Music.formatDuration(book.duration),
+                        text = if (progress > 0f) "${formatDuration(currentPos)} / ${formatDuration(book.duration)}" else formatDuration(book.duration),
                         style = MaterialTheme.typography.labelSmall,
                         color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f)
                     )
@@ -259,7 +326,7 @@ fun androidx.compose.animation.SharedTransitionScope.BookListItem(book: Music, i
                     Text(text = book.artist, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary, maxLines = 1)
                     val currentPos = (progress * book.duration).toLong()
                     Text(
-                        text = if (progress > 0f) "${Music.formatDuration(currentPos)} / ${Music.formatDuration(book.duration)}" else Music.formatDuration(book.duration),
+                        text = if (progress > 0f) "${formatDuration(currentPos)} / ${formatDuration(book.duration)}" else formatDuration(book.duration),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.secondary
                     )
@@ -270,20 +337,4 @@ fun androidx.compose.animation.SharedTransitionScope.BookListItem(book: Music, i
             if (progress > 0f) LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(4.dp), color = MaterialTheme.colorScheme.primary, trackColor = androidx.compose.ui.graphics.Color.Transparent)
         }
     }
-}
-
-private fun formatTime(ms: Long): String {
-    val totalSeconds = ms / 1000
-    val hours = totalSeconds / 3600
-    val minutes = (totalSeconds % 3600) / 60
-    val seconds = totalSeconds % 60
-    return if (hours > 0) String.format("%02d:%02d:%02d", hours, minutes, seconds) else String.format("%02d:%02d", minutes, seconds)
-}
-
-private fun formatDuration(duration: Long): String {
-    val totalSeconds = duration / 1000
-    val hours = totalSeconds / 3600
-    val minutes = (totalSeconds % 3600) / 60
-    val seconds = totalSeconds % 60
-    return if (hours > 0) String.format("%d:%02d:%02d", hours, minutes, seconds) else String.format("%02d:%02d", minutes, seconds)
 }

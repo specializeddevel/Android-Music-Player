@@ -20,8 +20,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import java.io.File
 import java.io.FileOutputStream
+import java.util.concurrent.ConcurrentHashMap
 
 fun CachedBook.toMusic(): Music = Music(id, title, album, artist, duration, path, artUri, fileSize, fileName)
 fun Music.toCachedBook(): CachedBook = CachedBook(id, title, album, artist, duration, path, artUri, fileSize, fileName)
@@ -32,6 +35,9 @@ class MainViewModel(application: Application, settingsViewModel: SettingsViewMod
     private val database = AppDatabase.getDatabase(application)
     private val _isLoading = MutableStateFlow(false)
     val isLoading = _isLoading.asStateFlow()
+    private val _scanProgress = MutableStateFlow(0 to 0)
+    val scanProgress = _scanProgress.asStateFlow()
+    private val artUriCache = ConcurrentHashMap<String, String?>()
     
     private val _books = database.cachedBookDao().getAllBooks()
         .map { list -> list.map { it.toMusic() } }
@@ -96,14 +102,34 @@ class MainViewModel(application: Application, settingsViewModel: SettingsViewMod
         }
     }
 
-    private fun scanDirectoryRecursively(context: Context, directory: DocumentFile): List<Music> {
-        val musicList = mutableListOf<Music>()
-        val extensions = arrayOf("mp3", "m4a", "m4b", "aac", "wav", "ogg", "flac")
-        directory.listFiles().forEach { file ->
-            if (file.isDirectory) musicList.addAll(scanDirectoryRecursively(context, file))
-            else {
-                val name = file.name?.lowercase() ?: ""
-                if (extensions.any { name.endsWith(".$it") }) {
+private suspend fun scanDirectoryRecursively(context: Context, directory: DocumentFile): List<Music> = withContext(Dispatchers.IO) {
+        val musicList = ConcurrentHashMap<String, Music>()
+        val extensions = setOf("mp3", "m4a", "m4b", "aac", "wav", "ogg", "flac")
+        var totalFiles = 0
+        var processedFiles = 0
+
+        suspend fun collectFiles(dir: DocumentFile): List<DocumentFile> {
+            val files = mutableListOf<DocumentFile>()
+            dir.listFiles()?.forEach { file ->
+                if (file.isDirectory) {
+                    files.addAll(collectFiles(file))
+                } else {
+                    val name = file.name?.lowercase() ?: ""
+                    if (extensions.any { name.endsWith(".$it") }) {
+                        files.add(file)
+                    }
+                }
+            }
+            return files
+        }
+
+        val allFiles = collectFiles(directory)
+        totalFiles = allFiles.size
+        _scanProgress.value = 0 to totalFiles
+
+        allFiles.chunked(8).forEach { chunk ->
+            chunk.map { file ->
+                async {
                     try {
                         context.contentResolver.openFileDescriptor(file.uri, "r")?.use { pfd ->
                             val retriever = MediaMetadataRetriever()
@@ -111,15 +137,32 @@ class MainViewModel(application: Application, settingsViewModel: SettingsViewMod
                             val duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
                             if (duration > 5000) {
                                 val id = file.uri.toString()
-                                musicList.add(Music(id, retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE) ?: file.name ?: "Unknown", retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST) ?: "Unknown Artist", retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM) ?: directory.name ?: "Unknown Album", duration, id, getUniqueArtUri(context, id, file.uri), file.length(), file.name ?: ""))
+                                val music = Music(
+                                    id = id,
+                                    title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE) ?: file.name ?: "Unknown",
+                                    artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST) ?: "Unknown Artist",
+                                    album = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM) ?: directory.name ?: "Unknown Album",
+                                    duration = duration,
+                                    path = id,
+                                    artUri = getUniqueArtUri(context, id, file.uri),
+                                    fileSize = file.length(),
+                                    fileName = file.name ?: ""
+                                )
+                                musicList[id] = music
                             }
                             retriever.release()
                         }
-                    } catch (e: Exception) {}
+                    } catch (e: Exception) {
+                        Log.e("MainViewModel", "Error scanning ${file.name}", e)
+                    }
                 }
-            }
+            }.awaitAll()
+
+            processedFiles += chunk.size
+            _scanProgress.value = processedFiles to totalFiles
         }
-        return musicList
+
+        musicList.values.toList()
     }
 
     private suspend fun scanWithMediaStore(context: Context): List<Music> = withContext(Dispatchers.IO) {
@@ -135,9 +178,16 @@ class MainViewModel(application: Application, settingsViewModel: SettingsViewMod
         tempList
     }
 
-    private fun getUniqueArtUri(context: Context, id: String, uri: Uri): String? {
+private fun getUniqueArtUri(context: Context, id: String, uri: Uri): String? {
+        artUriCache[id]?.let { return it }
+
         val cacheFile = File(context.cacheDir, "cover_${id.hashCode()}.jpg")
-        if (cacheFile.exists()) return Uri.fromFile(cacheFile).toString()
+        if (cacheFile.exists()) {
+            val cachedUri = Uri.fromFile(cacheFile).toString()
+            artUriCache[id] = cachedUri
+            return cachedUri
+        }
+
         val retriever = MediaMetadataRetriever()
         try {
             context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
@@ -145,11 +195,19 @@ class MainViewModel(application: Application, settingsViewModel: SettingsViewMod
                 retriever.embeddedPicture?.let { art ->
                     BitmapFactory.decodeByteArray(art, 0, art.size)?.let { bitmap ->
                         FileOutputStream(cacheFile).use { out -> bitmap.compress(Bitmap.CompressFormat.JPEG, 80, out) }
-                        return Uri.fromFile(cacheFile).toString()
+                        val cachedUri = Uri.fromFile(cacheFile).toString()
+                        artUriCache[id] = cachedUri
+                        return cachedUri
                     }
                 }
             }
-        } catch (e: Exception) {} finally { retriever.release() }
+        } catch (e: Exception) {
+            Log.e("MainViewModel", "Error extracting art for $id", e)
+        } finally {
+            retriever.release()
+        }
+
+        // Don't cache null values - ConcurrentHashMap doesn't allow null values
         return null
     }
 }
