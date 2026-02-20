@@ -1,5 +1,6 @@
 ﻿package com.raulburgosmurray.musicplayer.ui
 
+import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.fadeIn
@@ -26,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -51,12 +53,12 @@ fun PlayerScreen(
     onTransferClick: (String) -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
-    val isPlaying = state.isPlaying
-    val progress = if (state.duration > 0) state.currentPosition.toFloat() / state.duration.toFloat() else 0f
-    val duration = state.duration
-    val position = state.currentPosition
-    val currentItem = state.currentMediaItem
-    val activeTimerMinutes = state.sleepTimerMinutes
+    val configuration = LocalConfiguration.current
+    
+    // DETECCION DE TABLETA: Ancho mínimo de 600dp (~7 pulgadas)
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val isTablet = configuration.smallestScreenWidthDp >= 600
+    val shouldUseLandscapeLayout = isLandscape && isTablet
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -65,45 +67,66 @@ fun PlayerScreen(
     var showSpeedSheet by remember { mutableStateOf(false) }
     val timerSheetState = rememberModalBottomSheetState()
     var showTimerSheet by remember { mutableStateOf(false) }
-    val chapterSheetState = rememberModalBottomSheetState()
-    var showChapterSheet by remember { mutableStateOf(false) }
     val historySheetState = rememberModalBottomSheetState()
     var showHistorySheet by remember { mutableStateOf(false) }
     val queueSheetState = rememberModalBottomSheetState()
     var showQueueSheet by remember { mutableStateOf(false) }
-    val bookmarkSheetState = rememberModalBottomSheetState()
-    var showBookmarkSheet by remember { mutableStateOf(false) }
     val detailsSheetState = rememberModalBottomSheetState()
     var showDetailsSheet by remember { mutableStateOf(false) }
+    val bookmarkSheetState = rememberModalBottomSheetState()
+    var showBookmarkSheet by remember { mutableStateOf(false) }
 
-    var showAddBookmarkDialog by remember { mutableStateOf(false) }
-    var capturedPositionForBookmark by remember { mutableStateOf(0L) }
     var showShareFileConfirmation by remember { mutableStateOf(false) }
 
-    val playIcon = Icons.Default.PlayArrow
-    val pauseIcon = Icons.Default.Pause
-    val speedIcon = Icons.Default.Speed
-    val timerIcon = Icons.Default.Timer
-    val timerOffIcon = Icons.Default.TimerOff
-    
-    // Usar iconos estándar de Material que siempre funcionan
-    val skipNextIcon = Icons.Default.FastForward
-    val skipPreviousIcon = Icons.Default.FastRewind
-    val undoIcon = Icons.AutoMirrored.Filled.Undo
+    Scaffold { padding ->
+        if (shouldUseLandscapeLayout) {
+            LandscapePlayerContent(
+                state = state, viewModel = viewModel, sharedTransitionScope = sharedTransitionScope,
+                animatedVisibilityScope = animatedVisibilityScope, from = from, onBack = onBack,
+                onTransferClick = onTransferClick, onShowHistory = { showHistorySheet = true },
+                onShowQueue = { showQueueSheet = true }, onShowDetails = { showDetailsSheet = true },
+                onShowShare = { showShareFileConfirmation = true }, onShowSpeed = { showSpeedSheet = true },
+                onShowTimer = { showTimerSheet = true }
+            )
+        } else {
+            PortraitPlayerContent(
+                state = state, viewModel = viewModel, sharedTransitionScope = sharedTransitionScope,
+                animatedVisibilityScope = animatedVisibilityScope, from = from, onBack = onBack,
+                onTransferClick = onTransferClick, onShowHistory = { showHistorySheet = true },
+                onShowQueue = { showQueueSheet = true }, onShowDetails = { showDetailsSheet = true },
+                onShowShare = { showShareFileConfirmation = true }, onShowSpeed = { showSpeedSheet = true },
+                onShowTimer = { showTimerSheet = true }
+            )
+        }
+    }
 
+    if (showSpeedSheet) { ModalBottomSheet(onDismissRequest = { showSpeedSheet = false }, sheetState = speedSheetState) { SpeedSelectorContent(currentSpeed = state.playbackSpeed, onSpeedSelected = { viewModel.setPlaybackSpeed(it); showSpeedSheet = false }) } }
+    if (showTimerSheet) { ModalBottomSheet(onDismissRequest = { showTimerSheet = false }, sheetState = timerSheetState) { TimerSelectorContent(activeTimerMinutes = state.sleepTimerMinutes, onTimerSelected = { viewModel.startSleepTimer(it); showTimerSheet = false }, onCancelTimer = { viewModel.cancelSleepTimer(); showTimerSheet = false }) } }
+    if (showHistorySheet) { ModalBottomSheet(onDismissRequest = { showHistorySheet = false }, sheetState = historySheetState) { HistorySelectorContent(history = state.history, onActionSelected = { viewModel.seekTo(it.audioPositionMs); showHistorySheet = false }) } }
+    if (showQueueSheet) { ModalBottomSheet(onDismissRequest = { showQueueSheet = false }, sheetState = queueSheetState) { QueueSelectorContent(playlist = state.playlist, currentIndex = state.currentIndex, onItemClicked = { index -> viewModel.skipToQueueItem(index); showQueueSheet = false }, onRemoveItem = { viewModel.removeItemFromQueue(it) }, onShowDetails = { showDetailsSheet = true }) } }
+    if (showDetailsSheet && state.currentMusicDetails != null) { ModalBottomSheet(onDismissRequest = { showDetailsSheet = false }, sheetState = detailsSheetState) { BookDetailsContent(book = state.currentMusicDetails!!, allBooks = emptyList()) } }
+    if (showBookmarkSheet) { ModalBottomSheet(onDismissRequest = { showBookmarkSheet = false }, sheetState = bookmarkSheetState) { BookmarkSelectorContent(bookmarks = state.bookmarks, onBookmarkSelected = { viewModel.seekTo(it.position); showBookmarkSheet = false }, onDeleteBookmark = { id -> viewModel.deleteBookmark(id) }) } }
+    if (showShareFileConfirmation) {
+        AlertDialog(onDismissRequest = { showShareFileConfirmation = false }, title = { Text(stringResource(R.string.share_file_warning_title)) }, text = { Text(stringResource(R.string.share_file_warning_message)) }, confirmButton = { Button(onClick = { showShareFileConfirmation = false; viewModel.shareFile(context) }) { Text(stringResource(R.string.confirm)) } }, dismissButton = { TextButton(onClick = { showShareFileConfirmation = false }) { Text(stringResource(R.string.cancel)) } })
+    }
+}
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+fun PortraitPlayerContent(state: PlaybackState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit) {
+    val currentItem = state.currentMediaItem
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp).verticalScroll(rememberScrollState())) {
         Spacer(Modifier.height(16.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back_btn)) }
             Row {
-                IconButton(onClick = { showHistorySheet = true }) { Icon(Icons.Default.History, contentDescription = stringResource(R.string.activity_history)) }
-                IconButton(onClick = { showQueueSheet = true }) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, contentDescription = stringResource(R.string.playlist_btn)) }
-                IconButton(onClick = { showDetailsSheet = true }) { Icon(Icons.Default.Info, contentDescription = "Detalles") }
-                IconButton(onClick = { showShareFileConfirmation = true }) { Icon(Icons.Default.Share, stringResource(R.string.share_btn)) }
-                IconButton(onClick = { currentItem?.mediaId?.let { onTransferClick(it) } }) { Icon(Icons.Default.Wifi, stringResource(R.string.send)) }
+                IconButton(onClick = onShowHistory) { Icon(Icons.Default.History, null) }
+                IconButton(onClick = onShowQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null) }
+                IconButton(onClick = onShowDetails) { Icon(Icons.Default.Info, null) }
+                IconButton(onClick = onShowShare) { Icon(Icons.Default.Share, null) }
+                IconButton(onClick = { currentItem?.mediaId?.let { onTransferClick(it) } }) { Icon(Icons.Default.Wifi, null) }
             }
         }
-
         Spacer(Modifier.height(24.dp))
         Box(modifier = Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(32.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
             with(sharedTransitionScope) {
@@ -116,84 +139,80 @@ fun PlayerScreen(
                 }
             }
         }
-
         Spacer(Modifier.height(32.dp))
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(text = currentItem?.mediaMetadata?.title?.toString() ?: stringResource(R.string.unknown_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Text(text = currentMediaItemArtist(currentItem), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.secondary)
-                }
-                IconButton(onClick = { viewModel.toggleFavorite() }) { Icon(if (state.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, contentDescription = stringResource(R.string.favorite_btn), tint = if (state.isFavorite) Color.Red else LocalContentColor.current) }
-            }
+        PlayerControls(state, viewModel, onShowSpeed, onShowTimer)
+    }
+}
 
-            Spacer(Modifier.height(24.dp))
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Slider(value = progress.coerceIn(0f, 1f), onValueChange = { viewModel.seekTo((it * duration).toLong()) }, modifier = Modifier.fillMaxWidth())
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(text = formatTime(position), style = MaterialTheme.typography.labelSmall)
-                    if (state.lastPositionBeforeSeek != null) {
-                        TextButton(onClick = { viewModel.undoSeek() }, modifier = Modifier.height(32.dp)) {
-                            Icon(undoIcon, null, modifier = Modifier.size(14.dp)); Spacer(Modifier.width(4.dp))
-                            Text(stringResource(R.string.undo_seek), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                    Text(text = formatTime(state.duration), style = MaterialTheme.typography.labelSmall)
-                }
-            }
-
-            Spacer(Modifier.height(16.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { viewModel.skipBackward(30000L) }) { Icon(painter = painterResource(id = R.drawable.rewind_30), contentDescription = null, modifier = Modifier.size(36.dp)) }
-                IconButton(onClick = { viewModel.skipBackward(10000L) }) { Icon(skipPreviousIcon, contentDescription = null, modifier = Modifier.size(44.dp)) }
-                FilledIconButton(onClick = { viewModel.togglePlayPause() }, modifier = Modifier.size(80.dp), shape = RoundedCornerShape(24.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) { Icon(if (isPlaying) pauseIcon else playIcon, contentDescription = null, modifier = Modifier.size(44.dp)) }
-                IconButton(onClick = { viewModel.skipForward(10000L) }) { Icon(skipNextIcon, contentDescription = null, modifier = Modifier.size(44.dp)) }
-                IconButton(onClick = { viewModel.skipForward(30000L) }) { Icon(painter = painterResource(id = R.drawable.fast_forward_10), contentDescription = null, modifier = Modifier.size(36.dp)) }
-            }
-
-            Spacer(Modifier.height(32.dp))
-            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-                Surface(onClick = { showSpeedSheet = true }, shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.height(56.dp).weight(1f).padding(horizontal = 8.dp)) {
-                    Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                        Icon(speedIcon, null, modifier = Modifier.size(24.dp)); Spacer(Modifier.width(8.dp))
-                        Text(text = "${state.playbackSpeed}x", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+fun LandscapePlayerContent(state: PlaybackState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit) {
+    val currentItem = state.currentMediaItem
+    Row(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Box(modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(24.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
+            with(sharedTransitionScope) {
+                if (currentItem?.mediaMetadata?.artworkUri != null) {
+                    AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(currentItem.mediaMetadata.artworkUri).crossfade(true).build(), contentDescription = null, modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${from}_cover_${currentItem.mediaId}"), animatedVisibilityScope = animatedVisibilityScope), contentScale = ContentScale.Crop)
+                } else {
+                    Box(modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${from}_cover_${currentItem?.mediaId}"), animatedVisibilityScope = animatedVisibilityScope), contentAlignment = Alignment.Center) {
+                        BookPlaceholder(title = currentItem?.mediaMetadata?.title?.toString() ?: "A", modifier = Modifier.size(80.dp))
                     }
                 }
-                Surface(onClick = { showTimerSheet = true }, shape = RoundedCornerShape(20.dp), color = if (activeTimerMinutes > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant, contentColor = if (activeTimerMinutes > 0) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.height(56.dp).weight(1f).padding(horizontal = 8.dp)) {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(if (activeTimerMinutes > 0) timerIcon else timerOffIcon, null, modifier = Modifier.size(24.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text(text = if (activeTimerMinutes > 0) "${activeTimerMinutes}m" else stringResource(R.string.timer_btn), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        }
-                        if (state.isShakeWaiting) {
-                            Text(
-                                text = stringResource(R.string.shake_visual_prompt),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f)
-                            )
-                        }
-                    }
+            }
+            IconButton(onClick = onBack, modifier = Modifier.padding(8.dp).background(Color.Black.copy(alpha = 0.3f), CircleShape)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) }
+        }
+        Spacer(Modifier.width(24.dp))
+        Column(modifier = Modifier.weight(1.2f).fillMaxHeight().verticalScroll(rememberScrollState())) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                IconButton(onClick = onShowHistory) { Icon(Icons.Default.History, null) }
+                IconButton(onClick = onShowQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null) }
+                IconButton(onClick = onShowDetails) { Icon(Icons.Default.Info, null) }
+                IconButton(onClick = onShowShare) { Icon(Icons.Default.Share, null) }
+                IconButton(onClick = { currentItem?.mediaId?.let { onTransferClick(it) } }) { Icon(Icons.Default.Wifi, null) }
+            }
+            PlayerControls(state, viewModel, onShowSpeed, onShowTimer)
+        }
+    }
+}
+
+@Composable
+fun PlayerControls(state: PlaybackState, viewModel: PlaybackViewModel, onShowSpeed: () -> Unit, onShowTimer: () -> Unit) {
+    val currentItem = state.currentMediaItem
+    val isPlaying = state.isPlaying
+    val progress = if (state.duration > 0) state.currentPosition.toFloat() / state.duration.toFloat() else 0f
+    val duration = state.duration
+    val position = state.currentPosition
+    val activeTimerMinutes = state.sleepTimerMinutes
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(text = currentItem?.mediaMetadata?.title?.toString() ?: stringResource(R.string.unknown_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(text = currentMediaItemArtist(currentItem), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
+        Spacer(Modifier.height(16.dp))
+        Slider(value = progress.coerceIn(0f, 1f), onValueChange = { viewModel.seekTo((it * duration).toLong()) }, modifier = Modifier.fillMaxWidth())
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(text = formatDuration(position), style = MaterialTheme.typography.labelSmall)
+            Text(text = formatDuration(state.duration), style = MaterialTheme.typography.labelSmall)
+        }
+        Spacer(Modifier.height(16.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = { viewModel.skipBackward(30000L) }) { Icon(painter = painterResource(id = R.drawable.rewind_30), null, modifier = Modifier.size(32.dp)) }
+            IconButton(onClick = { viewModel.skipBackward(10000L) }) { Icon(Icons.Default.Replay10, null, modifier = Modifier.size(40.dp)) }
+            FilledIconButton(onClick = { viewModel.togglePlayPause() }, modifier = Modifier.size(64.dp), shape = RoundedCornerShape(20.dp)) { Icon(if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, null, modifier = Modifier.size(32.dp)) }
+            IconButton(onClick = { viewModel.skipForward(10000L) }) { Icon(Icons.Default.Forward10, null, modifier = Modifier.size(40.dp)) }
+            IconButton(onClick = { viewModel.skipForward(30000L) }) { Icon(painter = painterResource(id = R.drawable.fast_forward_10), null, modifier = Modifier.size(32.dp)) }
+        }
+        Spacer(Modifier.height(24.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+            Surface(onClick = onShowSpeed, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.height(48.dp).weight(1f).padding(horizontal = 4.dp)) {
+                Box(contentAlignment = Alignment.Center) { Text("${state.playbackSpeed}x", fontWeight = FontWeight.Bold) }
+            }
+            Surface(onClick = onShowTimer, shape = RoundedCornerShape(16.dp), color = if (activeTimerMinutes > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.height(48.dp).weight(1f).padding(horizontal = 4.dp)) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                    Text(if (activeTimerMinutes > 0) "${activeTimerMinutes}m" else stringResource(R.string.timer_btn), fontWeight = FontWeight.Bold)
+                    if (state.isShakeWaiting) Text(stringResource(R.string.shake_visual_prompt), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold)
                 }
             }
         }
-    }
-
-    if (showSpeedSheet) { ModalBottomSheet(onDismissRequest = { showSpeedSheet = false }, sheetState = speedSheetState) { SpeedSelectorContent(currentSpeed = state.playbackSpeed, onSpeedSelected = { viewModel.setPlaybackSpeed(it); showSpeedSheet = false }) } }
-    if (showTimerSheet) { ModalBottomSheet(onDismissRequest = { showTimerSheet = false }, sheetState = timerSheetState) { TimerSelectorContent(activeTimerMinutes = activeTimerMinutes, onTimerSelected = { viewModel.startSleepTimer(it); showTimerSheet = false }, onCancelTimer = { viewModel.cancelSleepTimer(); showTimerSheet = false }) } }
-    if (showChapterSheet) { ModalBottomSheet(onDismissRequest = { showChapterSheet = false }, sheetState = chapterSheetState) { ChapterSelectorContent(chapters = state.chapters, currentPosition = state.currentPosition, onChapterSelected = { viewModel.seekTo(it.startMs); showChapterSheet = false }) } }
-    if (showHistorySheet) { ModalBottomSheet(onDismissRequest = { showHistorySheet = false }, sheetState = historySheetState) { HistorySelectorContent(history = state.history, onActionSelected = { viewModel.seekTo(it.audioPositionMs); showHistorySheet = false }) } }
-    if (showQueueSheet) { ModalBottomSheet(onDismissRequest = { showQueueSheet = false }, sheetState = queueSheetState) { QueueSelectorContent(playlist = state.playlist, currentIndex = state.currentIndex, onItemClicked = { index -> viewModel.skipToQueueItem(index); showQueueSheet = false }, onRemoveItem = { viewModel.removeItemFromQueue(it) }, onMoveUp = { if (it > 0) viewModel.moveItemInQueue(it, it - 1) }, onMoveDown = { if (it < state.playlist.size - 1) viewModel.moveItemInQueue(it, it + 1) }) } }
-    if (showBookmarkSheet) { ModalBottomSheet(onDismissRequest = { showBookmarkSheet = false }, sheetState = bookmarkSheetState) { BookmarkSelectorContent(bookmarks = state.bookmarks, onBookmarkSelected = { viewModel.seekTo(it.position); showBookmarkSheet = false }, onDeleteBookmark = { id -> viewModel.deleteBookmark(id) }) } }
-    if (showAddBookmarkDialog) { AddBookmarkDialog(currentPosition = capturedPositionForBookmark, onDismiss = { showAddBookmarkDialog = false }, onConfirm = { note -> viewModel.addBookmark(note, capturedPositionForBookmark); showAddBookmarkDialog = false }) }
-    if (showDetailsSheet && state.currentMusicDetails != null) { ModalBottomSheet(onDismissRequest = { showDetailsSheet = false }, sheetState = detailsSheetState) { BookDetailsContent(book = state.currentMusicDetails!!, allBooks = emptyList()) } }
-    if (showShareFileConfirmation) {
-        AlertDialog(onDismissRequest = { showShareFileConfirmation = false }, title = { Text(stringResource(R.string.share_file_warning_title)) }, text = { Text(stringResource(R.string.share_file_warning_message)) }, confirmButton = { Button(onClick = { showShareFileConfirmation = false; viewModel.shareFile(context) }) { Text(stringResource(R.string.confirm)) } }, dismissButton = { TextButton(onClick = { showShareFileConfirmation = false }) { Text(stringResource(R.string.cancel)) } })
     }
 }
 
@@ -208,25 +227,11 @@ fun SpeedSelectorContent(currentSpeed: Float, onSpeedSelected: (Float) -> Unit) 
     Column(modifier = Modifier.fillMaxWidth().padding(24.dp).padding(bottom = 32.dp)) {
         Text(stringResource(R.string.playback_speed_selector), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(24.dp))
-        
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(3),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
+        LazyVerticalGrid(columns = GridCells.Fixed(3), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
             items(speeds) { speed ->
                 val isSelected = speed == currentSpeed
-                Surface(
-                    onClick = { onSpeedSelected(speed) },
-                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer,
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.height(60.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text("${speed}x", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    }
+                Surface(onClick = { onSpeedSelected(speed) }, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer, contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer, shape = RoundedCornerShape(16.dp), modifier = Modifier.height(60.dp)) {
+                    Box(contentAlignment = Alignment.Center) { Text("${speed}x", fontWeight = FontWeight.Bold) }
                 }
             }
         }
@@ -239,39 +244,17 @@ fun TimerSelectorContent(activeTimerMinutes: Int, onTimerSelected: (Int) -> Unit
     Column(modifier = Modifier.fillMaxWidth().padding(24.dp).padding(bottom = 32.dp)) {
         Text(stringResource(R.string.sleep_timer_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(24.dp))
-        
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(3),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
+        LazyVerticalGrid(columns = GridCells.Fixed(3), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
             items(options) { mins ->
                 val isSelected = mins == activeTimerMinutes
-                Surface(
-                    onClick = { onTimerSelected(mins) },
-                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                    contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.height(60.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text("${mins}m", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    }
+                Surface(onClick = { onTimerSelected(mins) }, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant, contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant, shape = RoundedCornerShape(16.dp), modifier = Modifier.height(60.dp)) {
+                    Box(contentAlignment = Alignment.Center) { Text("${mins}m", fontWeight = FontWeight.Bold) }
                 }
             }
         }
-        
         if (activeTimerMinutes > 0) {
             Spacer(Modifier.height(24.dp))
-            Button(
-                onClick = onCancelTimer,
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error, contentColor = MaterialTheme.colorScheme.onError),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Text(stringResource(R.string.stop_sleep_timer), fontWeight = FontWeight.Bold)
-            }
+            Button(onClick = onCancelTimer, modifier = Modifier.fillMaxWidth().height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error, contentColor = MaterialTheme.colorScheme.onError), shape = RoundedCornerShape(16.dp)) { Text(stringResource(R.string.stop_sleep_timer), fontWeight = FontWeight.Bold) }
         }
     }
 }
@@ -281,21 +264,13 @@ fun HistorySelectorContent(history: List<com.raulburgosmurray.musicplayer.Histor
     Column(modifier = Modifier.fillMaxWidth().padding(24.dp).padding(bottom = 32.dp)) {
         Text(stringResource(R.string.activity_history_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(16.dp))
-        if (history.isEmpty()) {
-            Text(stringResource(R.string.no_activity_yet), color = MaterialTheme.colorScheme.secondary)
-        } else {
+        if (history.isEmpty()) { Text(stringResource(R.string.no_activity_yet), color = MaterialTheme.colorScheme.secondary) }
+        else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(history) { action ->
-                    Card(
-                        onClick = { onActionSelected(action) },
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                    ) {
+                    Card(onClick = { onActionSelected(action) }, shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
                         Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(action.label, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge)
-                                Text(formatDuration(action.audioPositionMs), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-                            }
+                            Column(modifier = Modifier.weight(1f)) { Text(action.label, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge); Text(formatDuration(action.audioPositionMs), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary) }
                             Icon(Icons.AutoMirrored.Filled.Undo, null, tint = MaterialTheme.colorScheme.primary)
                         }
                     }
@@ -306,7 +281,7 @@ fun HistorySelectorContent(history: List<com.raulburgosmurray.musicplayer.Histor
 }
 
 @Composable
-fun QueueSelectorContent(playlist: List<androidx.media3.common.MediaItem>, currentIndex: Int, onItemClicked: (Int) -> Unit, onRemoveItem: (Int) -> Unit, onMoveUp: (Int) -> Unit, onMoveDown: (Int) -> Unit) {
+fun QueueSelectorContent(playlist: List<androidx.media3.common.MediaItem>, currentIndex: Int, onItemClicked: (Int) -> Unit, onRemoveItem: (Int) -> Unit, onShowDetails: () -> Unit) {
     Column(modifier = Modifier.fillMaxWidth().padding(24.dp).padding(bottom = 32.dp)) {
         Text(stringResource(R.string.playback_queue_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(16.dp))
@@ -322,30 +297,6 @@ fun QueueSelectorContent(playlist: List<androidx.media3.common.MediaItem>, curre
                 }
             }
         }
-    }
-}
-
-private fun formatTime(ms: Long): String {
-    val totalSeconds = ms / 1000
-    val hours = totalSeconds / 3600
-    val minutes = (totalSeconds % 3600) / 60
-    val seconds = totalSeconds % 60
-    return if (hours > 0) String.format("%02d:%02d:%02d", hours, minutes, seconds) else String.format("%02d:%02d", minutes, seconds)
-}
-
-private fun formatDuration(duration: Long): String {
-    val totalSeconds = duration / 1000
-    val hours = totalSeconds / 3600
-    val minutes = (totalSeconds % 3600) / 60
-    val seconds = totalSeconds % 60
-    return if (hours > 0) String.format("%d:%02d:%02d", hours, minutes, seconds) else String.format("%02d:%02d", minutes, seconds)
-}
-
-@Composable
-fun BookPlaceholder(title: String, modifier: Modifier = Modifier) {
-    val initial = title.firstOrNull()?.uppercase() ?: "?"
-    Box(modifier = modifier.background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
-        Text(text = initial, style = MaterialTheme.typography.displayLarge, color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.Bold)
     }
 }
 

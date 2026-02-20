@@ -228,14 +228,28 @@ class MainActivity : ComponentActivity() {
                                                 state.qrData?.let { data ->
                                                     val qrBitmap = remember(data) {
                                                         try {
-                                                            val hints = mapOf(EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M, EncodeHintType.MARGIN to 1)
+                                                            // CONFIGURACION ULTRA-ROBUSTA DE QR
+                                                            val hints = mapOf(
+                                                                EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.Q,
+                                                                EncodeHintType.CHARACTER_SET to "UTF-8",
+                                                                EncodeHintType.MARGIN to 2
+                                                            )
                                                             val bitMatrix = QRCodeWriter().encode(data, BarcodeFormat.QR_CODE, 512, 512, hints)
-                                                            val bitmap = Bitmap.createBitmap(bitMatrix.width, bitMatrix.height, Bitmap.Config.RGB_565)
-                                                            for (x in 0 until bitMatrix.width) for (y in 0 until bitMatrix.height) bitmap.setPixel(x, y, if (bitMatrix.get(x, y)) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
+                                                            val width = bitMatrix.width
+                                                            val height = bitMatrix.height
+                                                            val pixels = IntArray(width * height)
+                                                            for (y in 0 until height) {
+                                                                val offset = y * width
+                                                                for (x in 0 until width) {
+                                                                    pixels[offset + x] = if (bitMatrix.get(x, y)) android.graphics.Color.BLACK else android.graphics.Color.WHITE
+                                                                }
+                                                            }
+                                                            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                                                            bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
                                                             bitmap
                                                         } catch (e: Exception) { null }
                                                     }
-                                                    qrBitmap?.let { Image(bitmap = it.asImageBitmap(), contentDescription = "QR", modifier = Modifier.size(280.dp)) }
+                                                    qrBitmap?.let { Image(bitmap = it.asImageBitmap(), contentDescription = "QR", modifier = Modifier.size(300.dp)) }
                                                 }
                                                 Text(stringResource(R.string.qr_generated))
                                             } else { CircularProgressIndicator() }
