@@ -42,6 +42,7 @@ import com.raulburgosmurray.musicplayer.data.BookRepository
 import com.raulburgosmurray.musicplayer.data.FavoriteRepository
 import com.raulburgosmurray.musicplayer.data.BookmarkRepository
 import com.raulburgosmurray.musicplayer.data.QueueRepository
+import com.raulburgosmurray.musicplayer.data.ProgressRepository
 import com.raulburgosmurray.musicplayer.data.Bookmark
 import com.raulburgosmurray.musicplayer.data.AudioMetadata
 import com.raulburgosmurray.musicplayer.data.MetadataJsonHelper
@@ -98,6 +99,7 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
     private val favoriteRepository = FavoriteRepository(AppDatabase.getDatabase(application).favoriteDao())
     private val bookmarkRepository = BookmarkRepository(AppDatabase.getDatabase(application).bookmarkDao())
     private val queueRepository = QueueRepository(AppDatabase.getDatabase(application).queueDao())
+    private val progressRepository = ProgressRepository(AppDatabase.getDatabase(application).progressDao())
 
     private val _uiState = MutableStateFlow(PlaybackUiState())
     val uiState: StateFlow<PlaybackUiState> = _uiState.asStateFlow()
@@ -420,6 +422,24 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
         }
     }
 
+    private fun restorePositionIfNeeded(mediaId: String) {
+        viewModelScope.launch {
+            val progress = withContext(Dispatchers.IO) {
+                progressRepository.getProgress(mediaId)
+            }
+            if (progress != null) {
+                val mediaController = controller
+                mediaController?.let { ctrl ->
+                    val currentPos = ctrl.currentPosition
+                    if (kotlin.math.abs(currentPos - progress.lastPosition) > 1000) {
+                        ctrl.seekTo(progress.lastPosition)
+                        Log.d("PlaybackViewModel", "Restored position to ${progress.lastPosition}ms")
+                    }
+                }
+            }
+        }
+    }
+
     private fun setupController() {
         val player = controller ?: return
         player.addListener(object : Player.Listener {
@@ -436,7 +456,13 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
                     chapters = emptyList(),
                     dominantColor = null
                 )
-                updateCurrentMusicDetails(mediaItem?.mediaId)
+                
+                val mediaId = mediaItem?.mediaId
+                if (mediaId != null) {
+                    restorePositionIfNeeded(mediaId)
+                }
+                
+                updateCurrentMusicDetails(mediaId)
                 updateDominantColor(mediaItem?.mediaMetadata?.artworkUri)
                 mediaItem?.localConfiguration?.uri?.toString()?.let { uriString ->
                     if (uriString != lastScannedUri) {
