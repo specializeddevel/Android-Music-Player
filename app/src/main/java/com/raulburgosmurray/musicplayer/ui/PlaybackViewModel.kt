@@ -427,15 +427,21 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
             val progress = withContext(Dispatchers.IO) {
                 progressRepository.getProgress(mediaId)
             }
+            Log.d("PlaybackViewModel", "restorePositionIfNeeded: mediaId=$mediaId, progress=$progress")
             if (progress != null) {
                 val mediaController = controller
                 mediaController?.let { ctrl ->
                     val currentPos = ctrl.currentPosition
+                    Log.d("PlaybackViewModel", "currentPos=$currentPos, lastPosition=${progress.lastPosition}")
                     if (kotlin.math.abs(currentPos - progress.lastPosition) > 1000) {
                         ctrl.seekTo(progress.lastPosition)
                         Log.d("PlaybackViewModel", "Restored position to ${progress.lastPosition}ms")
+                    } else {
+                        Log.d("PlaybackViewModel", "Position difference too small, not seeking")
                     }
                 }
+            } else {
+                Log.d("PlaybackViewModel", "No progress found for mediaId=$mediaId")
             }
         }
     }
@@ -650,10 +656,15 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
     fun playPlaylist(mediaItems: List<MediaItem>, startIndex: Int) {
         val player = controller
         if (player != null) {
+            val mediaId = mediaItems.getOrNull(startIndex)?.mediaId
+            
             player.stop() 
             player.setMediaItems(mediaItems, startIndex, 0)
             player.prepare()
             player.play()
+            
+            // Restore position after starting playback
+            mediaId?.let { restorePositionIfNeeded(it) }
         } else {
             pendingPlaylist = Pair(mediaItems, startIndex)
         }
