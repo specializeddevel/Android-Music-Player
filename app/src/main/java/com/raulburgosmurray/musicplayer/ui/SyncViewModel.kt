@@ -9,6 +9,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.raulburgosmurray.musicplayer.data.AppDatabase
 import com.raulburgosmurray.musicplayer.data.AudiobookProgress
 import com.raulburgosmurray.musicplayer.data.GoogleDriveService
+import com.raulburgosmurray.musicplayer.data.ProgressRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,9 +20,7 @@ import kotlinx.coroutines.withContext
 import androidx.annotation.VisibleForTesting
 
 class SyncViewModel(application: Application) : AndroidViewModel(application) {
-    // ... rest of the properties ...
-
-    private val database = AppDatabase.getDatabase(application)
+    private val progressRepository = ProgressRepository(AppDatabase.getDatabase(application).progressDao())
     private val prefs = application.getSharedPreferences("sync_prefs", Context.MODE_PRIVATE)
 
     private val _userAccount = MutableStateFlow<GoogleSignInAccount?>(
@@ -60,7 +59,7 @@ class SyncViewModel(application: Application) : AndroidViewModel(application) {
                 
                 // 2. Obtener local
                 val localProgress = withContext(Dispatchers.IO) {
-                    database.progressDao().getAllProgress()
+                    progressRepository.getAllProgress()
                 }
 
                 // 3. Mezclar inteligentemente (Merge)
@@ -70,7 +69,7 @@ class SyncViewModel(application: Application) : AndroidViewModel(application) {
 
                 // 4. Subir la versión definitiva a la nube
                 val finalProgress = withContext(Dispatchers.IO) {
-                    database.progressDao().getAllProgress()
+                    progressRepository.getAllProgress()
                 }
                 val success = driveService.uploadProgress(finalProgress)
                 
@@ -95,7 +94,7 @@ class SyncViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val driveService = GoogleDriveService(context, account.email!!)
                 val localProgress = withContext(Dispatchers.IO) {
-                    database.progressDao().getAllProgress()
+                    progressRepository.getAllProgress()
                 }
                 driveService.uploadProgress(localProgress)
             } catch (e: Exception) {
@@ -128,7 +127,7 @@ class SyncViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         if (merged.isNotEmpty()) {
-            database.progressDao().upsertAll(merged)
+            progressRepository.saveAllProgress(merged)
         }
     }
 }

@@ -162,7 +162,7 @@ class PlaybackService : MediaSessionService() {
         saveProgressJob?.cancel()
         saveProgressJob = serviceScope.launch {
             while (isActive) {
-                delay(10000) // Aumentado a 10s para reducir carga
+                delay(Constants.POSITION_SAVE_INTERVAL_MS)
                 saveCurrentProgress(isPausing = false)
             }
         }

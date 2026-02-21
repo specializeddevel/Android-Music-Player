@@ -1,4 +1,4 @@
-﻿package com.raulburgosmurray.musicplayer.ui
+package com.raulburgosmurray.musicplayer.ui
 
 import android.app.Application
 import android.net.Uri
@@ -10,8 +10,11 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.documentfile.provider.DocumentFile
 import com.raulburgosmurray.musicplayer.data.AppDatabase
+import com.raulburgosmurray.musicplayer.data.BookRepository
+import com.raulburgosmurray.musicplayer.data.ProgressRepository
 import com.raulburgosmurray.musicplayer.data.AudiobookProgress
 import com.raulburgosmurray.musicplayer.R
+import com.raulburgosmurray.musicplayer.Constants
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,7 +38,8 @@ data class TransferUIState(
 )
 
 class LiteraTransferViewModel(application: Application) : AndroidViewModel(application) {
-
+    private val bookRepository = BookRepository(AppDatabase.getDatabase(application).cachedBookDao())
+    private val progressRepository = ProgressRepository(AppDatabase.getDatabase(application).progressDao())
     private val _uiState = MutableStateFlow(TransferUIState())
     val uiState = _uiState.asStateFlow()
 
@@ -43,7 +47,6 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
     private var serverJob: Job? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private var wifiLock: WifiManager.WifiLock? = null
-    private val database = AppDatabase.getDatabase(application)
     private var decisionDeferred: CompletableDeferred<String>? = null
 
     init { refreshLocalIp() }
@@ -68,8 +71,8 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
         resetTransferState()
         serverJob = viewModelScope.launch(Dispatchers.IO) {
             try {
-                val bookProgress = database.progressDao().getProgress(bookId)
-                val bookDetails = database.cachedBookDao().getBookById(bookId) ?: return@launch
+                val bookProgress = progressRepository.getProgress(bookId)
+                val bookDetails = bookRepository.getBookById(bookId) ?: return@launch
                 val ip = getLocalIpAddress()
                 if (ip == "0.0.0.0") { _uiState.value = _uiState.value.copy(error = "Sin Wi-Fi"); return@launch }
 
@@ -77,7 +80,7 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
                 val shortAuthor = if (bookDetails.artist.length > 20) bookDetails.artist.take(17) + "..." else bookDetails.artist
 
                 val qrJson = JSONObject().apply {
-                    put("ip", "$ip:50001"); put("t", shortTitle); put("a", shortAuthor)
+                    put("ip", "$ip:${Constants.TRANSFER_SERVER_PORT}"); put("t", shortTitle); put("a", shortAuthor)
                     if (bookProgress != null) { put("p", bookProgress.lastPosition); put("d", bookProgress.duration) }
                 }
 
@@ -88,7 +91,7 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
                 wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Litera:TransferWake").apply { acquire(15*60*1000L) }
                 wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "Litera:WifiLock").apply { acquire() }
 
-                serverSocket = ServerSocket(); serverSocket?.reuseAddress = true; serverSocket?.bind(InetSocketAddress(ip, 50001))
+                serverSocket = ServerSocket(); serverSocket?.reuseAddress = true; serverSocket?.bind(InetSocketAddress(ip, Constants.TRANSFER_SERVER_PORT))
 
                 while (isActive) {
                     val clientSocket = try { serverSocket?.accept() } catch (e: Exception) { null } ?: break
@@ -144,7 +147,7 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val json = JSONObject(qrString); val ip = json.getString("ip"); val title = json.getString("t"); val author = json.getString("a")
-                val localBooks = database.cachedBookDao().getAllBooks().first()
+                val localBooks = bookRepository.getAllBooks().first()
                 val existingBook = localBooks.find { it.title.startsWith(title.replace("...", ""), true) && it.artist.startsWith(author.replace("...", ""), true) }
 
                 if (existingBook != null) {
@@ -166,7 +169,7 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
         viewModelScope.launch(Dispatchers.IO) {
             when (decision) {
                 "PROGRESS" -> {
-                    if (progress != null) database.progressDao().saveProgress(progress)
+                    if (progress != null) progressRepository.saveProgress(progress)
                     withContext(Dispatchers.Main) { _uiState.value = _uiState.value.copy(transferStatus = context.getString(R.string.synced_via_qr)) }
                 }
                 "FILE" -> { if (targetIp != null) receiveFromIp(targetIp, libraryUri) }
@@ -182,7 +185,7 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
             _uiState.value = _uiState.value.copy(isDownloading = true, transferStatus = context.getString(R.string.connecting), error = null)
             var socket: Socket? = null
             try {
-                val parts = cleanUrl.split(":"); socket = Socket(); socket.connect(InetSocketAddress(parts[0], parts[1].toInt()), 10000); socket.soTimeout = 60000
+                val parts = cleanUrl.split(":"); socket = Socket(); socket.connect(InetSocketAddress(parts[0], parts[1].toInt()), Constants.SOCKET_CONNECT_TIMEOUT_MS); socket.soTimeout = Constants.SOCKET_READ_TIMEOUT_MS
                 val input = DataInputStream(BufferedInputStream(socket.inputStream))
                 val output = DataOutputStream(BufferedOutputStream(socket.outputStream))
                 

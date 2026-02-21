@@ -28,9 +28,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.abs
 
-/**
- * Helper function to convert HSL hue to RGB
- */
 private fun hueToRgb(p: Float, q: Float, t: Float): Float {
     var tNorm = t
     if (tNorm < 0f) tNorm += 1f
@@ -41,9 +38,6 @@ private fun hueToRgb(p: Float, q: Float, t: Float): Float {
     return p
 }
 
-/**
- * Helper function to convert HSL to Color
- */
 private fun hslToColor(h: Int, s: Int, l: Int): Color {
     val hNorm = h / 360f
     val sNorm = s / 100f
@@ -68,23 +62,13 @@ private fun hslToColor(h: Int, s: Int, l: Int): Color {
     return Color(r, g, b)
 }
 
-/**
- * Generates a unique color palette based on the book title
- * Returns a pair of (primary color, secondary color) for gradient
- * Uses darker, muted colors for better appearance on dark interface
- */
 fun generateBookColors(title: String): Pair<Color, Color> {
     val hash = title.hashCode()
     
-    // Generate hue from hash (0-360)
     val hue = abs(hash % 360)
-    
-    // Generate saturation (20-40%) for muted, professional look
     val saturation = 20 + (abs(hash / 360) % 20)
-    
-    // Generate lightness for two colors - darker for dark interface
-    val lightness1 = 15 + (abs(hash / 3600) % 10) // Very dark
-    val lightness2 = 25 + (abs(hash / 36000) % 10) // Slightly lighter
+    val lightness1 = 15 + (abs(hash / 3600) % 10)
+    val lightness2 = 25 + (abs(hash / 36000) % 10)
     
     return Pair(
         hslToColor(hue, saturation, lightness1),
@@ -92,10 +76,6 @@ fun generateBookColors(title: String): Pair<Color, Color> {
     )
 }
 
-/**
- * Elegant book placeholder with gradient background and title display
- * Works well for both large (player view) and small (list view) sizes
- */
 @Composable
 fun BookPlaceholder(title: String, modifier: Modifier = Modifier) {
     val colors = remember(title) { generateBookColors(title) }
@@ -118,14 +98,12 @@ fun BookPlaceholder(title: String, modifier: Modifier = Modifier) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // Book icon
             Text(
                 text = "📚",
                 fontSize = 48.sp,
                 modifier = Modifier.padding(bottom = 12.dp)
             )
             
-            // Title text
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleLarge,
@@ -139,10 +117,6 @@ fun BookPlaceholder(title: String, modifier: Modifier = Modifier) {
     }
 }
 
-/**
- * Compact book placeholder for list items
- * Shows abbreviated title with elegant design
- */
 @Composable
 fun CompactBookPlaceholder(title: String, modifier: Modifier = Modifier) {
     val colors = remember(title) { generateBookColors(title) }
@@ -192,12 +166,4 @@ fun formatDuration(duration: Long): String {
     val minutes = (totalSeconds % 3600) / 60
     val seconds = totalSeconds % 60
     return if (hours > 0) String.format("%d:%02d:%02d", hours, minutes, seconds) else String.format("%02d:%02d", minutes, seconds)
-}
-
-fun formatTime(ms: Long): String {
-    val totalSeconds = ms / 1000
-    val hours = totalSeconds / 3600
-    val minutes = (totalSeconds % 3600) / 60
-    val seconds = totalSeconds % 60
-    return if (hours > 0) String.format("%02d:%02d:%02d", hours, minutes, seconds) else String.format("%02d:%02d", minutes, seconds)
 }

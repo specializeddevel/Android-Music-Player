@@ -47,7 +47,9 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.raulburgosmurray.musicplayer.Music
 import com.raulburgosmurray.musicplayer.R
+import com.raulburgosmurray.musicplayer.Constants
 import com.raulburgosmurray.musicplayer.encodeBookId
+import com.raulburgosmurray.musicplayer.ui.PlaybackUiState
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
@@ -122,7 +124,7 @@ fun PlayerScreen(
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun PortraitPlayerContent(state: PlaybackState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit) {
+fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit) {
     val currentItem = state.currentMediaItem
     var pressedArea by remember { mutableStateOf<CoverTapArea?>(null) }
     
@@ -157,9 +159,9 @@ fun PortraitPlayerContent(state: PlaybackState, viewModel: PlaybackViewModel, sh
                 pressedArea = pressedArea,
                 onAreaPressed = { pressedArea = it },
                 onAreaReleased = { pressedArea = null },
-                onLeftTap = { viewModel.skipBackward(30000L) },
+                onLeftTap = { viewModel.skipBackward(Constants.SKIP_BACKWARD_MS) },
                 onCenterTap = { viewModel.togglePlayPause() },
-                onRightTap = { viewModel.skipForward(10000L) }
+                onRightTap = { viewModel.skipForward(Constants.SKIP_FORWARD_MS) }
             )
         }
         Spacer(Modifier.height(32.dp))
@@ -170,7 +172,7 @@ fun PortraitPlayerContent(state: PlaybackState, viewModel: PlaybackViewModel, sh
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun LandscapePlayerContent(state: PlaybackState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit) {
+fun LandscapePlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit) {
     val currentItem = state.currentMediaItem
     var pressedArea by remember { mutableStateOf<CoverTapArea?>(null) }
     
@@ -191,9 +193,9 @@ fun LandscapePlayerContent(state: PlaybackState, viewModel: PlaybackViewModel, s
                 pressedArea = pressedArea,
                 onAreaPressed = { pressedArea = it },
                 onAreaReleased = { pressedArea = null },
-                onLeftTap = { viewModel.skipBackward(30000L) },
+                onLeftTap = { viewModel.skipBackward(Constants.SKIP_BACKWARD_MS) },
                 onCenterTap = { viewModel.togglePlayPause() },
-                onRightTap = { viewModel.skipForward(10000L) }
+                onRightTap = { viewModel.skipForward(Constants.SKIP_FORWARD_MS) }
             )
             IconButton(onClick = onBack, modifier = Modifier.padding(8.dp).background(Color.Black.copy(alpha = 0.3f), CircleShape)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) }
         }
@@ -214,7 +216,7 @@ fun LandscapePlayerContent(state: PlaybackState, viewModel: PlaybackViewModel, s
 }
 
 @Composable
-fun PlayerControls(state: PlaybackState, viewModel: PlaybackViewModel, onShowSpeed: () -> Unit, onShowTimer: () -> Unit) {
+fun PlayerControls(state: PlaybackUiState, viewModel: PlaybackViewModel, onShowSpeed: () -> Unit, onShowTimer: () -> Unit) {
     val currentItem = state.currentMediaItem
     val isPlaying = state.isPlaying
     val progress = if (state.duration > 0) state.currentPosition.toFloat() / state.duration.toFloat() else 0f
@@ -247,11 +249,11 @@ fun PlayerControls(state: PlaybackState, viewModel: PlaybackViewModel, onShowSpe
         }
         Spacer(Modifier.height(16.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { viewModel.skipBackward(30000L) }) { Icon(painter = painterResource(id = R.drawable.rewind_30), null, modifier = Modifier.size(32.dp)) }
-            IconButton(onClick = { viewModel.skipBackward(10000L) }) { Icon(Icons.Default.Replay10, null, modifier = Modifier.size(40.dp)) }
+            IconButton(onClick = { viewModel.skipBackward(Constants.SKIP_BACKWARD_MS) }) { Icon(painter = painterResource(id = R.drawable.rewind_30), null, modifier = Modifier.size(32.dp)) }
+            IconButton(onClick = { viewModel.skipBackward(Constants.SKIP_FORWARD_MS) }) { Icon(Icons.Default.Replay10, null, modifier = Modifier.size(40.dp)) }
             FilledIconButton(onClick = { viewModel.togglePlayPause() }, modifier = Modifier.size(64.dp), shape = RoundedCornerShape(20.dp)) { Icon(if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, null, modifier = Modifier.size(32.dp)) }
-            IconButton(onClick = { viewModel.skipForward(10000L) }) { Icon(Icons.Default.Forward10, null, modifier = Modifier.size(40.dp)) }
-            IconButton(onClick = { viewModel.skipForward(30000L) }) { Icon(painter = painterResource(id = R.drawable.fast_forward_10), null, modifier = Modifier.size(32.dp)) }
+            IconButton(onClick = { viewModel.skipForward(Constants.SKIP_FORWARD_MS) }) { Icon(Icons.Default.Forward10, null, modifier = Modifier.size(40.dp)) }
+            IconButton(onClick = { viewModel.skipForward(Constants.SKIP_BACKWARD_MS) }) { Icon(painter = painterResource(id = R.drawable.fast_forward_10), null, modifier = Modifier.size(32.dp)) }
         }
         Spacer(Modifier.height(32.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {

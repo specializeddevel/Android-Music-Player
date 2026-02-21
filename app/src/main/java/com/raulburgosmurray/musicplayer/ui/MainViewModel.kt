@@ -1,45 +1,43 @@
 package com.raulburgosmurray.musicplayer.ui
 
 import android.app.Application
-import android.content.Context
 import android.net.Uri
-import android.os.Build
-import android.provider.MediaStore
-import android.util.Log
 import androidx.lifecycle.AndroidViewModel
-import android.content.ContentUris
 import androidx.lifecycle.viewModelScope
 import androidx.documentfile.provider.DocumentFile
 import com.raulburgosmurray.musicplayer.Music
+import com.raulburgosmurray.musicplayer.Constants
 import com.raulburgosmurray.musicplayer.data.AppDatabase
 import com.raulburgosmurray.musicplayer.data.CachedBook
-import com.raulburgosmurray.musicplayer.data.AudioMetadata
-import com.raulburgosmurray.musicplayer.data.MetadataHelper
-import com.raulburgosmurray.musicplayer.data.MetadataJsonHelper
+import com.raulburgosmurray.musicplayer.data.BookRepository
+import com.raulburgosmurray.musicplayer.data.FavoriteRepository
+import com.raulburgosmurray.musicplayer.data.ProgressRepository
+import com.raulburgosmurray.musicplayer.data.MusicScanner
+import com.raulburgosmurray.musicplayer.data.toMusic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import java.util.concurrent.ConcurrentHashMap
 
-fun CachedBook.toMusic(): Music = Music(id, title, album, artist, duration, path, artUri, fileSize, fileName)
 fun Music.toCachedBook(): CachedBook = CachedBook(id, title, album, artist, duration, path, artUri, fileSize, fileName)
 
 enum class SortOrder { TITLE, ARTIST, PROGRESS, RECENT }
 
 class MainViewModel(application: Application, settingsViewModel: SettingsViewModel) : AndroidViewModel(application) {
     private val database = AppDatabase.getDatabase(application)
+    private val bookRepository = BookRepository(database.cachedBookDao())
+    private val favoriteRepository = FavoriteRepository(database.favoriteDao())
+    private val progressRepository = ProgressRepository(database.progressDao())
+    private val musicScanner = MusicScanner()
+    
     private val _isLoading = MutableStateFlow(false)
     val isLoading = _isLoading.asStateFlow()
     private val _scanProgress = MutableStateFlow(0 to 0)
     val scanProgress = _scanProgress.asStateFlow()
-    private val artUriCache = ConcurrentHashMap<String, String?>()
     
-    private val _books = database.cachedBookDao().getAllBooks()
+    private val _books = bookRepository.getAllBooks()
         .map { list -> list.map { it.toMusic() } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(Constants.STATEFLOW_STOP_TIMEOUT_MS), emptyList())
     
     val sortOrder = settingsViewModel.sortOrder
     private val _favoriteIds = MutableStateFlow<Set<String>>(emptySet())
@@ -56,15 +54,15 @@ class MainViewModel(application: Application, settingsViewModel: SettingsViewMod
             SortOrder.PROGRESS -> books.sortedByDescending { progress[it.id] ?: 0f }
             SortOrder.RECENT -> books.sortedByDescending { timestamps[it.id] ?: 0L }
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(Constants.STATEFLOW_STOP_TIMEOUT_MS), emptyList())
 
     val favoriteBooks = combine(books, _favoriteIds) { b, f -> b.filter { f.contains(it.id) } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(Constants.STATEFLOW_STOP_TIMEOUT_MS), emptyList())
 
     init {
         viewModelScope.launch {
             settingsViewModel.libraryRootUri.collect { uri ->
-                if (database.cachedBookDao().getAllBooks().first().isEmpty()) loadBooks(uri)
+                if (bookRepository.getAllBooks().first().isEmpty()) loadBooks(uri)
             }
         }
         observeFavorites(); observeProgress()
@@ -72,7 +70,7 @@ class MainViewModel(application: Application, settingsViewModel: SettingsViewMod
 
     private fun observeProgress() {
         viewModelScope.launch {
-            database.progressDao().getAllProgressFlow().collect { list ->
+            progressRepository.getAllProgressFlow().collect { list ->
                 _bookProgress.value = list.associate { it.mediaId to if (it.duration > 0) it.lastPosition.toFloat() / it.duration.toFloat() else 0f }
                 _bookActivityTimestamps.value = list.associate { it.mediaId to it.lastPauseTimestamp }
             }
@@ -80,7 +78,7 @@ class MainViewModel(application: Application, settingsViewModel: SettingsViewMod
     }
 
     private fun observeFavorites() {
-        viewModelScope.launch { database.favoriteDao().getAllFavoriteIds().collectLatest { _favoriteIds.value = it.toSet() } }
+        viewModelScope.launch { favoriteRepository.getAllFavoriteIds().collectLatest { _favoriteIds.value = it.toSet() } }
     }
 
     fun loadBooks(libraryRootUri: String? = null) {
@@ -89,152 +87,20 @@ class MainViewModel(application: Application, settingsViewModel: SettingsViewMod
             val audioFiles = withContext(Dispatchers.IO) {
                 if (libraryRootUri != null) {
                     val rootDoc = DocumentFile.fromTreeUri(getApplication(), Uri.parse(libraryRootUri))
-                    if (rootDoc != null) scanDirectoryRecursively(getApplication(), rootDoc) else emptyList()
-                } else scanWithMediaStore(getApplication())
+                    if (rootDoc != null) {
+                        musicScanner.scanDirectory(getApplication(), rootDoc) { processed, total ->
+                            _scanProgress.value = processed to total
+                        }
+                    } else emptyList()
+                } else {
+                    musicScanner.scanMediaStore(getApplication())
+                }
             }
             withContext(Dispatchers.IO) {
-                database.cachedBookDao().clearCache()
-                database.cachedBookDao().upsertAll(audioFiles.map { it.toCachedBook() })
+                bookRepository.clearCache()
+                bookRepository.saveBooks(audioFiles.map { it.toCachedBook() })
             }
             _isLoading.value = false
         }
-    }
-
-private suspend fun scanDirectoryRecursively(context: Context, directory: DocumentFile): List<Music> = withContext(Dispatchers.IO) {
-        val musicList = ConcurrentHashMap<String, Music>()
-        val extensions = setOf("mp3", "m4a", "m4b", "aac", "wav", "ogg", "flac")
-        var totalFiles = 0
-        var processedFiles = 0
-
-        suspend fun collectFiles(dir: DocumentFile): List<DocumentFile> {
-            val files = mutableListOf<DocumentFile>()
-            dir.listFiles()?.forEach { file ->
-                if (file.isDirectory) {
-                    files.addAll(collectFiles(file))
-                } else {
-                    val name = file.name?.lowercase() ?: ""
-                    if (extensions.any { name.endsWith(".$it") }) {
-                        files.add(file)
-                    }
-                }
-            }
-            return files
-        }
-
-        val allFiles = collectFiles(directory)
-        totalFiles = allFiles.size
-        _scanProgress.value = 0 to totalFiles
-
-allFiles.chunked(8).forEach { chunk ->
-            val results = chunk.map { file ->
-                async {
-                    try {
-                        val id = file.uri.toString()
-                        Log.d("MainViewModel", "Scanning file: ${file.name}, URI: $id")
-                        
-                        val existingMetadata = MetadataJsonHelper.loadMetadata(context, id)
-                        
-                        if (existingMetadata != null && existingMetadata.duration > 5000) {
-                            Log.d("MainViewModel", "Skipping metadata extraction for ${file.name} - already exists in JSON")
-                            val music = Music(
-                                id = id,
-                                title = existingMetadata.title,
-                                artist = existingMetadata.artist,
-                                album = existingMetadata.album ?: "Unknown Album",
-                                duration = existingMetadata.duration,
-                                path = id,
-                                artUri = existingMetadata.artUri,
-                                fileSize = file.length(),
-                                fileName = existingMetadata.fileName
-                            )
-                            musicList[id] = music
-                            true
-                        } else {
-                            val freshMetadata = MetadataHelper.extractMetadataFromDocumentFile(context, file, directory.name)
-                            
-                            if (freshMetadata != null && freshMetadata.duration > 5000) {
-                                val finalMetadata = freshMetadata.copy(mediaId = id)
-                                
-                                val music = Music(
-                                    id = id,
-                                    title = finalMetadata.title,
-                                    artist = finalMetadata.artist,
-                                    album = finalMetadata.album ?: "Unknown Album",
-                                    duration = finalMetadata.duration,
-                                    path = id,
-                                    artUri = finalMetadata.artUri,
-                                    fileSize = file.length(),
-                                    fileName = finalMetadata.fileName
-                                )
-                                musicList[id] = music
-                                MetadataJsonHelper.saveMetadata(context, finalMetadata)
-                                true
-                            } else {
-                                false
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Log.e("MainViewModel", "Error scanning ${file.name}", e)
-                        false
-                    }
-                }
-            }.awaitAll()
-
-            processedFiles += results.count { it }
-            _scanProgress.value = processedFiles to totalFiles
-        }
-
-        musicList.values.toList()
-    }
-
-private suspend fun scanWithMediaStore(context: Context): List<Music> = withContext(Dispatchers.IO) {
-        val tempList = mutableListOf<Music>()
-        val collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL) else MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
-        val proj = arrayOf(MediaStore.Audio.Media._ID, MediaStore.Audio.Media.TITLE, MediaStore.Audio.Media.ALBUM, MediaStore.Audio.Media.ARTIST, MediaStore.Audio.Media.DURATION, MediaStore.Audio.Media.SIZE, MediaStore.Audio.Media.DISPLAY_NAME)
-        context.contentResolver.query(collection, proj, "${MediaStore.Audio.Media.DURATION} > 5000", null, null)?.use { cursor ->
-            while (cursor.moveToNext()) {
-                val idLong = cursor.getLong(0); val contentUri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, idLong)
-                val id = contentUri.toString()
-                
-                val existingMetadata = MetadataJsonHelper.loadMetadata(context, id)
-                
-                if (existingMetadata != null && existingMetadata.duration > 5000) {
-                    Log.d("MainViewModel", "Skipping metadata extraction for ${cursor.getString(6)} - already exists in JSON")
-                    val music = Music(
-                        id = id,
-                        title = existingMetadata.title,
-                        artist = existingMetadata.artist,
-                        album = existingMetadata.album ?: "Unknown",
-                        duration = existingMetadata.duration,
-                        path = id,
-                        artUri = existingMetadata.artUri,
-                        fileSize = cursor.getLong(5),
-                        fileName = cursor.getString(6) ?: ""
-                    )
-                    tempList.add(music)
-                } else {
-                    val freshMetadata = MetadataHelper.extractMetadataFromUri(context, contentUri, cursor.getString(6) ?: "")
-                    
-                    if (freshMetadata != null) {
-                        val finalMetadata = freshMetadata.copy(mediaId = id)
-                        
-                        val music = Music(
-                            id = id,
-                            title = finalMetadata.title,
-                            artist = finalMetadata.artist,
-                            album = finalMetadata.album ?: "Unknown",
-                            duration = finalMetadata.duration,
-                            path = id,
-                            artUri = finalMetadata.artUri,
-                            fileSize = cursor.getLong(5),
-                            fileName = cursor.getString(6) ?: ""
-                        )
-                        tempList.add(music)
-                        MetadataJsonHelper.saveMetadata(context, finalMetadata)
-                    }
-                }
-            }
-        }
-        tempList
     }
 }

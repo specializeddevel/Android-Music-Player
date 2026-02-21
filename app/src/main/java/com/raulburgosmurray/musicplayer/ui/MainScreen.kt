@@ -57,6 +57,7 @@ import com.google.zxing.qrcode.QRCodeWriter
 import com.raulburgosmurray.musicplayer.Music
 import com.raulburgosmurray.musicplayer.R
 import com.raulburgosmurray.musicplayer.encodeBookId
+import com.raulburgosmurray.musicplayer.ui.PlaybackUiState
 import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
 
@@ -306,7 +307,7 @@ fun androidx.compose.animation.SharedTransitionScope.BookGridItem(book: Music, i
 
 @OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
 @Composable
-fun androidx.compose.animation.SharedTransitionScope.MiniPlayer(state: PlaybackState, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, onTogglePlay: () -> Unit, onClick: () -> Unit) {
+fun androidx.compose.animation.SharedTransitionScope.MiniPlayer(state: PlaybackUiState, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, onTogglePlay: () -> Unit, onClick: () -> Unit) {
     val currentItem = state.currentMediaItem ?: return
     Surface(modifier = Modifier.fillMaxWidth().padding(8.dp).height(72.dp).clickable(onClick = onClick), shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.primaryContainer, tonalElevation = 8.dp) {
         Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
