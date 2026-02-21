@@ -18,3 +18,6 @@ data class CachedBook(
 
 fun CachedBook.toMusic(): com.raulburgosmurray.musicplayer.Music = 
     com.raulburgosmurray.musicplayer.Music(id, title, album, artist, duration, path, artUri, fileSize, fileName)
+
+fun com.raulburgosmurray.musicplayer.Music.toCachedBook(): CachedBook = 
+    CachedBook(id, title, album, artist, duration, path, artUri, fileSize, fileName)

@@ -14,12 +14,11 @@ import com.raulburgosmurray.musicplayer.data.FavoriteRepository
 import com.raulburgosmurray.musicplayer.data.ProgressRepository
 import com.raulburgosmurray.musicplayer.data.MusicScanner
 import com.raulburgosmurray.musicplayer.data.toMusic
+import com.raulburgosmurray.musicplayer.data.toCachedBook
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-fun Music.toCachedBook(): CachedBook = CachedBook(id, title, album, artist, duration, path, artUri, fileSize, fileName)
 
 enum class SortOrder { TITLE, ARTIST, PROGRESS, RECENT }
 
