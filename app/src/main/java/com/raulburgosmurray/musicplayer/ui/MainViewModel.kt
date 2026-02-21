@@ -126,43 +126,61 @@ private suspend fun scanDirectoryRecursively(context: Context, directory: Docume
         _scanProgress.value = 0 to totalFiles
 
 allFiles.chunked(8).forEach { chunk ->
-            chunk.map { file ->
+            val results = chunk.map { file ->
                 async {
                     try {
                         val id = file.uri.toString()
                         Log.d("MainViewModel", "Scanning file: ${file.name}, URI: $id")
                         
                         val existingMetadata = MetadataJsonHelper.loadMetadata(context, id)
-                        val freshMetadata = MetadataHelper.extractMetadataFromDocumentFile(context, file, directory.name)
                         
-                        if (freshMetadata != null && freshMetadata.duration > 5000) {
-                            val finalMetadata = if (existingMetadata != null) {
-                                MetadataJsonHelper.mergeMetadata(existingMetadata, freshMetadata.copy(mediaId = id))
-                            } else {
-                                freshMetadata.copy(mediaId = id)
-                            }
-                            
+                        if (existingMetadata != null && existingMetadata.duration > 5000) {
+                            Log.d("MainViewModel", "Skipping metadata extraction for ${file.name} - already exists in JSON")
                             val music = Music(
                                 id = id,
-                                title = finalMetadata.title,
-                                artist = finalMetadata.artist,
-                                album = finalMetadata.album ?: "Unknown Album",
-                                duration = finalMetadata.duration,
+                                title = existingMetadata.title,
+                                artist = existingMetadata.artist,
+                                album = existingMetadata.album ?: "Unknown Album",
+                                duration = existingMetadata.duration,
                                 path = id,
-                                artUri = finalMetadata.artUri,
+                                artUri = existingMetadata.artUri,
                                 fileSize = file.length(),
-                                fileName = finalMetadata.fileName
+                                fileName = existingMetadata.fileName
                             )
                             musicList[id] = music
-                            MetadataJsonHelper.saveMetadata(context, finalMetadata)
+                            true
+                        } else {
+                            val freshMetadata = MetadataHelper.extractMetadataFromDocumentFile(context, file, directory.name)
+                            
+                            if (freshMetadata != null && freshMetadata.duration > 5000) {
+                                val finalMetadata = freshMetadata.copy(mediaId = id)
+                                
+                                val music = Music(
+                                    id = id,
+                                    title = finalMetadata.title,
+                                    artist = finalMetadata.artist,
+                                    album = finalMetadata.album ?: "Unknown Album",
+                                    duration = finalMetadata.duration,
+                                    path = id,
+                                    artUri = finalMetadata.artUri,
+                                    fileSize = file.length(),
+                                    fileName = finalMetadata.fileName
+                                )
+                                musicList[id] = music
+                                MetadataJsonHelper.saveMetadata(context, finalMetadata)
+                                true
+                            } else {
+                                false
+                            }
                         }
                     } catch (e: Exception) {
                         Log.e("MainViewModel", "Error scanning ${file.name}", e)
+                        false
                     }
                 }
             }.awaitAll()
 
-            processedFiles += chunk.size
+            processedFiles += results.count { it }
             _scanProgress.value = processedFiles to totalFiles
         }
 
@@ -179,28 +197,41 @@ private suspend fun scanWithMediaStore(context: Context): List<Music> = withCont
                 val id = contentUri.toString()
                 
                 val existingMetadata = MetadataJsonHelper.loadMetadata(context, id)
-                val freshMetadata = MetadataHelper.extractMetadataFromUri(context, contentUri, cursor.getString(6) ?: "")
                 
-                if (freshMetadata != null) {
-                    val finalMetadata = if (existingMetadata != null) {
-                        MetadataJsonHelper.mergeMetadata(existingMetadata, freshMetadata.copy(mediaId = id))
-                    } else {
-                        freshMetadata.copy(mediaId = id)
-                    }
-                    
+                if (existingMetadata != null && existingMetadata.duration > 5000) {
+                    Log.d("MainViewModel", "Skipping metadata extraction for ${cursor.getString(6)} - already exists in JSON")
                     val music = Music(
                         id = id,
-                        title = finalMetadata.title,
-                        artist = finalMetadata.artist,
-                        album = finalMetadata.album ?: "Unknown",
-                        duration = finalMetadata.duration,
+                        title = existingMetadata.title,
+                        artist = existingMetadata.artist,
+                        album = existingMetadata.album ?: "Unknown",
+                        duration = existingMetadata.duration,
                         path = id,
-                        artUri = finalMetadata.artUri,
+                        artUri = existingMetadata.artUri,
                         fileSize = cursor.getLong(5),
                         fileName = cursor.getString(6) ?: ""
                     )
                     tempList.add(music)
-                    MetadataJsonHelper.saveMetadata(context, finalMetadata)
+                } else {
+                    val freshMetadata = MetadataHelper.extractMetadataFromUri(context, contentUri, cursor.getString(6) ?: "")
+                    
+                    if (freshMetadata != null) {
+                        val finalMetadata = freshMetadata.copy(mediaId = id)
+                        
+                        val music = Music(
+                            id = id,
+                            title = finalMetadata.title,
+                            artist = finalMetadata.artist,
+                            album = finalMetadata.album ?: "Unknown",
+                            duration = finalMetadata.duration,
+                            path = id,
+                            artUri = finalMetadata.artUri,
+                            fileSize = cursor.getLong(5),
+                            fileName = cursor.getString(6) ?: ""
+                        )
+                        tempList.add(music)
+                        MetadataJsonHelper.saveMetadata(context, finalMetadata)
+                    }
                 }
             }
         }
