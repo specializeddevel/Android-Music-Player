@@ -72,6 +72,7 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
         serverJob = viewModelScope.launch(Dispatchers.IO) {
             try {
                 val bookProgress = progressRepository.getProgress(bookId)
+                android.util.Log.d("LiteraTransfer", "startServer: bookId=$bookId, progress=$bookProgress")
                 val bookDetails = bookRepository.getBookById(bookId) ?: return@launch
                 val ip = getLocalIpAddress()
                 if (ip == "0.0.0.0") { _uiState.value = _uiState.value.copy(error = "Sin Wi-Fi"); return@launch }
@@ -81,7 +82,10 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
 
                 val qrJson = JSONObject().apply {
                     put("ip", "$ip:${Constants.TRANSFER_SERVER_PORT}"); put("t", shortTitle); put("a", shortAuthor)
-                    if (bookProgress != null) { put("p", bookProgress.lastPosition); put("d", bookProgress.duration) }
+                    if (bookProgress != null) { 
+                        android.util.Log.d("LiteraTransfer", "QR will include: position=${bookProgress.lastPosition}, duration=${bookProgress.duration}")
+                        put("p", bookProgress.lastPosition); put("d", bookProgress.duration) 
+                    }
                 }
 
                 _uiState.value = _uiState.value.copy(qrData = qrJson.toString(), isServerRunning = true, transferStatus = getApplication<Application>().getString(R.string.qr_generated))
@@ -164,12 +168,16 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
 
     fun handleUserDecision(decision: String, libraryUri: String?) {
         val targetIp = _uiState.value.targetIp; val progress = _uiState.value.pendingProgress
+        android.util.Log.d("LiteraTransfer", "handleUserDecision: decision=$decision, progress=$progress")
         val context = getApplication<Application>()
         _uiState.value = _uiState.value.copy(showConflictDialog = false)
         viewModelScope.launch(Dispatchers.IO) {
             when (decision) {
                 "PROGRESS" -> {
-                    if (progress != null) progressRepository.saveProgress(progress)
+                    if (progress != null) {
+                        android.util.Log.d("LiteraTransfer", "Saving progress: mediaId=${progress.mediaId}, position=${progress.lastPosition}, duration=${progress.duration}")
+                        progressRepository.saveProgress(progress)
+                    }
                     withContext(Dispatchers.Main) { _uiState.value = _uiState.value.copy(transferStatus = context.getString(R.string.synced_via_qr)) }
                 }
                 "FILE" -> { if (targetIp != null) receiveFromIp(targetIp, libraryUri) }

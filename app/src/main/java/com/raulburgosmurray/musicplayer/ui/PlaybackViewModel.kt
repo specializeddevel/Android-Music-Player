@@ -427,21 +427,26 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
             val progress = withContext(Dispatchers.IO) {
                 progressRepository.getProgress(mediaId)
             }
+            
             Log.d("PlaybackViewModel", "restorePositionIfNeeded: mediaId=$mediaId, progress=$progress")
-            if (progress != null) {
+            
+            if (progress != null && progress.lastPosition > 0) {
+                // Wait a bit for player to be ready
+                delay(500)
+                
                 val mediaController = controller
                 mediaController?.let { ctrl ->
-                    val currentPos = ctrl.currentPosition
-                    Log.d("PlaybackViewModel", "currentPos=$currentPos, lastPosition=${progress.lastPosition}")
-                    if (kotlin.math.abs(currentPos - progress.lastPosition) > 1000) {
+                    if (ctrl.playbackState == androidx.media3.common.Player.STATE_READY) {
+                        val currentPos = ctrl.currentPosition
+                        Log.d("PlaybackViewModel", "Restoring: currentPos=$currentPos, savedPos=${progress.lastPosition}")
                         ctrl.seekTo(progress.lastPosition)
                         Log.d("PlaybackViewModel", "Restored position to ${progress.lastPosition}ms")
                     } else {
-                        Log.d("PlaybackViewModel", "Position difference too small, not seeking")
+                        Log.d("PlaybackViewModel", "Player not ready, state=${ctrl.playbackState}")
                     }
                 }
             } else {
-                Log.d("PlaybackViewModel", "No progress found for mediaId=$mediaId")
+                Log.d("PlaybackViewModel", "No progress or position is 0 for mediaId=$mediaId")
             }
         }
     }
