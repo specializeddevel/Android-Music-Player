@@ -133,6 +133,7 @@ fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back_btn)) }
             Row {
+                IconButton(onClick = { viewModel.toggleFavorite() }) { Icon(if (state.isFavorite) Icons.Filled.Favorite else Icons.Default.Favorite, contentDescription = stringResource(R.string.favourites_btn), tint = if (state.isFavorite) Color.Red else LocalContentColor.current) }
                 IconButton(onClick = onShowHistory) { Icon(Icons.Default.History, null) }
                 IconButton(onClick = onShowQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null) }
                 IconButton(onClick = onShowDetails) { Icon(Icons.Default.Info, null) }
