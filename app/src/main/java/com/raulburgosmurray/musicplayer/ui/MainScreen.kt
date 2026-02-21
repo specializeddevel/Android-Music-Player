@@ -99,7 +99,12 @@ val books by mainViewModel.books.collectAsState()
     val detailsSheetState = rememberModalBottomSheetState()
     var showDetailsSheet by remember { mutableStateOf(false) }
     
-    val filteredBooks = if (searchQuery.isEmpty()) books else books.filter { it.title.contains(searchQuery, ignoreCase = true) || it.artist.contains(searchQuery, ignoreCase = true) }
+    val filteredBooks = remember(books, searchQuery) { 
+        if (searchQuery.isEmpty()) books 
+        else books.filter { it.title.contains(searchQuery, ignoreCase = true) || it.artist.contains(searchQuery, ignoreCase = true) } 
+    }
+
+    val favoriteIdsSet = remember(favoriteIds) { favoriteIds.toSet() }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -187,7 +192,10 @@ Box(modifier = Modifier.fillMaxSize()) {
                 } else {
                     if (layoutMode == LayoutMode.LIST) {
                         LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            items(filteredBooks) { book -> with(sharedTransitionScope) { BookListItem(book = book, isFavorite = favoriteIds.contains(book.id), progress = bookProgress[book.id] ?: 0f, animatedVisibilityScope = animatedVisibilityScope, onAddToQueue = { playbackViewModel.addToQueue(book); scope.launch { snackbarHostState.showSnackbar(message = context.getString(R.string.added_to_queue, book.title), duration = SnackbarDuration.Short) } }, onLongClick = { selectedBookForDetails = book; showDetailsSheet = true }, onClick = { onBookClick(book) }) } }
+                            items(
+                                items = filteredBooks,
+                                key = { it.id }
+                            ) { book -> with(sharedTransitionScope) { BookListItem(book = book, isFavorite = favoriteIdsSet.contains(book.id), progress = bookProgress[book.id] ?: 0f, animatedVisibilityScope = animatedVisibilityScope, onAddToQueue = { playbackViewModel.addToQueue(book); scope.launch { snackbarHostState.showSnackbar(message = context.getString(R.string.added_to_queue, book.title), duration = SnackbarDuration.Short) } }, onLongClick = { selectedBookForDetails = book; showDetailsSheet = true }, onClick = { onBookClick(book) }) } }
                         }
                     } else {
                         // AJUSTE DINÁMICO DE COLUMNAS: Solo 4 si es tableta Y horizontal. En móvil horizontal 3.
@@ -198,7 +206,10 @@ Box(modifier = Modifier.fillMaxSize()) {
                             else -> 2
                         }
                         LazyVerticalGrid(columns = GridCells.Fixed(columns), modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                            items(filteredBooks) { book -> with(sharedTransitionScope) { BookGridItem(book = book, isFavorite = favoriteIds.contains(book.id), progress = bookProgress[book.id] ?: 0f, animatedVisibilityScope = animatedVisibilityScope, onAddToQueue = { playbackViewModel.addToQueue(book); scope.launch { snackbarHostState.showSnackbar(message = context.getString(R.string.added_to_queue, book.title), duration = SnackbarDuration.Short) } }, onLongClick = { selectedBookForDetails = book; showDetailsSheet = true }, onClick = { onBookClick(book) }) } }
+                            items(
+                                items = filteredBooks,
+                                key = { it.id }
+                            ) { book -> with(sharedTransitionScope) { BookGridItem(book = book, isFavorite = favoriteIdsSet.contains(book.id), progress = bookProgress[book.id] ?: 0f, animatedVisibilityScope = animatedVisibilityScope, onAddToQueue = { playbackViewModel.addToQueue(book); scope.launch { snackbarHostState.showSnackbar(message = context.getString(R.string.added_to_queue, book.title), duration = SnackbarDuration.Short) } }, onLongClick = { selectedBookForDetails = book; showDetailsSheet = true }, onClick = { onBookClick(book) }) } }
                         }
                     }
                 }
