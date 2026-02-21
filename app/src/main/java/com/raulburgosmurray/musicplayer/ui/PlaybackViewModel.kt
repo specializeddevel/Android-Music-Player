@@ -431,18 +431,23 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
             Log.d("PlaybackViewModel", "restorePositionIfNeeded: mediaId=$mediaId, progress=$progress")
             
             if (progress != null && progress.lastPosition > 0) {
-                // Wait a bit for player to be ready
-                delay(500)
-                
+                // Wait for player to be ready (max 3 seconds)
                 val mediaController = controller
                 mediaController?.let { ctrl ->
+                    var attempts = 0
+                    while (ctrl.playbackState != androidx.media3.common.Player.STATE_READY && attempts < 6) {
+                        Log.d("PlaybackViewModel", "Waiting for player... state=${ctrl.playbackState}")
+                        delay(500)
+                        attempts++
+                    }
+                    
                     if (ctrl.playbackState == androidx.media3.common.Player.STATE_READY) {
                         val currentPos = ctrl.currentPosition
                         Log.d("PlaybackViewModel", "Restoring: currentPos=$currentPos, savedPos=${progress.lastPosition}")
                         ctrl.seekTo(progress.lastPosition)
                         Log.d("PlaybackViewModel", "Restored position to ${progress.lastPosition}ms")
                     } else {
-                        Log.d("PlaybackViewModel", "Player not ready, state=${ctrl.playbackState}")
+                        Log.d("PlaybackViewModel", "Player never ready, state=${ctrl.playbackState}")
                     }
                 }
             } else {
