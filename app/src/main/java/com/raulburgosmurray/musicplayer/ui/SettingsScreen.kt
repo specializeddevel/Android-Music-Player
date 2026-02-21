@@ -36,6 +36,7 @@ fun SettingsScreen(
     onBack: () -> Unit
 ) {
     val isDynamicEnabled by viewModel.isDynamicThemingEnabled.collectAsState()
+    val themeMode by viewModel.themeMode.collectAsState()
     val libraryRootUri by viewModel.libraryRootUri.collectAsState()
     val historyLimit by viewModel.historyLimit.collectAsState()
     val isShakeEnabled by viewModel.isShakeEnabled.collectAsState()
@@ -87,79 +88,101 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState())
         ) {
             // Cloud Sync Section
-            Text(stringResource(R.string.cloud_sync), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 16.dp))
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f))
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    if (userAccount == null) {
-                        Text(stringResource(R.string.cloud_sync_desc), style = MaterialTheme.typography.bodyMedium)
-                        Spacer(Modifier.height(12.dp))
-                        Button(
-                            onClick = {
-                                val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                                    .requestEmail()
-                                    .requestScopes(Scope(DriveScopes.DRIVE_APPDATA))
-                                    .build()
-                                val client = GoogleSignIn.getClient(context, gso)
-                                googleSignInLauncher.launch(client.signInIntent)
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(Icons.Default.CloudUpload, null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(stringResource(R.string.connect_google_drive))
-                        }
-                    } else {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.AccountCircle, null, modifier = Modifier.size(40.dp), tint = MaterialTheme.colorScheme.primary)
-                            Spacer(Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(userAccount?.displayName ?: "Usuario", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
-                                Text(userAccount?.email ?: "", style = MaterialTheme.typography.bodySmall)
-                            }
-                            IconButton(onClick = { 
-                                GoogleSignIn.getClient(context, GoogleSignInOptions.DEFAULT_SIGN_IN).signOut()
-                                syncViewModel.onLogout() 
-                            }) {
-                                Icon(Icons.Default.Logout, null, tint = MaterialTheme.colorScheme.error)
-                            }
-                        }
-                        
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), thickness = 0.5.dp)
-                        
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            Column {
-                                Text(stringResource(R.string.last_sync), style = MaterialTheme.typography.labelMedium)
-                                Text(
-                                    if (lastSyncTime > 0) SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault()).format(Date(lastSyncTime)) else stringResource(R.string.never),
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                            }
+            if (com.raulburgosmurray.musicplayer.FeatureFlags.CLOUD_SYNC) {
+                Text(stringResource(R.string.cloud_sync), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 16.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f))
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        if (userAccount == null) {
+                            Text(stringResource(R.string.cloud_sync_desc), style = MaterialTheme.typography.bodyMedium)
+                            Spacer(Modifier.height(12.dp))
                             Button(
-                                onClick = { syncViewModel.syncNow() },
-                                enabled = !isSyncing
+                                onClick = {
+                                    val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                                        .requestEmail()
+                                        .requestScopes(Scope(DriveScopes.DRIVE_APPDATA))
+                                        .build()
+                                    val client = GoogleSignIn.getClient(context, gso)
+                                    googleSignInLauncher.launch(client.signInIntent)
+                                },
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                if (isSyncing) CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
-                                else Text(stringResource(R.string.sync_now))
+                                Icon(Icons.Default.CloudUpload, null)
+                                Spacer(Modifier.width(8.dp))
+                                Text(stringResource(R.string.connect_google_drive))
+                            }
+                        } else {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.AccountCircle, null, modifier = Modifier.size(40.dp), tint = MaterialTheme.colorScheme.primary)
+                                Spacer(Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(userAccount?.displayName ?: "Usuario", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                                    Text(userAccount?.email ?: "", style = MaterialTheme.typography.bodySmall)
+                                }
+                                IconButton(onClick = {
+                                    GoogleSignIn.getClient(context, GoogleSignInOptions.DEFAULT_SIGN_IN).signOut()
+                                    syncViewModel.onLogout()
+                                }) {
+                                    Icon(Icons.Default.Logout, null, tint = MaterialTheme.colorScheme.error)
+                                }
+                            }
+
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), thickness = 0.5.dp)
+
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Column {
+                                    Text(stringResource(R.string.last_sync), style = MaterialTheme.typography.labelMedium)
+                                    Text(
+                                        if (lastSyncTime > 0) SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault()).format(Date(lastSyncTime)) else stringResource(R.string.never),
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                                Button(
+                                    onClick = { syncViewModel.syncNow() },
+                                    enabled = !isSyncing
+                                ) {
+                                    if (isSyncing) CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                                    else Text(stringResource(R.string.sync_now))
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(24.dp))
+            }
 
             // Appearance
             Text(stringResource(R.string.appearance), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 16.dp))
             Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
-                Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.dynamic_colors), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
-                        Text(stringResource(R.string.dynamic_colors_desc), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(stringResource(R.string.theme_mode), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        ThemeMode.entries.forEachIndexed { index, mode ->
+                            SegmentedButton(
+                                selected = themeMode == mode,
+                                onClick = { viewModel.setThemeMode(mode) },
+                                shape = SegmentedButtonDefaults.itemShape(index, ThemeMode.entries.size),
+                                label = {
+                                    Text(stringResource(when (mode) {
+                                        ThemeMode.SYSTEM -> R.string.theme_system
+                                        ThemeMode.LIGHT  -> R.string.theme_light
+                                        ThemeMode.DARK   -> R.string.theme_dark
+                                    }))
+                                }
+                            )
+                        }
                     }
-                    Switch(checked = isDynamicEnabled, onCheckedChange = { viewModel.setDynamicThemingEnabled(it) })
+                    HorizontalDivider(thickness = 0.5.dp)
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.dynamic_colors), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.dynamic_colors_desc), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Switch(checked = isDynamicEnabled, onCheckedChange = { viewModel.setDynamicThemingEnabled(it) })
+                    }
                 }
             }
             

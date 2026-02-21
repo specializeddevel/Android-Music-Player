@@ -2,9 +2,6 @@ package com.raulburgosmurray.musicplayer.ui
 
 import android.app.Application
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
@@ -16,14 +13,15 @@ import androidx.documentfile.provider.DocumentFile
 import com.raulburgosmurray.musicplayer.Music
 import com.raulburgosmurray.musicplayer.data.AppDatabase
 import com.raulburgosmurray.musicplayer.data.CachedBook
+import com.raulburgosmurray.musicplayer.data.AudioMetadata
+import com.raulburgosmurray.musicplayer.data.MetadataHelper
+import com.raulburgosmurray.musicplayer.data.MetadataJsonHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import java.io.File
-import java.io.FileOutputStream
 import java.util.concurrent.ConcurrentHashMap
 
 fun CachedBook.toMusic(): Music = Music(id, title, album, artist, duration, path, artUri, fileSize, fileName)
@@ -127,30 +125,36 @@ private suspend fun scanDirectoryRecursively(context: Context, directory: Docume
         totalFiles = allFiles.size
         _scanProgress.value = 0 to totalFiles
 
-        allFiles.chunked(8).forEach { chunk ->
+allFiles.chunked(8).forEach { chunk ->
             chunk.map { file ->
                 async {
                     try {
-                        context.contentResolver.openFileDescriptor(file.uri, "r")?.use { pfd ->
-                            val retriever = MediaMetadataRetriever()
-                            retriever.setDataSource(pfd.fileDescriptor)
-                            val duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
-                            if (duration > 5000) {
-                                val id = file.uri.toString()
-                                val music = Music(
-                                    id = id,
-                                    title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE) ?: file.name ?: "Unknown",
-                                    artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST) ?: "Unknown Artist",
-                                    album = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM) ?: directory.name ?: "Unknown Album",
-                                    duration = duration,
-                                    path = id,
-                                    artUri = getUniqueArtUri(context, id, file.uri),
-                                    fileSize = file.length(),
-                                    fileName = file.name ?: ""
-                                )
-                                musicList[id] = music
+                        val id = file.uri.toString()
+                        Log.d("MainViewModel", "Scanning file: ${file.name}, URI: $id")
+                        
+                        val existingMetadata = MetadataJsonHelper.loadMetadata(context, id)
+                        val freshMetadata = MetadataHelper.extractMetadataFromDocumentFile(context, file, directory.name)
+                        
+                        if (freshMetadata != null && freshMetadata.duration > 5000) {
+                            val finalMetadata = if (existingMetadata != null) {
+                                MetadataJsonHelper.mergeMetadata(existingMetadata, freshMetadata.copy(mediaId = id))
+                            } else {
+                                freshMetadata.copy(mediaId = id)
                             }
-                            retriever.release()
+                            
+                            val music = Music(
+                                id = id,
+                                title = finalMetadata.title,
+                                artist = finalMetadata.artist,
+                                album = finalMetadata.album ?: "Unknown Album",
+                                duration = finalMetadata.duration,
+                                path = id,
+                                artUri = finalMetadata.artUri,
+                                fileSize = file.length(),
+                                fileName = finalMetadata.fileName
+                            )
+                            musicList[id] = music
+                            MetadataJsonHelper.saveMetadata(context, finalMetadata)
                         }
                     } catch (e: Exception) {
                         Log.e("MainViewModel", "Error scanning ${file.name}", e)
@@ -165,49 +169,41 @@ private suspend fun scanDirectoryRecursively(context: Context, directory: Docume
         musicList.values.toList()
     }
 
-    private suspend fun scanWithMediaStore(context: Context): List<Music> = withContext(Dispatchers.IO) {
+private suspend fun scanWithMediaStore(context: Context): List<Music> = withContext(Dispatchers.IO) {
         val tempList = mutableListOf<Music>()
         val collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL) else MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
         val proj = arrayOf(MediaStore.Audio.Media._ID, MediaStore.Audio.Media.TITLE, MediaStore.Audio.Media.ALBUM, MediaStore.Audio.Media.ARTIST, MediaStore.Audio.Media.DURATION, MediaStore.Audio.Media.SIZE, MediaStore.Audio.Media.DISPLAY_NAME)
         context.contentResolver.query(collection, proj, "${MediaStore.Audio.Media.DURATION} > 5000", null, null)?.use { cursor ->
             while (cursor.moveToNext()) {
                 val idLong = cursor.getLong(0); val contentUri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, idLong)
-                tempList.add(Music(idLong.toString(), cursor.getString(1) ?: "Unknown", cursor.getString(2) ?: "Unknown", cursor.getString(3) ?: "Unknown", cursor.getLong(4), contentUri.toString(), getUniqueArtUri(context, idLong.toString(), contentUri), cursor.getLong(5), cursor.getString(6) ?: ""))
+                val id = contentUri.toString()
+                
+                val existingMetadata = MetadataJsonHelper.loadMetadata(context, id)
+                val freshMetadata = MetadataHelper.extractMetadataFromUri(context, contentUri, cursor.getString(6) ?: "")
+                
+                if (freshMetadata != null) {
+                    val finalMetadata = if (existingMetadata != null) {
+                        MetadataJsonHelper.mergeMetadata(existingMetadata, freshMetadata.copy(mediaId = id))
+                    } else {
+                        freshMetadata.copy(mediaId = id)
+                    }
+                    
+                    val music = Music(
+                        id = id,
+                        title = finalMetadata.title,
+                        artist = finalMetadata.artist,
+                        album = finalMetadata.album ?: "Unknown",
+                        duration = finalMetadata.duration,
+                        path = id,
+                        artUri = finalMetadata.artUri,
+                        fileSize = cursor.getLong(5),
+                        fileName = cursor.getString(6) ?: ""
+                    )
+                    tempList.add(music)
+                    MetadataJsonHelper.saveMetadata(context, finalMetadata)
+                }
             }
         }
         tempList
-    }
-
-private fun getUniqueArtUri(context: Context, id: String, uri: Uri): String? {
-        artUriCache[id]?.let { return it }
-
-        val cacheFile = File(context.cacheDir, "cover_${id.hashCode()}.jpg")
-        if (cacheFile.exists()) {
-            val cachedUri = Uri.fromFile(cacheFile).toString()
-            artUriCache[id] = cachedUri
-            return cachedUri
-        }
-
-        val retriever = MediaMetadataRetriever()
-        try {
-            context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
-                retriever.setDataSource(pfd.fileDescriptor)
-                retriever.embeddedPicture?.let { art ->
-                    BitmapFactory.decodeByteArray(art, 0, art.size)?.let { bitmap ->
-                        FileOutputStream(cacheFile).use { out -> bitmap.compress(Bitmap.CompressFormat.JPEG, 80, out) }
-                        val cachedUri = Uri.fromFile(cacheFile).toString()
-                        artUriCache[id] = cachedUri
-                        return cachedUri
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("MainViewModel", "Error extracting art for $id", e)
-        } finally {
-            retriever.release()
-        }
-
-        // Don't cache null values - ConcurrentHashMap doesn't allow null values
-        return null
     }
 }

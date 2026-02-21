@@ -1,6 +1,8 @@
 package com.raulburgosmurray.musicplayer.ui
 
+import android.net.Uri
 import android.content.res.Configuration
+import android.util.Base64
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.fadeIn
@@ -10,6 +12,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -29,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -42,6 +47,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.raulburgosmurray.musicplayer.Music
 import com.raulburgosmurray.musicplayer.R
+import com.raulburgosmurray.musicplayer.encodeBookId
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
@@ -52,7 +58,8 @@ fun PlayerScreen(
     animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope,
     from: String,
     onBack: () -> Unit,
-    onTransferClick: (String) -> Unit
+    onTransferClick: (String) -> Unit,
+    navController: androidx.navigation.NavController
 ) {
     val state by viewModel.uiState.collectAsState()
     val configuration = LocalConfiguration.current
@@ -106,7 +113,7 @@ fun PlayerScreen(
     if (showTimerSheet) { ModalBottomSheet(onDismissRequest = { showTimerSheet = false }, sheetState = timerSheetState) { TimerSelectorContent(activeTimerMinutes = state.sleepTimerMinutes, onTimerSelected = { viewModel.startSleepTimer(it); showTimerSheet = false }, onCancelTimer = { viewModel.cancelSleepTimer(); showTimerSheet = false }) } }
     if (showHistorySheet) { ModalBottomSheet(onDismissRequest = { showHistorySheet = false }, sheetState = historySheetState) { HistorySelectorContent(history = state.history, onActionSelected = { viewModel.seekTo(it.audioPositionMs); showHistorySheet = false }) } }
     if (showQueueSheet) { ModalBottomSheet(onDismissRequest = { showQueueSheet = false }, sheetState = queueSheetState) { QueueSelectorContent(playlist = state.playlist, currentIndex = state.currentIndex, onItemClicked = { index -> viewModel.skipToQueueItem(index); showQueueSheet = false }, onRemoveItem = { viewModel.removeItemFromQueue(it) }, onShowDetails = { showDetailsSheet = true }) } }
-    if (showDetailsSheet && state.currentMusicDetails != null) { ModalBottomSheet(onDismissRequest = { showDetailsSheet = false }, sheetState = detailsSheetState) { BookDetailsContent(book = state.currentMusicDetails!!, allBooks = emptyList()) } }
+    if (showDetailsSheet && state.currentMusicDetails != null) { ModalBottomSheet(onDismissRequest = { showDetailsSheet = false }, sheetState = detailsSheetState) { BookDetailsContent(book = state.currentMusicDetails!!, allBooks = emptyList(), onEditMetadata = { bookId -> navController.navigate("metadata_editor?bookId=${encodeBookId(bookId)}") }) } }
     if (showBookmarkSheet) { ModalBottomSheet(onDismissRequest = { showBookmarkSheet = false }, sheetState = bookmarkSheetState) { BookmarkSelectorContent(bookmarks = state.bookmarks, onBookmarkSelected = { viewModel.seekTo(it.position); showBookmarkSheet = false }, onDeleteBookmark = { id -> viewModel.deleteBookmark(id) }) } }
     if (showShareFileConfirmation) {
         AlertDialog(onDismissRequest = { showShareFileConfirmation = false }, title = { Text(stringResource(R.string.share_file_warning_title)) }, text = { Text(stringResource(R.string.share_file_warning_message)) }, confirmButton = { Button(onClick = { showShareFileConfirmation = false; viewModel.shareFile(context) }) { Text(stringResource(R.string.confirm)) } }, dismissButton = { TextButton(onClick = { showShareFileConfirmation = false }) { Text(stringResource(R.string.cancel)) } })
@@ -117,6 +124,8 @@ fun PlayerScreen(
 @Composable
 fun PortraitPlayerContent(state: PlaybackState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit) {
     val currentItem = state.currentMediaItem
+    var pressedArea by remember { mutableStateOf<CoverTapArea?>(null) }
+    
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp).verticalScroll(rememberScrollState()).statusBarsPadding().navigationBarsPadding()) {
         Spacer(Modifier.height(16.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -126,7 +135,9 @@ fun PortraitPlayerContent(state: PlaybackState, viewModel: PlaybackViewModel, sh
                 IconButton(onClick = onShowQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null) }
                 IconButton(onClick = onShowDetails) { Icon(Icons.Default.Info, null) }
                 IconButton(onClick = onShowShare) { Icon(Icons.Default.Share, null) }
-                IconButton(onClick = { currentItem?.mediaId?.let { onTransferClick(it) } }) { Icon(Icons.Default.Wifi, null) }
+                if (com.raulburgosmurray.musicplayer.FeatureFlags.P2P_TRANSFER) {
+                    IconButton(onClick = { currentItem?.mediaId?.let { onTransferClick(it) } }) { Icon(Icons.Default.Wifi, null) }
+                }
             }
         }
         Spacer(Modifier.height(24.dp))
@@ -135,11 +146,21 @@ fun PortraitPlayerContent(state: PlaybackState, viewModel: PlaybackViewModel, sh
                 if (currentItem?.mediaMetadata?.artworkUri != null) {
                     AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(currentItem.mediaMetadata.artworkUri).crossfade(true).build(), contentDescription = null, modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${from}_cover_${currentItem.mediaId}"), animatedVisibilityScope = animatedVisibilityScope), contentScale = ContentScale.Crop)
                 } else {
-                    Box(modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${from}_cover_${currentItem?.mediaId}"), animatedVisibilityScope = animatedVisibilityScope), contentAlignment = Alignment.Center) {
-                        BookPlaceholder(title = currentItem?.mediaMetadata?.title?.toString() ?: "A", modifier = Modifier.size(120.dp))
+                    Box(modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${from}_cover_${currentItem?.mediaId}"), animatedVisibilityScope = animatedVisibilityScope)) {
+                        BookPlaceholder(title = currentItem?.mediaMetadata?.title?.toString() ?: "A", modifier = Modifier.fillMaxSize())
                     }
                 }
             }
+            // Touch controls overlay
+            CoverTouchControls(
+                modifier = Modifier.fillMaxSize(),
+                pressedArea = pressedArea,
+                onAreaPressed = { pressedArea = it },
+                onAreaReleased = { pressedArea = null },
+                onLeftTap = { viewModel.skipBackward(30000L) },
+                onCenterTap = { viewModel.togglePlayPause() },
+                onRightTap = { viewModel.skipForward(10000L) }
+            )
         }
         Spacer(Modifier.height(32.dp))
         PlayerControls(state, viewModel, onShowSpeed, onShowTimer)
@@ -151,17 +172,29 @@ fun PortraitPlayerContent(state: PlaybackState, viewModel: PlaybackViewModel, sh
 @Composable
 fun LandscapePlayerContent(state: PlaybackState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit) {
     val currentItem = state.currentMediaItem
+    var pressedArea by remember { mutableStateOf<CoverTapArea?>(null) }
+    
     Row(modifier = Modifier.fillMaxSize().padding(16.dp).statusBarsPadding().navigationBarsPadding()) {
         Box(modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(24.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
             with(sharedTransitionScope) {
                 if (currentItem?.mediaMetadata?.artworkUri != null) {
                     AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(currentItem.mediaMetadata.artworkUri).crossfade(true).build(), contentDescription = null, modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${from}_cover_${currentItem.mediaId}"), animatedVisibilityScope = animatedVisibilityScope), contentScale = ContentScale.Crop)
                 } else {
-                    Box(modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${from}_cover_${currentItem?.mediaId}"), animatedVisibilityScope = animatedVisibilityScope), contentAlignment = Alignment.Center) {
-                        BookPlaceholder(title = currentItem?.mediaMetadata?.title?.toString() ?: "A", modifier = Modifier.size(80.dp))
+                    Box(modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${from}_cover_${currentItem?.mediaId}"), animatedVisibilityScope = animatedVisibilityScope)) {
+                        BookPlaceholder(title = currentItem?.mediaMetadata?.title?.toString() ?: "A", modifier = Modifier.fillMaxSize())
                     }
                 }
             }
+            // Touch controls overlay
+            CoverTouchControls(
+                modifier = Modifier.fillMaxSize(),
+                pressedArea = pressedArea,
+                onAreaPressed = { pressedArea = it },
+                onAreaReleased = { pressedArea = null },
+                onLeftTap = { viewModel.skipBackward(30000L) },
+                onCenterTap = { viewModel.togglePlayPause() },
+                onRightTap = { viewModel.skipForward(10000L) }
+            )
             IconButton(onClick = onBack, modifier = Modifier.padding(8.dp).background(Color.Black.copy(alpha = 0.3f), CircleShape)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) }
         }
         Spacer(Modifier.width(24.dp))
@@ -171,7 +204,9 @@ fun LandscapePlayerContent(state: PlaybackState, viewModel: PlaybackViewModel, s
                 IconButton(onClick = onShowQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null) }
                 IconButton(onClick = onShowDetails) { Icon(Icons.Default.Info, null) }
                 IconButton(onClick = onShowShare) { Icon(Icons.Default.Share, null) }
-                IconButton(onClick = { currentItem?.mediaId?.let { onTransferClick(it) } }) { Icon(Icons.Default.Wifi, null) }
+                if (com.raulburgosmurray.musicplayer.FeatureFlags.P2P_TRANSFER) {
+                    IconButton(onClick = { currentItem?.mediaId?.let { onTransferClick(it) } }) { Icon(Icons.Default.Wifi, null) }
+                }
             }
             PlayerControls(state, viewModel, onShowSpeed, onShowTimer)
         }
@@ -289,9 +324,9 @@ fun HistorySelectorContent(history: List<com.raulburgosmurray.musicplayer.Histor
                         Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(modifier = Modifier.weight(1f)) { Text(action.label, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge); Text(formatDuration(action.audioPositionMs), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary) }
                             Icon(Icons.AutoMirrored.Filled.Undo, null, tint = MaterialTheme.colorScheme.primary)
-                        }
-                    }
-                }
+}
+    }
+}
             }
         }
     }
@@ -361,4 +396,108 @@ fun AddBookmarkDialog(currentPosition: Long, onDismiss: () -> Unit, onConfirm: (
         text = { Column { Text(stringResource(R.string.save_position_label, formatDuration(currentPosition))); Spacer(Modifier.height(8.dp)); OutlinedTextField(value = note, onValueChange = { note = it }, label = { Text(stringResource(R.string.note_label)) }, modifier = Modifier.fillMaxWidth()) } },
         confirmButton = { Button(onClick = { onConfirm(note) }) { Text(stringResource(R.string.save)) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } })
+}
+
+enum class CoverTapArea { LEFT, CENTER, RIGHT }
+
+@Composable
+fun CoverTouchControls(
+    modifier: Modifier = Modifier,
+    pressedArea: CoverTapArea?,
+    onAreaPressed: (CoverTapArea) -> Unit,
+    onAreaReleased: () -> Unit,
+    onLeftTap: () -> Unit,
+    onCenterTap: () -> Unit,
+    onRightTap: () -> Unit
+) {
+    Box(modifier = modifier.pointerInput(Unit) {
+        detectTapGestures(
+            onPress = { offset ->
+                val width = size.width
+                val x = offset.x
+                val area = when {
+                    x < width * 0.33f -> CoverTapArea.LEFT
+                    x < width * 0.67f -> CoverTapArea.CENTER
+                    else -> CoverTapArea.RIGHT
+                }
+                onAreaPressed(area)
+                tryAwaitRelease()
+                onAreaReleased()
+            },
+            onTap = { offset ->
+                val width = size.width
+                val x = offset.x
+                when {
+                    x < width * 0.33f -> onLeftTap()
+                    x < width * 0.67f -> onCenterTap()
+                    else -> onRightTap()
+                }
+            }
+        )
+    }) {
+        Row(modifier = Modifier.fillMaxSize()) {
+            // Left area indicator
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .background(
+                        if (pressedArea == CoverTapArea.LEFT) 
+                            Color.White.copy(alpha = 0.3f) 
+                        else 
+                            Color.Transparent
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.rewind_30),
+                    contentDescription = "Retroceder 30s",
+                    tint = Color.White.copy(alpha = if (pressedArea == CoverTapArea.LEFT) 1f else 0.5f),
+                    modifier = Modifier.size(48.dp)
+                )
+            }
+            
+            // Center area indicator
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .background(
+                        if (pressedArea == CoverTapArea.CENTER) 
+                            Color.White.copy(alpha = 0.3f) 
+                        else 
+                            Color.Transparent
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = "Pausar/Reproducir",
+                    tint = Color.White.copy(alpha = if (pressedArea == CoverTapArea.CENTER) 1f else 0.5f),
+                    modifier = Modifier.size(64.dp)
+                )
+            }
+            
+            // Right area indicator
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .background(
+                        if (pressedArea == CoverTapArea.RIGHT) 
+                            Color.White.copy(alpha = 0.3f) 
+                        else 
+                            Color.Transparent
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.fast_forward_30),
+                    contentDescription = "Adelantar 30s",
+                    tint = Color.White.copy(alpha = if (pressedArea == CoverTapArea.RIGHT) 1f else 0.5f),
+                    modifier = Modifier.size(48.dp)
+                )
+            }
+        }
+    }
 }

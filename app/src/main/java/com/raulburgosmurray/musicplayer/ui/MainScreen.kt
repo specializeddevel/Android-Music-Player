@@ -6,6 +6,8 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.net.Uri
+import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.*
@@ -27,6 +29,7 @@ import androidx.compose.foundation.basicMarquee
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -53,6 +56,7 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
 import com.raulburgosmurray.musicplayer.Music
 import com.raulburgosmurray.musicplayer.R
+import com.raulburgosmurray.musicplayer.encodeBookId
 import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
 
@@ -68,7 +72,8 @@ fun MainScreen(
     onMiniPlayerClick: () -> Unit,
     onFavoritesClick: () -> Unit,
     onSettingsClick: () -> Unit,
-    onReceiveClick: () -> Unit = {}
+    onReceiveClick: () -> Unit = {},
+    navController: androidx.navigation.NavController
 ) {
 val books by mainViewModel.books.collectAsState()
     val favoriteIds by mainViewModel.favoriteIds.collectAsState()
@@ -101,7 +106,9 @@ val books by mainViewModel.books.collectAsState()
             TopAppBar(
                 title = { Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
                 actions = {
-                    IconButton(onClick = onReceiveClick) { Icon(Icons.Default.Wifi, contentDescription = stringResource(R.string.receive)) }
+                    if (com.raulburgosmurray.musicplayer.FeatureFlags.P2P_TRANSFER) {
+                        IconButton(onClick = onReceiveClick) { Icon(Icons.Default.Wifi, contentDescription = stringResource(R.string.receive)) }
+                    }
                     IconButton(onClick = { mainViewModel.loadBooks(settingsViewModel.libraryRootUri.value) }) { Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.open)) }
                     IconButton(onClick = { settingsViewModel.setLayoutMode(if (layoutMode == LayoutMode.LIST) LayoutMode.GRID else LayoutMode.LIST) }) { Icon(if (layoutMode == LayoutMode.LIST) Icons.Default.GridView else Icons.AutoMirrored.Filled.ViewList, contentDescription = "Vista") }
                     Box {
@@ -198,13 +205,14 @@ Box(modifier = Modifier.fillMaxSize()) {
             }
         }
     }
-    if (showDetailsSheet && selectedBookForDetails != null) { ModalBottomSheet(onDismissRequest = { showDetailsSheet = false }, sheetState = detailsSheetState) { BookDetailsContent(book = selectedBookForDetails!!, allBooks = books) } }
+    if (showDetailsSheet && selectedBookForDetails != null) { ModalBottomSheet(onDismissRequest = { showDetailsSheet = false }, sheetState = detailsSheetState) { BookDetailsContent(book = selectedBookForDetails!!, allBooks = books, onEditMetadata = { bookId -> navController.navigate("metadata_editor?bookId=${encodeBookId(bookId)}") }) } }
 }
 
 @Composable
-fun BookDetailsContent(book: Music, allBooks: List<Music> = emptyList()) {
+fun BookDetailsContent(book: Music, allBooks: List<Music> = emptyList(), onEditMetadata: (String) -> Unit = {}) {
     val siblingCount = allBooks.count { it.album == book.album && it.id != book.id }
     val context = LocalContext.current
+    val metadata = remember { com.raulburgosmurray.musicplayer.data.MetadataJsonHelper.loadMetadata(context, book.id) }
     Column(modifier = Modifier.fillMaxWidth().padding(24.dp).padding(bottom = 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Surface(modifier = Modifier.size(120.dp), shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
             if (book.artUri != null) AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(book.artUri).crossfade(true).build(), contentDescription = null, contentScale = ContentScale.Crop)
@@ -215,7 +223,9 @@ fun BookDetailsContent(book: Music, allBooks: List<Music> = emptyList()) {
         Text(text = book.artist, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
         if (siblingCount > 0) { Surface(modifier = Modifier.padding(top = 8.dp), shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)) { Text(text = "+ $siblingCount archivos en esta colección", modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) } }
         Spacer(Modifier.height(24.dp))
-        Button(onClick = { openFolder(context, book.path) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer), shape = RoundedCornerShape(16.dp)) { Icon(Icons.Default.OpenInNew, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.view_in_folder)) }
+        Button(onClick = { openFolder(context, book.path) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer), shape = RoundedCornerShape(16.dp)) { Icon(Icons.AutoMirrored.Filled.OpenInNew, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.view_in_folder)) }
+        Spacer(Modifier.height(8.dp))
+        Button(onClick = { onEditMetadata(book.id) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer), shape = RoundedCornerShape(16.dp)) { Icon(Icons.Default.Edit, null); Spacer(Modifier.width(8.dp)); Text("Editar metadatos") }
         Spacer(Modifier.height(16.dp))
         Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -224,6 +234,12 @@ fun BookDetailsContent(book: Music, allBooks: List<Music> = emptyList()) {
                 DetailRow(icon = Icons.Default.SdCard, label = "Tamaño", value = formatFileSize(book.fileSize))
                 DetailRow(icon = Icons.Default.Timer, label = "Duración", value = formatDuration(book.duration))
                 DetailRow(icon = Icons.Default.AudioFile, label = "Formato", value = book.path.substringAfterLast(".").uppercase())
+                if (metadata != null) {
+                    if (metadata.album != null) DetailRow(icon = Icons.Default.Album, label = "Serie", value = metadata.album)
+                    if (metadata.year != null) DetailRow(icon = Icons.Default.CalendarToday, label = "Año", value = metadata.year)
+                    if (metadata.genre != null) DetailRow(icon = Icons.Default.Category, label = "Género", value = metadata.genre)
+                    if (metadata.trackNumber != null) DetailRow(icon = Icons.Default.Numbers, label = "Nº Volumen", value = metadata.trackNumber.toString())
+                }
             }
         }
     }
@@ -261,21 +277,23 @@ fun openFolder(context: android.content.Context, path: String) {
 @OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun androidx.compose.animation.SharedTransitionScope.BookGridItem(book: Music, isFavorite: Boolean, progress: Float, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, keyPrefix: String = "grid", onAddToQueue: () -> Unit, onLongClick: () -> Unit, onClick: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth().aspectRatio(0.7f).combinedClickable(onClick = onClick, onLongClick = onLongClick), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
+    Card(modifier = Modifier.fillMaxWidth().height(240.dp).combinedClickable(onClick = onClick, onLongClick = onLongClick), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
         Box(modifier = Modifier.fillMaxSize()) {
             Surface(modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${keyPrefix}_cover_${book.id}"), animatedVisibilityScope = animatedVisibilityScope), color = MaterialTheme.colorScheme.surface) {
                 if (book.artUri != null) AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(book.artUri).crossfade(true).placeholder(R.drawable.ic_audiobook_cover).build(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                 else BookPlaceholder(title = book.title, modifier = Modifier.fillMaxSize())
             }
             Surface(modifier = Modifier.fillMaxWidth().align(Alignment.BottomCenter), color = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.6f)) {
-                Column(modifier = Modifier.padding(8.dp).heightIn(max = 70.dp).verticalScroll(rememberScrollState())) {
-                    Text(text = book.title, style = MaterialTheme.typography.labelLarge, color = androidx.compose.ui.graphics.Color.White, fontWeight = FontWeight.Bold)
-                    Text(text = book.artist, style = MaterialTheme.typography.labelSmall, color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.8f))
+                Column(modifier = Modifier.padding(8.dp)) {
+                    Text(text = book.title, style = MaterialTheme.typography.labelLarge, color = androidx.compose.ui.graphics.Color.White, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(text = book.artist, style = MaterialTheme.typography.labelSmall, color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.8f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     val currentPos = (progress * book.duration).toLong()
                     Text(
                         text = if (progress > 0f) "${formatDuration(currentPos)} / ${formatDuration(book.duration)}" else formatDuration(book.duration),
                         style = MaterialTheme.typography.labelSmall,
-                        color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f)
+                        color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -292,9 +310,9 @@ fun androidx.compose.animation.SharedTransitionScope.MiniPlayer(state: PlaybackS
     val currentItem = state.currentMediaItem ?: return
     Surface(modifier = Modifier.fillMaxWidth().padding(8.dp).height(72.dp).clickable(onClick = onClick), shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.primaryContainer, tonalElevation = 8.dp) {
         Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Card(shape = RoundedCornerShape(8.dp), modifier = Modifier.size(56.dp).sharedElement(rememberSharedContentState(key = "mini_cover_${currentItem.mediaId}"), animatedVisibilityScope = animatedVisibilityScope)) {
+Card(shape = RoundedCornerShape(8.dp), modifier = Modifier.size(56.dp).sharedElement(rememberSharedContentState(key = "mini_cover_${currentItem.mediaId}"), animatedVisibilityScope = animatedVisibilityScope)) {
                 if (currentItem.mediaMetadata.artworkUri != null) AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(currentItem.mediaMetadata.artworkUri).crossfade(true).placeholder(R.drawable.ic_audiobook_cover).build(), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                else BookPlaceholder(title = currentItem.mediaMetadata.title?.toString() ?: "A", modifier = Modifier.fillMaxSize())
+                else CompactBookPlaceholder(title = currentItem.mediaMetadata.title?.toString() ?: "A", modifier = Modifier.fillMaxSize())
             }
             Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp), verticalArrangement = Arrangement.Center) {
                 Text(text = currentItem.mediaMetadata.title?.toString() ?: stringResource(R.string.unknown_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.basicMarquee())
@@ -313,9 +331,9 @@ fun androidx.compose.animation.SharedTransitionScope.BookListItem(book: Music, i
     Card(modifier = Modifier.fillMaxWidth().combinedClickable(onClick = onClick, onLongClick = onLongClick), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
         Column {
             Row(modifier = Modifier.padding(12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Surface(modifier = Modifier.size(60.dp).sharedElement(rememberSharedContentState(key = "${keyPrefix}_cover_${book.id}"), animatedVisibilityScope = animatedVisibilityScope), shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surface) {
+Surface(modifier = Modifier.size(60.dp).sharedElement(rememberSharedContentState(key = "${keyPrefix}_cover_${book.id}"), animatedVisibilityScope = animatedVisibilityScope), shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surface) {
                     if (book.artUri != null) AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(book.artUri).crossfade(true).placeholder(R.drawable.ic_audiobook_cover).build(), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                    else BookPlaceholder(title = book.title, modifier = Modifier.fillMaxSize())
+                    else CompactBookPlaceholder(title = book.title, modifier = Modifier.fillMaxSize())
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Column(modifier = Modifier.weight(1f)) {
@@ -334,7 +352,7 @@ fun androidx.compose.animation.SharedTransitionScope.BookListItem(book: Music, i
                 IconButton(onClick = onAddToQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = stringResource(R.string.playlist_btn), tint = MaterialTheme.colorScheme.primary) }
                 Icon(Icons.Default.PlayCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
             }
-            if (progress > 0f) LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(4.dp), color = MaterialTheme.colorScheme.primary, trackColor = androidx.compose.ui.graphics.Color.Transparent)
+if (progress > 0f) LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(4.dp), color = MaterialTheme.colorScheme.primary, trackColor = androidx.compose.ui.graphics.Color.Transparent)
         }
     }
 }

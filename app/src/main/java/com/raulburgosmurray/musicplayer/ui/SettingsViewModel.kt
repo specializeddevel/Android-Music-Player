@@ -12,6 +12,8 @@ enum class LayoutMode {
     LIST, GRID
 }
 
+enum class ThemeMode { SYSTEM, LIGHT, DARK }
+
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
     private val prefs = application.getSharedPreferences("settings", Context.MODE_PRIVATE)
     
@@ -39,6 +41,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         LayoutMode.valueOf(prefs.getString("layout_mode", LayoutMode.LIST.name) ?: LayoutMode.LIST.name)
     )
     val layoutMode: StateFlow<LayoutMode> = _layoutMode.asStateFlow()
+
+    private val _themeMode = MutableStateFlow(
+        ThemeMode.valueOf(prefs.getString("theme_mode", ThemeMode.SYSTEM.name) ?: ThemeMode.SYSTEM.name)
+    )
+    val themeMode: StateFlow<ThemeMode> = _themeMode.asStateFlow()
 
     private val _isShakeEnabled = MutableStateFlow(prefs.getBoolean("shake_enabled", true))
     val isShakeEnabled: StateFlow<Boolean> = _isShakeEnabled.asStateFlow()
@@ -72,6 +79,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setLayoutMode(mode: LayoutMode) {
         _layoutMode.value = mode
         prefs.edit().putString("layout_mode", mode.name).apply()
+    }
+
+    fun setThemeMode(mode: ThemeMode) {
+        _themeMode.value = mode
+        prefs.edit().putString("theme_mode", mode.name).apply()
     }
 
     fun setShakeEnabled(enabled: Boolean) {

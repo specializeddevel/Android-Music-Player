@@ -1,4 +1,4 @@
-﻿package com.raulburgosmurray.musicplayer
+package com.raulburgosmurray.musicplayer
 
 import android.os.Bundle
 import android.widget.Toast
@@ -11,6 +11,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.util.Base64
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.BackHandler
@@ -28,6 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,7 +45,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.SavedStateViewModelFactory
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -136,6 +140,12 @@ class MainActivity : ComponentActivity() {
             val playbackState by playbackViewModel.uiState.collectAsState()
             val isDynamicEnabled by settingsViewModel.isDynamicThemingEnabled.collectAsState()
             val libraryUri by settingsViewModel.libraryRootUri.collectAsState()
+            val themeMode by settingsViewModel.themeMode.collectAsState()
+            val isDark = when (themeMode) {
+                com.raulburgosmurray.musicplayer.ui.ThemeMode.DARK   -> true
+                com.raulburgosmurray.musicplayer.ui.ThemeMode.LIGHT  -> false
+                com.raulburgosmurray.musicplayer.ui.ThemeMode.SYSTEM -> isSystemInDarkTheme()
+            }
             
             // CONECTAR PREFERENCIAS DE SHAKE
             val isShakeEnabled by settingsViewModel.isShakeEnabled.collectAsState()
@@ -146,7 +156,7 @@ class MainActivity : ComponentActivity() {
                 playbackViewModel.updateShakePreferences(isShakeEnabled, isVibrationEnabled, isSoundEnabled)
             }
 
-            MusicPlayerTheme(dynamicColor = isDynamicEnabled, seedColor = if (isDynamicEnabled && playbackState.dominantColor != null) Color(playbackState.dominantColor!!) else null) {
+            MusicPlayerTheme(darkTheme = isDark, dynamicColor = isDynamicEnabled, seedColor = if (isDynamicEnabled && playbackState.dominantColor != null) Color(playbackState.dominantColor!!) else null) {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     val navController = rememberNavController()
                     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -179,8 +189,8 @@ class MainActivity : ComponentActivity() {
                                 OnboardingScreen(onSelectFolder = { folderLauncher.launch(null) })
                             }
 
-                            composable("main") { MainScreen(mainViewModel, settingsViewModel, playbackViewModel, this@SharedTransitionLayout, this@composable, onBookClick = { handleBookClick(it, playbackViewModel, navController, "list") }, onMiniPlayerClick = { navController.navigate("player/mini") }, onFavoritesClick = { navController.navigate("favorites") }, onSettingsClick = { navController.navigate("settings") }, onReceiveClick = { navController.navigate("transfer") }) }
-                            composable("favorites") { FavoritesScreen(mainViewModel, playbackViewModel, this@SharedTransitionLayout, this@composable, onBack = { navController.popBackStack() }, onBookClick = { handleBookClick(it, playbackViewModel, navController, "fav") }, onMiniPlayerClick = { navController.navigate("player/mini") }) }
+                            composable("main") { MainScreen(mainViewModel, settingsViewModel, playbackViewModel, this@SharedTransitionLayout, this@composable, onBookClick = { handleBookClick(it, playbackViewModel, navController, "list") }, onMiniPlayerClick = { navController.navigate("player/mini") }, onFavoritesClick = { navController.navigate("favorites") }, onSettingsClick = { navController.navigate("settings") }, onReceiveClick = { navController.navigate("transfer") }, navController = navController) }
+                            composable("favorites") { FavoritesScreen(mainViewModel, playbackViewModel, this@SharedTransitionLayout, this@composable, onBack = { navController.popBackStack() }, onBookClick = { handleBookClick(it, playbackViewModel, navController, "fav") }, onMiniPlayerClick = { navController.navigate("player/mini") }, navController = navController) }
                             composable("settings") { SettingsScreen(settingsViewModel, mainViewModel, syncViewModel, onBack = { navController.popBackStack() }) }
                             composable(route = "transfer?bookId={bookId}", arguments = listOf(navArgument("bookId") { type = NavType.StringType; nullable = true; defaultValue = null })) { backStackEntry ->
                                 val bookId = backStackEntry.arguments?.getString("bookId")
@@ -300,12 +310,20 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             }
-                            composable(route = "player/{from}", arguments = listOf(navArgument("from") { type = NavType.StringType })) { backStackEntry ->
+composable(route = "player/{from}", arguments = listOf(navArgument("from") { type = NavType.StringType })) { backStackEntry ->
                                 val sScope = this@SharedTransitionLayout
                                 val aScope = this@composable
                                 PlayerScreen(playbackViewModel, sScope, aScope, backStackEntry.arguments?.getString("from") ?: "list", onBack = { if (navController.currentDestination?.route?.startsWith("player") == true) navController.popBackStack() }, onTransferClick = { bookId ->
                                     navController.navigate("transfer?bookId=${Uri.encode(bookId)}")
-                                })
+                                }, navController = navController)
+                            }
+                            composable(route = "metadata_editor?bookId={bookId}", arguments = listOf(navArgument("bookId") { type = NavType.StringType })) { backStackEntry ->
+                                val bookId = decodeBookId(backStackEntry.arguments?.getString("bookId") ?: return@composable)
+                                val viewModel: MetadataEditorViewModel = viewModel(
+                                    factory = SavedStateViewModelFactory(application, backStackEntry)
+                                )
+                                LaunchedEffect(bookId) { viewModel.loadMetadata(bookId) }
+                                MetadataEditorScreen(viewModel, onBack = { navController.popBackStack() })
                             }
                         }
                     }
@@ -317,6 +335,6 @@ class MainActivity : ComponentActivity() {
     private fun handleBookClick(book: Music, playbackViewModel: PlaybackViewModel, navController: androidx.navigation.NavController, from: String) {
         if (playbackViewModel.uiState.value.currentMediaItem?.mediaId == book.id) { navController.navigate("player/$from"); return }
         playbackViewModel.playPlaylist(listOf(book.toMediaItem()), 0)
-        navController.navigate("player/$from")
+navController.navigate("player/$from")
     }
 }

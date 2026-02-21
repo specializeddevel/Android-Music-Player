@@ -21,12 +21,18 @@ android {
     }
 
     buildTypes {
+        debug {
+            buildConfigField("boolean", "FEATURE_P2P_TRANSFER", "true")
+            buildConfigField("boolean", "FEATURE_CLOUD_SYNC", "true")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            buildConfigField("boolean", "FEATURE_P2P_TRANSFER", "false")
+            buildConfigField("boolean", "FEATURE_CLOUD_SYNC", "false")
         }
     }
     compileOptions {
@@ -37,9 +43,10 @@ android {
         jvmTarget = "11"
     }
 
-    buildFeatures{
+    buildFeatures {
         viewBinding = true
         compose = true
+        buildConfig = true
     }
 
     packaging {
