@@ -15,3 +15,6 @@ data class CachedBook(
     val fileSize: Long,
     val fileName: String = ""
 )
+
+fun CachedBook.toMusic(): com.raulburgosmurray.musicplayer.Music = 
+    com.raulburgosmurray.musicplayer.Music(id, title, album, artist, duration, path, artUri, fileSize, fileName)

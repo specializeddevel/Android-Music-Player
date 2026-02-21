@@ -1,6 +1,7 @@
 package com.raulburgosmurray.musicplayer
 
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import android.Manifest
 import android.os.Build
@@ -203,7 +204,7 @@ class MainActivity : ComponentActivity() {
                                 
                                 LaunchedEffect(state.transferStatus) {
                                     if (state.transferStatus?.contains("EXITO") == true || state.transferStatus?.contains("recibido") == true || state.transferStatus?.contains("Inbox") == true || state.transferStatus?.contains("Sincronizado") == true) {
-                                        delay(1500); mainViewModel.loadBooks(settingsViewModel.libraryRootUri.value)
+                                        delay(Constants.QR_SCAN_DELAY_MS); mainViewModel.loadBooks(settingsViewModel.libraryRootUri.value)
                                     }
                                 }
                                 LaunchedEffect(bookId) { if (bookId != null) transferViewModel.startServer(bookId) else { if (!hasCameraPermission) launcher.launch(Manifest.permission.CAMERA); transferViewModel.refreshLocalIp() } }
@@ -285,7 +286,9 @@ class MainActivity : ComponentActivity() {
                                                                     }
                                                                 }
                                                                 cameraProvider.unbindAll(); cameraProvider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageAnalysis)
-                                                            } catch (e: Exception) {}
+                                                            } catch (e: Exception) {
+                                                                Log.e("MainActivity", "Error al inicializar cámara QR", e)
+                                                            }
                                                         }, ContextCompat.getMainExecutor(ctx)); previewView
                                                     }, modifier = Modifier.fillMaxSize())
                                                 }
@@ -319,9 +322,7 @@ composable(route = "player/{from}", arguments = listOf(navArgument("from") { typ
                             }
                             composable(route = "metadata_editor?bookId={bookId}", arguments = listOf(navArgument("bookId") { type = NavType.StringType })) { backStackEntry ->
                                 val bookId = decodeBookId(backStackEntry.arguments?.getString("bookId") ?: return@composable)
-                                val viewModel: MetadataEditorViewModel = viewModel(
-                                    factory = SavedStateViewModelFactory(application, backStackEntry)
-                                )
+                                val viewModel: MetadataEditorViewModel = viewModel()
                                 LaunchedEffect(bookId) { viewModel.loadMetadata(bookId) }
                                 MetadataEditorScreen(viewModel, onBack = { navController.popBackStack() })
                             }

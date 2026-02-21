@@ -38,7 +38,10 @@ import android.os.CountDownTimer
 import android.content.Intent
 
 import com.raulburgosmurray.musicplayer.data.AppDatabase
-import com.raulburgosmurray.musicplayer.data.FavoriteBook
+import com.raulburgosmurray.musicplayer.data.BookRepository
+import com.raulburgosmurray.musicplayer.data.FavoriteRepository
+import com.raulburgosmurray.musicplayer.data.BookmarkRepository
+import com.raulburgosmurray.musicplayer.data.QueueRepository
 import com.raulburgosmurray.musicplayer.data.Bookmark
 import com.raulburgosmurray.musicplayer.data.AudioMetadata
 import com.raulburgosmurray.musicplayer.data.MetadataJsonHelper
@@ -49,11 +52,14 @@ import kotlinx.coroutines.flow.first
 
 import com.raulburgosmurray.musicplayer.Chapter
 import com.raulburgosmurray.musicplayer.HistoryAction
+import com.raulburgosmurray.musicplayer.Music
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.withContext
+import com.raulburgosmurray.musicplayer.Constants
+import com.raulburgosmurray.musicplayer.ui.formatDuration
 
-data class PlaybackState(
+data class PlaybackUiState(
     val isPlaying: Boolean = false,
     val currentPosition: Long = 0,
     val duration: Long = 0,
@@ -87,10 +93,14 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
     private var originalTimerMinutes: Int = 0
     private var sensorManager: SensorManager? = null
     private var shakeDetector: com.raulburgosmurray.musicplayer.ShakeDetector? = null
-    private val database = AppDatabase.getDatabase(application)
+    
+    private val bookRepository = BookRepository(AppDatabase.getDatabase(application).cachedBookDao())
+    private val favoriteRepository = FavoriteRepository(AppDatabase.getDatabase(application).favoriteDao())
+    private val bookmarkRepository = BookmarkRepository(AppDatabase.getDatabase(application).bookmarkDao())
+    private val queueRepository = QueueRepository(AppDatabase.getDatabase(application).queueDao())
 
-    private val _uiState = MutableStateFlow(PlaybackState())
-    val uiState: StateFlow<PlaybackState> = _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow(PlaybackUiState())
+    val uiState: StateFlow<PlaybackUiState> = _uiState.asStateFlow()
 
     private var isQueueLoaded = false
     private var pendingBooksToLoadQueue: List<com.raulburgosmurray.musicplayer.Music>? = null
@@ -180,7 +190,7 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
             _uiState.flatMapLatest { state ->
                 val mediaId = state.currentMediaItem?.mediaId
                 if (mediaId != null) {
-                    database.bookmarkDao().getBookmarksForMedia(mediaId)
+                    bookmarkRepository.getBookmarksForMedia(mediaId)
                 } else {
                     flowOf(emptyList())
                 }
@@ -195,7 +205,7 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
             _uiState.flatMapLatest { state ->
                 val mediaId = state.currentMediaItem?.mediaId
                 if (mediaId != null) {
-                    database.favoriteDao().isFavorite(mediaId)
+                    favoriteRepository.isFavorite(mediaId)
                 } else {
                     flowOf(false)
                 }
@@ -219,9 +229,9 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
         
         viewModelScope.launch {
             if (isCurrentlyFav) {
-                database.favoriteDao().removeFavorite(currentItem.mediaId)
+                favoriteRepository.removeFavorite(currentItem.mediaId)
             } else {
-                database.favoriteDao().addFavorite(FavoriteBook(currentItem.mediaId))
+                favoriteRepository.addFavorite(currentItem.mediaId)
             }
         }
     }
@@ -230,12 +240,10 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
         val currentItem = _uiState.value.currentMediaItem ?: return
         
         viewModelScope.launch(Dispatchers.IO) {
-            database.bookmarkDao().insertBookmark(
-                Bookmark(
-                    mediaId = currentItem.mediaId,
-                    position = position,
-                    note = note
-                )
+            bookmarkRepository.addBookmark(
+                mediaId = currentItem.mediaId,
+                position = position,
+                note = note
             )
             withContext(Dispatchers.Main) {
                 logAction("Marcador añadido")
@@ -245,13 +253,13 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
 
     fun deleteBookmark(bookmarkId: Int) {
         viewModelScope.launch(Dispatchers.IO) {
-            database.bookmarkDao().deleteBookmark(bookmarkId)
+            bookmarkRepository.deleteBookmark(bookmarkId)
         }
     }
 
     fun updateBookmarkNote(bookmarkId: Int, newNote: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            database.bookmarkDao().updateBookmarkNote(bookmarkId, newNote)
+            bookmarkRepository.updateBookmarkNote(bookmarkId, newNote)
         }
     }
 
@@ -361,7 +369,7 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
             items.add(com.raulburgosmurray.musicplayer.data.QueueItem(mediaId = item.mediaId, orderIndex = i))
         }
         viewModelScope.launch(Dispatchers.IO) {
-            database.queueDao().updateFullQueue(items)
+            queueRepository.updateFullQueue(items)
         }
     }
 
@@ -378,7 +386,7 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
         }
 
         viewModelScope.launch {
-            val savedQueue = withContext(Dispatchers.IO) { database.queueDao().getQueueSnapshot() }
+            val savedQueue = withContext(Dispatchers.IO) { queueRepository.getQueueSnapshot() }
             if (savedQueue.isNotEmpty()) {
                 val itemsToLoad = savedQueue.mapNotNull { savedItem ->
                     allBooks.find { it.id == savedItem.mediaId }?.toMediaItem()
@@ -400,27 +408,16 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
         }
         viewModelScope.launch {
             val cachedBook = withContext(Dispatchers.IO) {
-                database.cachedBookDao().getAllBooks().first().find { it.id == mediaId }
+                bookRepository.getAllBooks().first().find { it.id == mediaId }
             }
             val metadata = withContext(Dispatchers.IO) {
                 MetadataJsonHelper.loadMetadata(getApplication(), mediaId)
             }
-            _uiState.value = _uiState.value.copy(currentMusicDetails = cachedBook?.toMusic(), currentMetadata = metadata)
+            _uiState.value = _uiState.value.copy(
+                currentMusicDetails = cachedBook?.let { Music(it.id, it.title, it.album, it.artist, it.duration, it.path, it.artUri, it.fileSize, it.fileName) }, 
+                currentMetadata = metadata
+            )
         }
-    }
-
-    private fun encodeMediaIdForDatabase(mediaId: String): String {
-        val uri = android.net.Uri.parse(mediaId)
-        val scheme = uri.scheme
-        val authority = uri.authority
-        val path = uri.path
-        
-        if (scheme == null || authority == null || path == null) {
-            return mediaId
-        }
-        
-        val encodedPath = android.net.Uri.encode(path, "/")
-        return "$scheme://$authority$encodedPath"
     }
 
     private fun setupController() {
@@ -526,7 +523,7 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
                         _uiState.value = _uiState.value.copy(currentPosition = it.currentPosition)
                     }
                 }
-                delay(1000)
+                delay(Constants.PROGRESS_UPDATE_INTERVAL_MS)
             }
         }
     }
@@ -595,7 +592,7 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
                 }
 
                 // Zona de advertencia: últimos 30 segundos
-                if (millisUntilFinished <= 30000 && !hasWarned) {
+                if (millisUntilFinished <= Constants.SLEEP_TIMER_WARNING_MS && !hasWarned) {
                     hasWarned = true
                     vibrate()
                     playWarningSound()
@@ -640,8 +637,8 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
         val state = _uiState.value
         val title = state.currentMediaItem?.mediaMetadata?.title ?: "Audiolibro"
         val artist = state.currentMediaItem?.mediaMetadata?.artist ?: "Desconocido"
-        val position = com.raulburgosmurray.musicplayer.Music.formatDuration(state.currentPosition)
-        val duration = com.raulburgosmurray.musicplayer.Music.formatDuration(state.duration)
+        val position = formatDuration(state.currentPosition)
+        val duration = formatDuration(state.duration)
         val percentage = if (state.duration > 0) (state.currentPosition * 100 / state.duration).toInt() else 0
 
         val shareText = "🎧 Estoy escuchando '$title' de $artist en mi reproductor. \n¡Voy por el minuto $position de $duration ($percentage%)! 📖✨"
