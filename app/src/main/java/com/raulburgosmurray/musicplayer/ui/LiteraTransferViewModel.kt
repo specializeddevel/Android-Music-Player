@@ -180,6 +180,7 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
 
     fun receiveFromIp(ipAndPort: String, targetRootUri: String?) {
         val context = getApplication<Application>()
+        val pendingProgress = _uiState.value.pendingProgress
         viewModelScope.launch(Dispatchers.IO) {
             val cleanUrl = ipAndPort.replace("http://", "").replace("/", "").trim()
             _uiState.value = _uiState.value.copy(isDownloading = true, transferStatus = context.getString(R.string.connecting), error = null)
@@ -195,19 +196,22 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
                 output.writeUTF("FILE"); output.flush()
                 
                 val fileName = input.readUTF(); val fileSize = input.readLong()
-                downloadToFolder(input, fileName, fileSize, targetRootUri)
+                downloadToFolder(input, fileName, fileSize, targetRootUri, pendingProgress)
             } catch (e: Exception) { _uiState.value = _uiState.value.copy(error = "Error: ${e.message}", isDownloading = false) }
             finally { try { socket?.close() } catch (e: Exception) {} }
         }
     }
 
-    private suspend fun downloadToFolder(input: DataInputStream, fileName: String, fileSize: Long, targetRootUri: String?) {
+    private suspend fun downloadToFolder(input: DataInputStream, fileName: String, fileSize: Long, targetRootUri: String?, pendingProgress: AudiobookProgress?) {
         val context = getApplication<Application>()
         var finalPath: String? = null
+        var finalUri: String? = null
         val outputStream: OutputStream = if (targetRootUri != null) {
             val rootDoc = DocumentFile.fromTreeUri(context, Uri.parse(targetRootUri))
             var inboxDir = rootDoc?.findFile("Inbox"); if (inboxDir == null) inboxDir = rootDoc?.createDirectory("Inbox")
-            val newFile = inboxDir?.createFile("audio/*", fileName); finalPath = newFile?.uri?.toString(); context.contentResolver.openOutputStream(newFile!!.uri)!!
+            val newFile = inboxDir?.createFile("audio/*", fileName)
+            finalUri = newFile?.uri?.toString()
+            context.contentResolver.openOutputStream(newFile!!.uri)!!
         } else {
             val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), "Litera/Inbox")
             if (!dir.exists()) dir.mkdirs()
@@ -222,8 +226,23 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
                 if (now - last > 150) { _uiState.value = _uiState.value.copy(downloadProgress = total.toFloat() / fileSize); last = now }
             }
         }
+        
+        val savedUri = finalUri ?: "file://$finalPath"
+        
+        if (pendingProgress != null) {
+            val newProgress = AudiobookProgress(
+                mediaId = savedUri,
+                lastPosition = pendingProgress.lastPosition,
+                duration = pendingProgress.duration,
+                lastUpdated = System.currentTimeMillis(),
+                playbackSpeed = 1.0f,
+                lastPauseTimestamp = 0L
+            )
+            progressRepository.saveProgress(newProgress)
+        }
+        
         if (finalPath != null && !finalPath.startsWith("content://")) MediaScannerConnection.scanFile(context, arrayOf(finalPath), null, null)
-        withContext(Dispatchers.Main) { _uiState.value = _uiState.value.copy(isDownloading = false, transferStatus = context.getString(R.string.book_received), downloadProgress = 1f) }
+        withContext(Dispatchers.Main) { _uiState.value = _uiState.value.copy(isDownloading = false, transferStatus = context.getString(R.string.book_received), downloadProgress = 1f, pendingProgress = null) }
     }
 
     private fun getLocalIpAddress(): String {
