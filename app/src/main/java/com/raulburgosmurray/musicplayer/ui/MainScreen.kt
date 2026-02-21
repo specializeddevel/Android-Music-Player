@@ -6,6 +6,8 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.net.Uri
+import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.*
@@ -27,6 +29,7 @@ import androidx.compose.foundation.basicMarquee
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -53,6 +56,7 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
 import com.raulburgosmurray.musicplayer.Music
 import com.raulburgosmurray.musicplayer.R
+import com.raulburgosmurray.musicplayer.encodeBookId
 import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
 
@@ -68,7 +72,8 @@ fun MainScreen(
     onMiniPlayerClick: () -> Unit,
     onFavoritesClick: () -> Unit,
     onSettingsClick: () -> Unit,
-    onReceiveClick: () -> Unit = {}
+    onReceiveClick: () -> Unit = {},
+    navController: androidx.navigation.NavController
 ) {
 val books by mainViewModel.books.collectAsState()
     val favoriteIds by mainViewModel.favoriteIds.collectAsState()
@@ -200,13 +205,14 @@ Box(modifier = Modifier.fillMaxSize()) {
             }
         }
     }
-    if (showDetailsSheet && selectedBookForDetails != null) { ModalBottomSheet(onDismissRequest = { showDetailsSheet = false }, sheetState = detailsSheetState) { BookDetailsContent(book = selectedBookForDetails!!, allBooks = books) } }
+    if (showDetailsSheet && selectedBookForDetails != null) { ModalBottomSheet(onDismissRequest = { showDetailsSheet = false }, sheetState = detailsSheetState) { BookDetailsContent(book = selectedBookForDetails!!, allBooks = books, onEditMetadata = { bookId -> navController.navigate("metadata_editor?bookId=${encodeBookId(bookId)}") }) } }
 }
 
 @Composable
-fun BookDetailsContent(book: Music, allBooks: List<Music> = emptyList()) {
+fun BookDetailsContent(book: Music, allBooks: List<Music> = emptyList(), onEditMetadata: (String) -> Unit = {}) {
     val siblingCount = allBooks.count { it.album == book.album && it.id != book.id }
     val context = LocalContext.current
+    val metadata = remember { com.raulburgosmurray.musicplayer.data.MetadataJsonHelper.loadMetadata(context, book.id) }
     Column(modifier = Modifier.fillMaxWidth().padding(24.dp).padding(bottom = 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Surface(modifier = Modifier.size(120.dp), shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
             if (book.artUri != null) AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(book.artUri).crossfade(true).build(), contentDescription = null, contentScale = ContentScale.Crop)
@@ -217,7 +223,9 @@ fun BookDetailsContent(book: Music, allBooks: List<Music> = emptyList()) {
         Text(text = book.artist, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
         if (siblingCount > 0) { Surface(modifier = Modifier.padding(top = 8.dp), shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)) { Text(text = "+ $siblingCount archivos en esta colección", modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) } }
         Spacer(Modifier.height(24.dp))
-        Button(onClick = { openFolder(context, book.path) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer), shape = RoundedCornerShape(16.dp)) { Icon(Icons.Default.OpenInNew, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.view_in_folder)) }
+        Button(onClick = { openFolder(context, book.path) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer), shape = RoundedCornerShape(16.dp)) { Icon(Icons.AutoMirrored.Filled.OpenInNew, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.view_in_folder)) }
+        Spacer(Modifier.height(8.dp))
+        Button(onClick = { onEditMetadata(book.id) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer), shape = RoundedCornerShape(16.dp)) { Icon(Icons.Default.Edit, null); Spacer(Modifier.width(8.dp)); Text("Editar metadatos") }
         Spacer(Modifier.height(16.dp))
         Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -226,6 +234,12 @@ fun BookDetailsContent(book: Music, allBooks: List<Music> = emptyList()) {
                 DetailRow(icon = Icons.Default.SdCard, label = "Tamaño", value = formatFileSize(book.fileSize))
                 DetailRow(icon = Icons.Default.Timer, label = "Duración", value = formatDuration(book.duration))
                 DetailRow(icon = Icons.Default.AudioFile, label = "Formato", value = book.path.substringAfterLast(".").uppercase())
+                if (metadata != null) {
+                    if (metadata.album != null) DetailRow(icon = Icons.Default.Album, label = "Serie", value = metadata.album)
+                    if (metadata.year != null) DetailRow(icon = Icons.Default.CalendarToday, label = "Año", value = metadata.year)
+                    if (metadata.genre != null) DetailRow(icon = Icons.Default.Category, label = "Género", value = metadata.genre)
+                    if (metadata.trackNumber != null) DetailRow(icon = Icons.Default.Numbers, label = "Nº Volumen", value = metadata.trackNumber.toString())
+                }
             }
         }
     }
@@ -338,7 +352,7 @@ Surface(modifier = Modifier.size(60.dp).sharedElement(rememberSharedContentState
                 IconButton(onClick = onAddToQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = stringResource(R.string.playlist_btn), tint = MaterialTheme.colorScheme.primary) }
                 Icon(Icons.Default.PlayCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
             }
-            if (progress > 0f) LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(4.dp), color = MaterialTheme.colorScheme.primary, trackColor = androidx.compose.ui.graphics.Color.Transparent)
+if (progress > 0f) LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(4.dp), color = MaterialTheme.colorScheme.primary, trackColor = androidx.compose.ui.graphics.Color.Transparent)
         }
     }
 }

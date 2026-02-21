@@ -1,5 +1,7 @@
 package com.raulburgosmurray.musicplayer.ui
 
+import android.net.Uri
+import android.util.Base64
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
@@ -20,6 +22,7 @@ import com.raulburgosmurray.musicplayer.Music
 
 import androidx.compose.ui.res.stringResource
 import com.raulburgosmurray.musicplayer.R
+import com.raulburgosmurray.musicplayer.encodeBookId
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
@@ -30,7 +33,8 @@ fun FavoritesScreen(
     animatedVisibilityScope: AnimatedVisibilityScope,
     onBack: () -> Unit,
     onBookClick: (Music) -> Unit,
-    onMiniPlayerClick: () -> Unit
+    onMiniPlayerClick: () -> Unit,
+    navController: androidx.navigation.NavController
 ) {
     val favoriteBooks by mainViewModel.favoriteBooks.collectAsState()
     val bookProgress by mainViewModel.bookProgress.collectAsState()
@@ -111,12 +115,12 @@ fun FavoritesScreen(
         }
     }
 
-    if (showDetailsSheet && selectedBookForDetails != null) {
+if (showDetailsSheet && selectedBookForDetails != null) {
         ModalBottomSheet(
             onDismissRequest = { showDetailsSheet = false },
             sheetState = detailsSheetState
         ) {
-            BookDetailsContent(book = selectedBookForDetails!!, allBooks = favoriteBooks)
+            BookDetailsContent(book = selectedBookForDetails!!, allBooks = favoriteBooks, onEditMetadata = { bookId -> navController.navigate("metadata_editor?bookId=${encodeBookId(bookId)}") })
         }
     }
 }

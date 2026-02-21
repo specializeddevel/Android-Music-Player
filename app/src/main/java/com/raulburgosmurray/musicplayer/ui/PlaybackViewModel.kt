@@ -40,6 +40,8 @@ import android.content.Intent
 import com.raulburgosmurray.musicplayer.data.AppDatabase
 import com.raulburgosmurray.musicplayer.data.FavoriteBook
 import com.raulburgosmurray.musicplayer.data.Bookmark
+import com.raulburgosmurray.musicplayer.data.AudioMetadata
+import com.raulburgosmurray.musicplayer.data.MetadataJsonHelper
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -69,7 +71,8 @@ data class PlaybackState(
     val history: List<HistoryAction> = emptyList(),
     val dominantColor: Int? = null,
     val isShakeWaiting: Boolean = false,
-    val currentMusicDetails: com.raulburgosmurray.musicplayer.Music? = null
+    val currentMusicDetails: com.raulburgosmurray.musicplayer.Music? = null,
+    val currentMetadata: AudioMetadata? = null
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -390,17 +393,34 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
         }
     }
 
-    private fun updateCurrentMusicDetails(mediaId: String?) {
+private fun updateCurrentMusicDetails(mediaId: String?) {
         if (mediaId == null) {
-            _uiState.value = _uiState.value.copy(currentMusicDetails = null)
+            _uiState.value = _uiState.value.copy(currentMusicDetails = null, currentMetadata = null)
             return
         }
         viewModelScope.launch {
             val cachedBook = withContext(Dispatchers.IO) {
                 database.cachedBookDao().getAllBooks().first().find { it.id == mediaId }
             }
-            _uiState.value = _uiState.value.copy(currentMusicDetails = cachedBook?.toMusic())
+            val metadata = withContext(Dispatchers.IO) {
+                MetadataJsonHelper.loadMetadata(getApplication(), mediaId)
+            }
+            _uiState.value = _uiState.value.copy(currentMusicDetails = cachedBook?.toMusic(), currentMetadata = metadata)
         }
+    }
+
+    private fun encodeMediaIdForDatabase(mediaId: String): String {
+        val uri = android.net.Uri.parse(mediaId)
+        val scheme = uri.scheme
+        val authority = uri.authority
+        val path = uri.path
+        
+        if (scheme == null || authority == null || path == null) {
+            return mediaId
+        }
+        
+        val encodedPath = android.net.Uri.encode(path, "/")
+        return "$scheme://$authority$encodedPath"
     }
 
     private fun setupController() {

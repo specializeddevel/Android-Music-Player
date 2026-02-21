@@ -1,6 +1,8 @@
 package com.raulburgosmurray.musicplayer.ui
 
+import android.net.Uri
 import android.content.res.Configuration
+import android.util.Base64
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.fadeIn
@@ -45,6 +47,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.raulburgosmurray.musicplayer.Music
 import com.raulburgosmurray.musicplayer.R
+import com.raulburgosmurray.musicplayer.encodeBookId
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
@@ -55,7 +58,8 @@ fun PlayerScreen(
     animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope,
     from: String,
     onBack: () -> Unit,
-    onTransferClick: (String) -> Unit
+    onTransferClick: (String) -> Unit,
+    navController: androidx.navigation.NavController
 ) {
     val state by viewModel.uiState.collectAsState()
     val configuration = LocalConfiguration.current
@@ -109,7 +113,7 @@ fun PlayerScreen(
     if (showTimerSheet) { ModalBottomSheet(onDismissRequest = { showTimerSheet = false }, sheetState = timerSheetState) { TimerSelectorContent(activeTimerMinutes = state.sleepTimerMinutes, onTimerSelected = { viewModel.startSleepTimer(it); showTimerSheet = false }, onCancelTimer = { viewModel.cancelSleepTimer(); showTimerSheet = false }) } }
     if (showHistorySheet) { ModalBottomSheet(onDismissRequest = { showHistorySheet = false }, sheetState = historySheetState) { HistorySelectorContent(history = state.history, onActionSelected = { viewModel.seekTo(it.audioPositionMs); showHistorySheet = false }) } }
     if (showQueueSheet) { ModalBottomSheet(onDismissRequest = { showQueueSheet = false }, sheetState = queueSheetState) { QueueSelectorContent(playlist = state.playlist, currentIndex = state.currentIndex, onItemClicked = { index -> viewModel.skipToQueueItem(index); showQueueSheet = false }, onRemoveItem = { viewModel.removeItemFromQueue(it) }, onShowDetails = { showDetailsSheet = true }) } }
-    if (showDetailsSheet && state.currentMusicDetails != null) { ModalBottomSheet(onDismissRequest = { showDetailsSheet = false }, sheetState = detailsSheetState) { BookDetailsContent(book = state.currentMusicDetails!!, allBooks = emptyList()) } }
+    if (showDetailsSheet && state.currentMusicDetails != null) { ModalBottomSheet(onDismissRequest = { showDetailsSheet = false }, sheetState = detailsSheetState) { BookDetailsContent(book = state.currentMusicDetails!!, allBooks = emptyList(), onEditMetadata = { bookId -> navController.navigate("metadata_editor?bookId=${encodeBookId(bookId)}") }) } }
     if (showBookmarkSheet) { ModalBottomSheet(onDismissRequest = { showBookmarkSheet = false }, sheetState = bookmarkSheetState) { BookmarkSelectorContent(bookmarks = state.bookmarks, onBookmarkSelected = { viewModel.seekTo(it.position); showBookmarkSheet = false }, onDeleteBookmark = { id -> viewModel.deleteBookmark(id) }) } }
     if (showShareFileConfirmation) {
         AlertDialog(onDismissRequest = { showShareFileConfirmation = false }, title = { Text(stringResource(R.string.share_file_warning_title)) }, text = { Text(stringResource(R.string.share_file_warning_message)) }, confirmButton = { Button(onClick = { showShareFileConfirmation = false; viewModel.shareFile(context) }) { Text(stringResource(R.string.confirm)) } }, dismissButton = { TextButton(onClick = { showShareFileConfirmation = false }) { Text(stringResource(R.string.cancel)) } })
@@ -320,9 +324,9 @@ fun HistorySelectorContent(history: List<com.raulburgosmurray.musicplayer.Histor
                         Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(modifier = Modifier.weight(1f)) { Text(action.label, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge); Text(formatDuration(action.audioPositionMs), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary) }
                             Icon(Icons.AutoMirrored.Filled.Undo, null, tint = MaterialTheme.colorScheme.primary)
-                        }
-                    }
-                }
+}
+    }
+}
             }
         }
     }
