@@ -473,12 +473,7 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
                     dominantColor = null
                 )
                 
-                val mediaId = mediaItem?.mediaId
-                if (mediaId != null) {
-                    restorePositionIfNeeded(mediaId)
-                }
-                
-                updateCurrentMusicDetails(mediaId)
+                updateCurrentMusicDetails(mediaItem?.mediaId)
                 updateDominantColor(mediaItem?.mediaMetadata?.artworkUri)
                 mediaItem?.localConfiguration?.uri?.toString()?.let { uriString ->
                     if (uriString != lastScannedUri) {
@@ -672,9 +667,6 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
             player.setMediaItems(mediaItems, startIndex, 0)
             player.prepare()
             player.play()
-            
-            // Restore position after starting playback
-            mediaId?.let { restorePositionIfNeeded(it) }
         } else {
             pendingPlaylist = Pair(mediaItems, startIndex)
         }
