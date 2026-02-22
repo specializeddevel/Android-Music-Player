@@ -10,16 +10,19 @@ android {
     namespace = "com.raulburgosmurray.musicplayer"
     compileSdk = 35
 
-    // Generar versionCode automático basado en timestamp
-    val timestamp = System.currentTimeMillis() / 1000
-    val autoVersionCode = (timestamp - 1704067200).toInt() // Desde 1/1/2024
+    // Versionado manual - cambiar estos valores para actualizar la versión
+    val versionMajor = 1
+    val versionMinor = 0
+    val versionPatch = 220226001
+    val versionCode = versionMajor * 10000 + versionMinor * 100 + versionPatch
+    val versionName = "$versionMajor.$versionMinor.$versionPatch"
 
     defaultConfig {
         applicationId = "com.raulburgosmurray.musicplayer"
         minSdk = 24
         targetSdk = 35
-        versionCode = autoVersionCode
-        versionName = "1.0.${autoVersionCode}"
+        this.versionCode = versionCode
+        this.versionName = versionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

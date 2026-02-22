@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Litera</string>
     <string name="shuffle_btn">Shuffle</string>
@@ -84,6 +84,11 @@
     <string name="entry_limit">Entry Limit</string>
     <string name="entry_limit_desc">Maximum number of actions to remember in the current session.</string>
     <string name="library">Library</string>
+    <string name="scan_all_memory">Scan All Memory</string>
+    <string name="scan_all_memory_desc">Scan all audio files on the device</string>
+    <string name="folders_to_scan">Folders to Scan</string>
+    <string name="add_folder">Add Folder</string>
+    <string name="rescan_folders">Rescan Folders</string>
     <string name="audiobook_folder">Audiobook Folder</string>
     <string name="scanning_all_memory">Scanning all memory</string>
     <string name="about_app">About App</string>
@@ -121,6 +126,7 @@
     <string name="confirm">Confirm</string>
     <string name="send">Send</string>
     <string name="receive">Receive</string>
+    <string name="book_details">Book Details</string>
     <string name="retry">Retry</string>
     <string name="address">Address: %1$s</string>
     <string name="manual">Manual</string>

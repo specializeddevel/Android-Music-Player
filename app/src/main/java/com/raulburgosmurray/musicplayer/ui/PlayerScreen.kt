@@ -52,6 +52,12 @@ import com.raulburgosmurray.musicplayer.encodeBookId
 import com.raulburgosmurray.musicplayer.ui.PlaybackUiState
 import kotlinx.coroutines.launch
 
+private fun capitalizeWords(text: String): String {
+    return text.split(" ").joinToString(" ") { word ->
+        word.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun PlayerScreen(
@@ -134,6 +140,7 @@ fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, 
     val metadata = remember(mediaId) { mediaId?.let { com.raulburgosmurray.musicplayer.data.MetadataJsonHelper.loadMetadata(context, it) } }
     val displayTitle = metadata?.title?.takeIf { it.isNotBlank() } ?: currentItem?.mediaMetadata?.title?.toString() ?: "A"
     var pressedArea by remember { mutableStateOf<CoverTapArea?>(null) }
+    var showMoreMenu by remember { mutableStateOf(false) }
     
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp).verticalScroll(rememberScrollState()).statusBarsPadding().navigationBarsPadding()) {
         Spacer(Modifier.height(16.dp))
@@ -144,10 +151,15 @@ fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, 
                 IconButton(onClick = onShowHistory) { Icon(Icons.Default.History, null) }
                 IconButton(onClick = onShowQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null) }
                 IconButton(onClick = onShowBookmark) { Icon(Icons.Default.Bookmark, null) }
-                IconButton(onClick = onShowDetails) { Icon(Icons.Default.Info, null) }
-                IconButton(onClick = onShowShare) { Icon(Icons.Default.Share, null) }
-                if (com.raulburgosmurray.musicplayer.FeatureFlags.P2P_TRANSFER) {
-                    IconButton(onClick = { currentItem?.mediaId?.let { onTransferClick(it) } }) { Icon(Icons.Default.Wifi, null) }
+                Box {
+                    IconButton(onClick = { showMoreMenu = true }) { Icon(Icons.Default.MoreVert, null) }
+                    DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
+                        DropdownMenuItem(text = { Text(stringResource(R.string.book_details)) }, leadingIcon = { Icon(Icons.Default.Info, null) }, onClick = { showMoreMenu = false; onShowDetails() })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.share_btn)) }, leadingIcon = { Icon(Icons.Default.Share, null) }, onClick = { showMoreMenu = false; onShowShare() })
+                        if (com.raulburgosmurray.musicplayer.FeatureFlags.P2P_TRANSFER) {
+                            DropdownMenuItem(text = { Text(stringResource(R.string.send)) }, leadingIcon = { Icon(Icons.Default.Wifi, null) }, onClick = { showMoreMenu = false; currentItem?.mediaId?.let { onTransferClick(it) } })
+                        }
+                    }
                 }
             }
         }
@@ -368,7 +380,7 @@ fun QueueSelectorContent(playlist: List<androidx.media3.common.MediaItem>, curre
                 Surface(onClick = { onItemClicked(index) }, color = if (index == currentIndex) MaterialTheme.colorScheme.primaryContainer else Color.Transparent, shape = RoundedCornerShape(12.dp)) {
                     Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("${index + 1}", modifier = Modifier.width(24.dp), style = MaterialTheme.typography.labelSmall)
-                        Column(modifier = Modifier.weight(1f)) { Text(itemTitle, fontWeight = if (index == currentIndex) FontWeight.Bold else FontWeight.Normal); Text(item.mediaMetadata.artist?.toString() ?: stringResource(R.string.unknown_artist), style = MaterialTheme.typography.bodySmall) }
+                        Column(modifier = Modifier.weight(1f)) { Text(itemTitle, fontWeight = if (index == currentIndex) FontWeight.Bold else FontWeight.Normal); Text(capitalizeWords(item.mediaMetadata.artist?.toString() ?: stringResource(R.string.unknown_artist)), style = MaterialTheme.typography.bodySmall) }
                         IconButton(onClick = { onRemoveItem(index) }) { Icon(Icons.Default.RemoveCircleOutline, null, tint = MaterialTheme.colorScheme.error) }
                     }
                 }
