@@ -325,14 +325,19 @@ fun androidx.compose.animation.SharedTransitionScope.BookGridItem(book: Music, i
 @Composable
 fun androidx.compose.animation.SharedTransitionScope.MiniPlayer(state: PlaybackUiState, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, onTogglePlay: () -> Unit, onClick: () -> Unit) {
     val currentItem = state.currentMediaItem ?: return
+    val context = LocalContext.current
+    val metadata = remember(currentItem.mediaId) { currentItem.mediaId?.let { com.raulburgosmurray.musicplayer.data.MetadataJsonHelper.loadMetadata(context, it) } }
+    val displayTitle = metadata?.title?.takeIf { it.isNotBlank() } ?: currentItem.mediaMetadata.title?.toString() ?: stringResource(R.string.unknown_title)
+    val displayLetter = displayTitle.firstOrNull()?.uppercase() ?: "A"
+    
     Surface(modifier = Modifier.fillMaxWidth().padding(8.dp).height(72.dp).clickable(onClick = onClick), shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.primaryContainer, tonalElevation = 8.dp) {
         Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
 Card(shape = RoundedCornerShape(8.dp), modifier = Modifier.size(56.dp).sharedElement(rememberSharedContentState(key = "mini_cover_${currentItem.mediaId}"), animatedVisibilityScope = animatedVisibilityScope)) {
                 if (currentItem.mediaMetadata.artworkUri != null) AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(currentItem.mediaMetadata.artworkUri).crossfade(true).placeholder(R.drawable.ic_audiobook_cover).build(), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                else CompactBookPlaceholder(title = currentItem.mediaMetadata.title?.toString() ?: "A", modifier = Modifier.fillMaxSize())
+                else CompactBookPlaceholder(title = displayLetter, modifier = Modifier.fillMaxSize())
             }
             Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp), verticalArrangement = Arrangement.Center) {
-                Text(text = currentItem.mediaMetadata.title?.toString() ?: stringResource(R.string.unknown_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.basicMarquee())
+                Text(text = displayTitle, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.basicMarquee())
                 Text(text = currentItem.mediaMetadata.artist?.toString() ?: stringResource(R.string.unknown_artist), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, modifier = Modifier.basicMarquee())
             }
             IconButton(onClick = onTogglePlay) { Icon(if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, contentDescription = stringResource(R.string.pause_play_btn), modifier = Modifier.size(32.dp), tint = MaterialTheme.colorScheme.primary) }
