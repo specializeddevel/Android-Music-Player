@@ -26,6 +26,8 @@ import org.json.JSONObject
 data class TransferUIState(
     val isServerRunning: Boolean = false,
     val qrData: String? = null,
+    val qrPositionMs: Long = 0,
+    val qrDurationMs: Long = 0,
     val localIp: String = "Detectando...",
     val isDownloading: Boolean = false,
     val downloadProgress: Float = 0f,
@@ -87,8 +89,17 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
                         put("p", bookProgress.lastPosition); put("d", bookProgress.duration) 
                     }
                 }
+                
+                val positionMs = bookProgress?.lastPosition ?: 0L
+                val durationMs = bookProgress?.duration ?: 0L
 
-                _uiState.value = _uiState.value.copy(qrData = qrJson.toString(), isServerRunning = true, transferStatus = getApplication<Application>().getString(R.string.qr_generated))
+                _uiState.value = _uiState.value.copy(
+                    qrData = qrJson.toString(),
+                    qrPositionMs = positionMs,
+                    qrDurationMs = durationMs,
+                    isServerRunning = true, 
+                    transferStatus = getApplication<Application>().getString(R.string.qr_generated)
+                )
 
                 val pm = getApplication<Application>().getSystemService(Application.POWER_SERVICE) as PowerManager
                 val wm = getApplication<Application>().getSystemService(Application.WIFI_SERVICE) as WifiManager
@@ -177,6 +188,10 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
                     if (progress != null) {
                         android.util.Log.d("LiteraTransfer", "Saving progress: mediaId=${progress.mediaId}, position=${progress.lastPosition}, duration=${progress.duration}")
                         progressRepository.saveProgress(progress)
+                        
+                        // Verify it was saved
+                        val savedProgress = progressRepository.getProgress(progress.mediaId)
+                        android.util.Log.d("LiteraTransfer", "Verified saved progress: $savedProgress")
                     }
                     withContext(Dispatchers.Main) { _uiState.value = _uiState.value.copy(transferStatus = context.getString(R.string.synced_via_qr)) }
                 }
@@ -239,7 +254,7 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
         
         if (pendingProgress != null) {
             val newProgress = AudiobookProgress(
-                mediaId = savedUri,
+                mediaId = pendingProgress.mediaId,
                 lastPosition = pendingProgress.lastPosition,
                 duration = pendingProgress.duration,
                 lastUpdated = System.currentTimeMillis(),
@@ -247,6 +262,7 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
                 lastPauseTimestamp = 0L
             )
             progressRepository.saveProgress(newProgress)
+            android.util.Log.d("LiteraTransfer", "Saved progress with existing book ID: ${pendingProgress.mediaId}, position=${pendingProgress.lastPosition}")
         }
         
         if (finalPath != null && !finalPath.startsWith("content://")) MediaScannerConnection.scanFile(context, arrayOf(finalPath), null, null)

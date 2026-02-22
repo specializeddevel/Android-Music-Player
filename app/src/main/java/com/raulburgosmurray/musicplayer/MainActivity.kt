@@ -261,6 +261,16 @@ class MainActivity : ComponentActivity() {
                                                         } catch (e: Exception) { null }
                                                     }
                                                     qrBitmap?.let { Image(bitmap = it.asImageBitmap(), contentDescription = "QR", modifier = Modifier.size(300.dp)) }
+                                                    if (state.qrPositionMs > 0 && state.qrDurationMs > 0) {
+                                                        Spacer(Modifier.height(8.dp))
+                                                        val posSec = state.qrPositionMs / 1000
+                                                        val durSec = state.qrDurationMs / 1000
+                                                        Text(
+                                                            "${posSec / 60}:${String.format("%02d", posSec % 60)} / ${durSec / 60}:${String.format("%02d", durSec % 60)}",
+                                                            style = MaterialTheme.typography.bodyMedium,
+                                                            color = MaterialTheme.colorScheme.primary
+                                                        )
+                                                    }
                                                 }
                                                 Text(stringResource(R.string.qr_generated))
                                             } else { CircularProgressIndicator() }
