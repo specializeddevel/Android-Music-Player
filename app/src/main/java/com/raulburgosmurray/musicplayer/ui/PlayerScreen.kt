@@ -97,7 +97,7 @@ fun PlayerScreen(
                 onTransferClick = onTransferClick, onShowHistory = { showHistorySheet = true },
                 onShowQueue = { showQueueSheet = true }, onShowDetails = { showDetailsSheet = true },
                 onShowShare = { showShareFileConfirmation = true }, onShowSpeed = { showSpeedSheet = true },
-                onShowTimer = { showTimerSheet = true }
+                onShowTimer = { showTimerSheet = true }, onShowBookmark = { showBookmarkSheet = true }
             )
         } else {
             PortraitPlayerContent(
@@ -106,7 +106,7 @@ fun PlayerScreen(
                 onTransferClick = onTransferClick, onShowHistory = { showHistorySheet = true },
                 onShowQueue = { showQueueSheet = true }, onShowDetails = { showDetailsSheet = true },
                 onShowShare = { showShareFileConfirmation = true }, onShowSpeed = { showSpeedSheet = true },
-                onShowTimer = { showTimerSheet = true }
+                onShowTimer = { showTimerSheet = true }, onShowBookmark = { showBookmarkSheet = true }
             )
         }
     }
@@ -124,7 +124,7 @@ fun PlayerScreen(
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit) {
+fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit, onShowBookmark: () -> Unit) {
     val currentItem = state.currentMediaItem
     var pressedArea by remember { mutableStateOf<CoverTapArea?>(null) }
     
@@ -136,6 +136,7 @@ fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, 
                 IconButton(onClick = { viewModel.toggleFavorite() }) { Icon(if (state.isFavorite) Icons.Filled.Favorite else Icons.Default.Favorite, contentDescription = stringResource(R.string.favourites_btn), tint = if (state.isFavorite) Color.Red else LocalContentColor.current) }
                 IconButton(onClick = onShowHistory) { Icon(Icons.Default.History, null) }
                 IconButton(onClick = onShowQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null) }
+                IconButton(onClick = onShowBookmark) { Icon(Icons.Default.Bookmark, null) }
                 IconButton(onClick = onShowDetails) { Icon(Icons.Default.Info, null) }
                 IconButton(onClick = onShowShare) { Icon(Icons.Default.Share, null) }
                 if (com.raulburgosmurray.musicplayer.FeatureFlags.P2P_TRANSFER) {
@@ -173,7 +174,7 @@ fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, 
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun LandscapePlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit) {
+fun LandscapePlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit, onShowBookmark: () -> Unit) {
     val currentItem = state.currentMediaItem
     var pressedArea by remember { mutableStateOf<CoverTapArea?>(null) }
     
@@ -203,8 +204,10 @@ fun LandscapePlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel,
         Spacer(Modifier.width(24.dp))
         Column(modifier = Modifier.weight(1.2f).fillMaxHeight().verticalScroll(rememberScrollState())) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                IconButton(onClick = { viewModel.toggleFavorite() }) { Icon(if (state.isFavorite) Icons.Filled.Favorite else Icons.Default.Favorite, contentDescription = stringResource(R.string.favourites_btn), tint = if (state.isFavorite) Color.Red else LocalContentColor.current) }
                 IconButton(onClick = onShowHistory) { Icon(Icons.Default.History, null) }
                 IconButton(onClick = onShowQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null) }
+                IconButton(onClick = onShowBookmark) { Icon(Icons.Default.Bookmark, null) }
                 IconButton(onClick = onShowDetails) { Icon(Icons.Default.Info, null) }
                 IconButton(onClick = onShowShare) { Icon(Icons.Default.Share, null) }
                 if (com.raulburgosmurray.musicplayer.FeatureFlags.P2P_TRANSFER) {
