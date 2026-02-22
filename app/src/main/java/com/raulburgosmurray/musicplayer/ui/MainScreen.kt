@@ -63,7 +63,7 @@ import java.util.concurrent.Executors
 
 private fun capitalizeWords(text: String): String {
     return text.split(" ").joinToString(" ") { word ->
-        word.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+        word.lowercase().replaceFirstChar { it.titlecase() }
     }
 }
 
