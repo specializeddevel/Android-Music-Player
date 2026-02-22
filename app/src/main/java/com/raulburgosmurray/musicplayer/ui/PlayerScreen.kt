@@ -86,6 +86,7 @@ fun PlayerScreen(
     var showDetailsSheet by remember { mutableStateOf(false) }
     val bookmarkSheetState = rememberModalBottomSheetState()
     var showBookmarkSheet by remember { mutableStateOf(false) }
+    var showAddBookmarkDialog by remember { mutableStateOf(false) }
 
     var showShareFileConfirmation by remember { mutableStateOf(false) }
 
@@ -116,7 +117,8 @@ fun PlayerScreen(
     if (showHistorySheet) { ModalBottomSheet(onDismissRequest = { showHistorySheet = false }, sheetState = historySheetState) { HistorySelectorContent(history = state.history, onActionSelected = { viewModel.seekTo(it.audioPositionMs); showHistorySheet = false }) } }
     if (showQueueSheet) { ModalBottomSheet(onDismissRequest = { showQueueSheet = false }, sheetState = queueSheetState) { QueueSelectorContent(playlist = state.playlist, currentIndex = state.currentIndex, onItemClicked = { index -> viewModel.skipToQueueItem(index); showQueueSheet = false }, onRemoveItem = { viewModel.removeItemFromQueue(it) }, onShowDetails = { showDetailsSheet = true }) } }
     if (showDetailsSheet && state.currentMusicDetails != null) { ModalBottomSheet(onDismissRequest = { showDetailsSheet = false }, sheetState = detailsSheetState) { BookDetailsContent(book = state.currentMusicDetails!!, allBooks = emptyList(), onEditMetadata = { bookId -> navController.navigate("metadata_editor?bookId=${encodeBookId(bookId)}") }) } }
-    if (showBookmarkSheet) { ModalBottomSheet(onDismissRequest = { showBookmarkSheet = false }, sheetState = bookmarkSheetState) { BookmarkSelectorContent(bookmarks = state.bookmarks, onBookmarkSelected = { viewModel.seekTo(it.position); showBookmarkSheet = false }, onDeleteBookmark = { id -> viewModel.deleteBookmark(id) }) } }
+    if (showBookmarkSheet) { ModalBottomSheet(onDismissRequest = { showBookmarkSheet = false }, sheetState = bookmarkSheetState) { BookmarkSelectorContent(bookmarks = state.bookmarks, onBookmarkSelected = { viewModel.seekTo(it.position); showBookmarkSheet = false }, onDeleteBookmark = { id -> viewModel.deleteBookmark(id) }, onAddBookmark = { showAddBookmarkDialog = true }) } }
+    if (showAddBookmarkDialog) { AddBookmarkDialog(currentPosition = state.currentPosition, onDismiss = { showAddBookmarkDialog = false }, onConfirm = { note -> viewModel.addBookmark(note, state.currentPosition); showAddBookmarkDialog = false }) }
     if (showShareFileConfirmation) {
         AlertDialog(onDismissRequest = { showShareFileConfirmation = false }, title = { Text(stringResource(R.string.share_file_warning_title)) }, text = { Text(stringResource(R.string.share_file_warning_message)) }, confirmButton = { Button(onClick = { showShareFileConfirmation = false; viewModel.shareFile(context) }) { Text(stringResource(R.string.confirm)) } }, dismissButton = { TextButton(onClick = { showShareFileConfirmation = false }) { Text(stringResource(R.string.cancel)) } })
     }
@@ -359,9 +361,12 @@ fun QueueSelectorContent(playlist: List<androidx.media3.common.MediaItem>, curre
 }
 
 @Composable
-fun BookmarkSelectorContent(bookmarks: List<com.raulburgosmurray.musicplayer.data.Bookmark>, onBookmarkSelected: (com.raulburgosmurray.musicplayer.data.Bookmark) -> Unit, onDeleteBookmark: (Int) -> Unit) {
+fun BookmarkSelectorContent(bookmarks: List<com.raulburgosmurray.musicplayer.data.Bookmark>, onBookmarkSelected: (com.raulburgosmurray.musicplayer.data.Bookmark) -> Unit, onDeleteBookmark: (Int) -> Unit, onAddBookmark: () -> Unit) {
     Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
-        Text(stringResource(R.string.manual_bookmarks), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.manual_bookmarks), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            FilledIconButton(onClick = onAddBookmark) { Icon(Icons.Default.Add, null) }
+        }
         Spacer(Modifier.height(16.dp))
         if (bookmarks.isEmpty()) { Text(stringResource(R.string.no_bookmarks_yet), color = MaterialTheme.colorScheme.secondary) }
         else {
