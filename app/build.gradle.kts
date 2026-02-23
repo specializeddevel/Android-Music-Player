@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.compose.compiler)
     id("org.jetbrains.kotlin.plugin.serialization") version "2.0.21"
+    id("androidx.room") version "2.6.1"
 }
 
 android {
@@ -17,7 +18,7 @@ android {
     val versionCode = versionMajor * 10000 + versionMinor * 100 + versionPatch
     val versionName = "$versionMajor.$versionMinor.$versionPatch"
 
-    defaultConfig {
+defaultConfig {
         applicationId = "com.raulburgosmurray.musicplayer"
         minSdk = 24
         targetSdk = 35
@@ -25,6 +26,10 @@ android {
         this.versionName = versionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    room {
+        schemaDirectory("$projectDir/schemas")
     }
 
     buildTypes {

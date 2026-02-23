@@ -36,7 +36,8 @@ data class TransferUIState(
     val pendingProgress: AudiobookProgress? = null,
     val pendingBookTitle: String? = null,
     val showConflictDialog: Boolean = false,
-    val targetIp: String? = null
+    val targetIp: String? = null,
+    val receiveSuccess: Boolean = false
 )
 
 class LiteraTransferViewModel(application: Application) : AndroidViewModel(application) {
@@ -53,9 +54,13 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
 
     init { refreshLocalIp() }
 
+    fun clearReceiveSuccess() {
+        _uiState.value = _uiState.value.copy(receiveSuccess = false)
+    }
+
     fun resetTransferState() {
         _uiState.value = _uiState.value.copy(
-            isDownloading = false, downloadProgress = 0f, transferStatus = getApplication<Application>().getString(R.string.open),
+            isDownloading = false, downloadProgress = 0f, transferStatus = getApplication<Application>().getString(R.string.ready),
             error = null, pendingProgress = null, pendingBookTitle = null,
             showConflictDialog = false, targetIp = null
         )
@@ -77,7 +82,7 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
                 android.util.Log.d("LiteraTransfer", "startServer: bookId=$bookId, progress=$bookProgress")
                 val bookDetails = bookRepository.getBookById(bookId) ?: return@launch
                 val ip = getLocalIpAddress()
-                if (ip == "0.0.0.0") { _uiState.value = _uiState.value.copy(error = "Sin Wi-Fi"); return@launch }
+                if (ip == "0.0.0.0") { _uiState.value = _uiState.value.copy(error = getApplication<Application>().getString(R.string.no_wifi)); return@launch }
 
                 val shortTitle = if (bookDetails.title.length > 25) bookDetails.title.take(22) + "..." else bookDetails.title
                 val shortAuthor = if (bookDetails.artist.length > 20) bookDetails.artist.take(17) + "..." else bookDetails.artist
@@ -266,7 +271,7 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
         }
         
         if (finalPath != null && !finalPath.startsWith("content://")) MediaScannerConnection.scanFile(context, arrayOf(finalPath), null, null)
-        withContext(Dispatchers.Main) { _uiState.value = _uiState.value.copy(isDownloading = false, transferStatus = context.getString(R.string.book_received), downloadProgress = 1f, pendingProgress = null) }
+        withContext(Dispatchers.Main) { _uiState.value = _uiState.value.copy(isDownloading = false, transferStatus = context.getString(R.string.book_received), downloadProgress = 1f, pendingProgress = null, receiveSuccess = true) }
     }
 
     private fun getLocalIpAddress(): String {

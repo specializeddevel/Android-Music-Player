@@ -215,9 +215,12 @@ class MainActivity : ComponentActivity() {
                                 var hasCameraPermission by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) }
                                 val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { hasCameraPermission = it }
                                 
-                                LaunchedEffect(state.transferStatus) {
-                                    if (state.transferStatus?.contains("EXITO") == true || state.transferStatus?.contains("recibido") == true || state.transferStatus?.contains("Inbox") == true || state.transferStatus?.contains("Sincronizado") == true) {
-                                        delay(Constants.QR_SCAN_DELAY_MS); mainViewModel.loadBooks(if (scanAllMemory) emptyList() else libraryRootUris, scanAllMemory)
+                                LaunchedEffect(state.receiveSuccess) {
+                                    if (state.receiveSuccess) {
+                                        transferViewModel.clearReceiveSuccess()
+                                        mainViewModel.loadBooks(if (scanAllMemory) emptyList() else libraryRootUris, scanAllMemory)
+                                        Toast.makeText(context, context.getString(R.string.book_received), Toast.LENGTH_LONG).show()
+                                        navController.navigate("main") { popUpTo("transfer?bookId={bookId}") { inclusive = true } }
                                     }
                                 }
                                 LaunchedEffect(bookId) { if (bookId != null) transferViewModel.startServer(bookId) else { if (!hasCameraPermission) launcher.launch(Manifest.permission.CAMERA); transferViewModel.refreshLocalIp() } }

@@ -1,9 +1,16 @@
 package com.raulburgosmurray.musicplayer.data
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "audiobook_progress")
+@Entity(
+    tableName = "audiobook_progress",
+    indices = [
+        Index(value = ["lastPauseTimestamp"]),
+        Index(value = ["lastUpdated"])
+    ]
+)
 data class AudiobookProgress(
     @PrimaryKey val mediaId: String,
     val lastPosition: Long,

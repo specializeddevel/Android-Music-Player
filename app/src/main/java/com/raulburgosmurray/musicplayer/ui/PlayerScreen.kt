@@ -7,12 +7,14 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -28,6 +30,7 @@ import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,9 +56,13 @@ import com.raulburgosmurray.musicplayer.ui.PlaybackUiState
 import kotlinx.coroutines.launch
 
 private fun capitalizeWords(text: String): String {
-    return text.split(" ").joinToString(" ") { word ->
-        word.lowercase().replaceFirstChar { it.titlecase() }
-    }
+    return text
+        .replace(Regex("\\.[a-zA-Z0-9]{2,4}$"), "")
+        .replace("_", " ")
+        .replace("-", " ")
+        .split(" ")
+        .filter { it.isNotEmpty() }
+        .joinToString(" ") { word -> word.lowercase().replaceFirstChar { it.titlecase() } }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
@@ -96,26 +103,69 @@ fun PlayerScreen(
     var bookmarkPositionAtCreation by remember { mutableStateOf(0L) }
 
     var showShareFileConfirmation by remember { mutableStateOf(false) }
+    var isLocked by rememberSaveable { mutableStateOf(false) }
 
     Scaffold { padding ->
-        if (shouldUseLandscapeLayout) {
-            LandscapePlayerContent(
-                state = state, viewModel = viewModel, sharedTransitionScope = sharedTransitionScope,
-                animatedVisibilityScope = animatedVisibilityScope, from = from, onBack = onBack,
-                onTransferClick = onTransferClick, onShowHistory = { showHistorySheet = true },
-                onShowQueue = { showQueueSheet = true }, onShowDetails = { showDetailsSheet = true },
-                onShowShare = { showShareFileConfirmation = true }, onShowSpeed = { showSpeedSheet = true },
-                onShowTimer = { showTimerSheet = true }, onShowBookmark = { showBookmarkSheet = true }
-            )
-        } else {
-            PortraitPlayerContent(
-                state = state, viewModel = viewModel, sharedTransitionScope = sharedTransitionScope,
-                animatedVisibilityScope = animatedVisibilityScope, from = from, onBack = onBack,
-                onTransferClick = onTransferClick, onShowHistory = { showHistorySheet = true },
-                onShowQueue = { showQueueSheet = true }, onShowDetails = { showDetailsSheet = true },
-                onShowShare = { showShareFileConfirmation = true }, onShowSpeed = { showSpeedSheet = true },
-                onShowTimer = { showTimerSheet = true }, onShowBookmark = { showBookmarkSheet = true }
-            )
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (shouldUseLandscapeLayout) {
+                LandscapePlayerContent(
+                    state = state, viewModel = viewModel, sharedTransitionScope = sharedTransitionScope,
+                    animatedVisibilityScope = animatedVisibilityScope, from = from, onBack = onBack,
+                    onTransferClick = onTransferClick, onShowHistory = { showHistorySheet = true },
+                    onShowQueue = { showQueueSheet = true }, onShowDetails = { showDetailsSheet = true },
+                    onShowShare = { showShareFileConfirmation = true }, onShowSpeed = { showSpeedSheet = true },
+                    onShowTimer = { showTimerSheet = true }, onShowBookmark = { showBookmarkSheet = true },
+                    onLock = { isLocked = true }
+                )
+            } else {
+                PortraitPlayerContent(
+                    state = state, viewModel = viewModel, sharedTransitionScope = sharedTransitionScope,
+                    animatedVisibilityScope = animatedVisibilityScope, from = from, onBack = onBack,
+                    onTransferClick = onTransferClick, onShowHistory = { showHistorySheet = true },
+                    onShowQueue = { showQueueSheet = true }, onShowDetails = { showDetailsSheet = true },
+                    onShowShare = { showShareFileConfirmation = true }, onShowSpeed = { showSpeedSheet = true },
+                    onShowTimer = { showTimerSheet = true }, onShowBookmark = { showBookmarkSheet = true },
+                    onLock = { isLocked = true }
+                )
+            }
+            if (isLocked) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    // Capa de fondo: absorbe todos los toques excepto los que van al botón de encima
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.55f))
+                            .pointerInput(Unit) {
+                                awaitPointerEventScope {
+                                    while (true) {
+                                        awaitPointerEvent(PointerEventPass.Initial)
+                                            .changes.forEach { it.consume() }
+                                    }
+                                }
+                            }
+                    )
+                    // Contenido de desbloqueo: renderizado encima, recibe los eventos primero
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Icon(Icons.Default.Lock, null, Modifier.size(48.dp), tint = Color.White)
+                        Text(stringResource(R.string.screen_locked), color = Color.White, style = MaterialTheme.typography.titleMedium)
+                        OutlinedButton(
+                            onClick = { isLocked = false },
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                            border = BorderStroke(1.dp, Color.White)
+                        ) {
+                            Icon(Icons.Default.LockOpen, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.unlock))
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -133,7 +183,7 @@ fun PlayerScreen(
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit, onShowBookmark: () -> Unit) {
+fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit, onShowBookmark: () -> Unit, onLock: () -> Unit) {
     val currentItem = state.currentMediaItem
     val context = LocalContext.current
     val mediaId = currentItem?.mediaId
@@ -151,6 +201,7 @@ fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, 
                 IconButton(onClick = onShowHistory) { Icon(Icons.Default.History, null) }
                 IconButton(onClick = onShowQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null) }
                 IconButton(onClick = onShowBookmark) { Icon(Icons.Default.Bookmark, null) }
+                IconButton(onClick = onLock) { Icon(Icons.Default.Lock, null) }
                 Box {
                     IconButton(onClick = { showMoreMenu = true }) { Icon(Icons.Default.MoreVert, null) }
                     DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
@@ -182,7 +233,7 @@ fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, 
                 onAreaReleased = { pressedArea = null },
                 onLeftTap = { viewModel.skipBackward(Constants.SKIP_BACKWARD_MS) },
                 onCenterTap = { viewModel.togglePlayPause() },
-                onRightTap = { viewModel.skipForward(Constants.SKIP_FORWARD_MS) }
+                onRightTap = { viewModel.skipForward(Constants.SKIP_BACKWARD_MS) }
             )
         }
         Spacer(Modifier.height(32.dp))
@@ -193,7 +244,7 @@ fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, 
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun LandscapePlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit, onShowBookmark: () -> Unit) {
+fun LandscapePlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit, onShowBookmark: () -> Unit, onLock: () -> Unit) {
     val currentItem = state.currentMediaItem
     val context = LocalContext.current
     val mediaId = currentItem?.mediaId
@@ -220,7 +271,7 @@ fun LandscapePlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel,
                 onAreaReleased = { pressedArea = null },
                 onLeftTap = { viewModel.skipBackward(Constants.SKIP_BACKWARD_MS) },
                 onCenterTap = { viewModel.togglePlayPause() },
-                onRightTap = { viewModel.skipForward(Constants.SKIP_FORWARD_MS) }
+                onRightTap = { viewModel.skipForward(Constants.SKIP_BACKWARD_MS) }
             )
             IconButton(onClick = onBack, modifier = Modifier.padding(8.dp).background(Color.Black.copy(alpha = 0.3f), CircleShape)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) }
         }
@@ -231,6 +282,7 @@ fun LandscapePlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel,
                 IconButton(onClick = onShowHistory) { Icon(Icons.Default.History, null) }
                 IconButton(onClick = onShowQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null) }
                 IconButton(onClick = onShowBookmark) { Icon(Icons.Default.Bookmark, null) }
+                IconButton(onClick = onLock) { Icon(Icons.Default.Lock, null) }
                 IconButton(onClick = onShowDetails) { Icon(Icons.Default.Info, null) }
                 IconButton(onClick = onShowShare) { Icon(Icons.Default.Share, null) }
                 if (com.raulburgosmurray.musicplayer.FeatureFlags.P2P_TRANSFER) {
@@ -275,17 +327,15 @@ fun PlayerControls(state: PlaybackUiState, viewModel: PlaybackViewModel, onShowS
                 ) {
                     Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Deshacer", style = MaterialTheme.typography.labelSmall)
+                    Text(stringResource(R.string.undo), style = MaterialTheme.typography.labelSmall)
                 }
             }
         }
         Spacer(Modifier.height(16.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { viewModel.skipBackward(Constants.SKIP_BACKWARD_MS) }) { Icon(painter = painterResource(id = R.drawable.rewind_30), null, modifier = Modifier.size(32.dp)) }
             IconButton(onClick = { viewModel.skipBackward(Constants.SKIP_FORWARD_MS) }) { Icon(Icons.Default.Replay10, null, modifier = Modifier.size(40.dp)) }
             FilledIconButton(onClick = { viewModel.togglePlayPause() }, modifier = Modifier.size(64.dp), shape = RoundedCornerShape(20.dp)) { Icon(if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, null, modifier = Modifier.size(32.dp)) }
             IconButton(onClick = { viewModel.skipForward(Constants.SKIP_FORWARD_MS) }) { Icon(Icons.Default.Forward10, null, modifier = Modifier.size(40.dp)) }
-            IconButton(onClick = { viewModel.skipForward(Constants.SKIP_BACKWARD_MS) }) { Icon(painter = painterResource(id = R.drawable.fast_forward_10), null, modifier = Modifier.size(32.dp)) }
         }
         Spacer(Modifier.height(32.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -376,7 +426,7 @@ fun QueueSelectorContent(playlist: List<androidx.media3.common.MediaItem>, curre
             items(playlist.size) { index ->
                 val item = playlist[index]
                 val itemMetadata = remember(item.mediaId) { item.mediaId?.let { com.raulburgosmurray.musicplayer.data.MetadataJsonHelper.loadMetadata(context, it) } }
-                val itemTitle = itemMetadata?.title?.takeIf { it.isNotBlank() } ?: item.mediaMetadata.title?.toString() ?: stringResource(R.string.unknown_title)
+                val itemTitle = capitalizeWords(itemMetadata?.title?.takeIf { it.isNotBlank() } ?: item.mediaMetadata.title?.toString() ?: stringResource(R.string.unknown_title))
                 Surface(onClick = { onItemClicked(index) }, color = if (index == currentIndex) MaterialTheme.colorScheme.primaryContainer else Color.Transparent, shape = RoundedCornerShape(12.dp)) {
                     Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("${index + 1}", modifier = Modifier.width(24.dp), style = MaterialTheme.typography.labelSmall)
@@ -491,7 +541,7 @@ fun CoverTouchControls(
             ) {
                 Icon(
                     painter = painterResource(id = R.drawable.rewind_30),
-                    contentDescription = "Retroceder 30s",
+                    contentDescription = stringResource(R.string.rewind_30s),
                     tint = Color.White.copy(alpha = if (pressedArea == CoverTapArea.LEFT) 1f else 0.5f),
                     modifier = Modifier.size(48.dp)
                 )
@@ -512,7 +562,7 @@ fun CoverTouchControls(
             ) {
                 Icon(
                     imageVector = Icons.Default.PlayArrow,
-                    contentDescription = "Pausar/Reproducir",
+                    contentDescription = stringResource(R.string.pause_play_btn),
                     tint = Color.White.copy(alpha = if (pressedArea == CoverTapArea.CENTER) 1f else 0.5f),
                     modifier = Modifier.size(64.dp)
                 )
@@ -533,7 +583,7 @@ fun CoverTouchControls(
             ) {
                 Icon(
                     painter = painterResource(id = R.drawable.fast_forward_30),
-                    contentDescription = "Adelantar 30s",
+                    contentDescription = stringResource(R.string.fast_forward_30s),
                     tint = Color.White.copy(alpha = if (pressedArea == CoverTapArea.RIGHT) 1f else 0.5f),
                     modifier = Modifier.size(48.dp)
                 )

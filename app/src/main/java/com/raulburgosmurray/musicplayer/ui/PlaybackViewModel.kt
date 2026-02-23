@@ -28,6 +28,7 @@ import androidx.palette.graphics.Palette
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 import com.raulburgosmurray.musicplayer.PlaybackService
+import com.raulburgosmurray.musicplayer.R
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -248,7 +249,7 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
                 note = note
             )
             withContext(Dispatchers.Main) {
-                logAction("Marcador añadido")
+                logAction(getApplication<Application>().getString(R.string.history_bookmark_added))
             }
         }
     }
@@ -570,10 +571,10 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
     fun togglePlayPause() {
         controller?.let {
             if (it.isPlaying) {
-                logAction("Pausa")
+                logAction(getApplication<Application>().getString(R.string.history_pause))
                 it.pause()
             } else {
-                logAction("Reproducir")
+                logAction(getApplication<Application>().getString(R.string.history_play))
                 it.play()
             }
         }
@@ -586,26 +587,26 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
     fun undoSeek() {
         val prevPos = _uiState.value.lastPositionBeforeSeek ?: return
         val currentPos = controller?.currentPosition ?: 0L
-        logAction("Deshacer salto")
+        logAction(getApplication<Application>().getString(R.string.history_undo_seek))
         controller?.seekTo(prevPos)
         _uiState.value = _uiState.value.copy(lastPositionBeforeSeek = currentPos)
     }
 
     fun seekTo(position: Long) {
         saveCurrentPositionAsUndo()
-        logAction("Salto manual")
+        logAction(getApplication<Application>().getString(R.string.history_manual_seek))
         controller?.seekTo(position)
     }
 
     fun skipForward(millis: Long) {
         saveCurrentPositionAsUndo()
-        logAction("Adelantar ${millis/1000}s")
+        logAction(getApplication<Application>().getString(R.string.history_skip_forward, millis/1000))
         controller?.let { it.seekTo(it.currentPosition + millis) }
     }
 
     fun skipBackward(millis: Long) {
         saveCurrentPositionAsUndo()
-        logAction("Retroceder ${millis/1000}s")
+        logAction(getApplication<Application>().getString(R.string.history_skip_backward, millis/1000))
         controller?.let { it.seekTo(it.currentPosition - millis) }
     }
 
@@ -643,7 +644,7 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
                 stopShakeDetection()
                 _uiState.value = _uiState.value.copy(isShakeWaiting = false)
                 controller?.pause()
-                logAction("Temporizador finalizado")
+                logAction(getApplication<Application>().getString(R.string.history_timer_finished))
                 cancelSleepTimer() 
             }
         }.start()

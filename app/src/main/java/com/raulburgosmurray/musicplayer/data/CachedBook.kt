@@ -1,9 +1,17 @@
 package com.raulburgosmurray.musicplayer.data
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "cached_books")
+@Entity(
+    tableName = "cached_books",
+    indices = [
+        Index(value = ["title"]),
+        Index(value = ["artist"]),
+        Index(value = ["album"])
+    ]
+)
 data class CachedBook(
     @PrimaryKey val id: String,
     val title: String,

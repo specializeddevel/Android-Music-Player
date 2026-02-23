@@ -62,9 +62,13 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
 
 private fun capitalizeWords(text: String): String {
-    return text.split(" ").joinToString(" ") { word ->
-        word.lowercase().replaceFirstChar { it.titlecase() }
-    }
+    return text
+        .replace(Regex("\\.[a-zA-Z0-9]{2,4}$"), "")
+        .replace("_", " ")
+        .replace("-", " ")
+        .split(" ")
+        .filter { it.isNotEmpty() }
+        .joinToString(" ") { word -> word.lowercase().replaceFirstChar { it.titlecase() } }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.animation.ExperimentalSharedTransitionApi::class)
@@ -133,7 +137,7 @@ fun MainScreen(
                         val scanAll = settingsViewModel.scanAllMemory.value
                         mainViewModel.loadBooks(if (scanAll) emptyList() else uris, scanAll)
                     }) { Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.open)) }
-                    IconButton(onClick = { settingsViewModel.setLayoutMode(if (layoutMode == LayoutMode.LIST) LayoutMode.GRID else LayoutMode.LIST) }) { Icon(if (layoutMode == LayoutMode.LIST) Icons.Default.GridView else Icons.AutoMirrored.Filled.ViewList, contentDescription = "Vista") }
+                    IconButton(onClick = { settingsViewModel.setLayoutMode(if (layoutMode == LayoutMode.LIST) LayoutMode.GRID else LayoutMode.LIST) }) { Icon(if (layoutMode == LayoutMode.LIST) Icons.Default.GridView else Icons.AutoMirrored.Filled.ViewList, contentDescription = stringResource(R.string.layout_toggle)) }
                     Box {
                         IconButton(onClick = { showSortMenu = true }) { Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = stringResource(R.string.sort_title)) }
                         DropdownMenu(expanded = showSortMenu, onDismissRequest = { showSortMenu = false }) {
@@ -160,11 +164,11 @@ fun MainScreen(
                         Spacer(Modifier.height(16.dp))
                         val (current, total) = scanProgress
                         if (total > 0) {
-                            Text("Escaneando: $current / $total archivos", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
+                            Text(stringResource(R.string.scanning_progress, current, total), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
                             Spacer(Modifier.height(8.dp))
                             LinearProgressIndicator(progress = { current.toFloat() / total.toFloat() }, modifier = Modifier.width(200.dp))
                         } else {
-                            Text("Cargando biblioteca...", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
+                            Text(stringResource(R.string.loading_library), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
                         }
                     }
                 } else if (books.isEmpty()) {
@@ -182,14 +186,14 @@ fun MainScreen(
                         )
                         Spacer(Modifier.height(24.dp))
                         Text(
-                            text = "No hay audiolibros",
+                            text = stringResource(R.string.no_audiobooks),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(Modifier.height(12.dp))
                         Text(
-                            text = if (scanAllMemory) "No se encontraron audiolibros en la memoria" else "Agrega archivos de audio a tu carpeta seleccionada para comenzar",
+                            text = if (scanAllMemory) stringResource(R.string.no_audiobooks_in_memory) else stringResource(R.string.no_audiobooks_in_folder),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.secondary,
                             textAlign = TextAlign.Center
@@ -208,7 +212,7 @@ fun MainScreen(
                         ) {
                             Icon(Icons.Default.Refresh, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
-                            Text(if (scanAllMemory) "Escanear memoria" else "Escanear carpetas")
+                            Text(if (scanAllMemory) stringResource(R.string.scan_memory_btn) else stringResource(R.string.scan_folders_btn))
                         }
                     }
                 } else {
@@ -217,7 +221,7 @@ fun MainScreen(
                             items(
                                 items = displayedBooks,
                                 key = { it.id }
-                            ) { book -> with(sharedTransitionScope) { BookListItem(book = book, isFavorite = favoriteIdsSet.contains(book.id), progress = bookProgress[book.id] ?: 0f, animatedVisibilityScope = animatedVisibilityScope, onAddToQueue = { playbackViewModel.addToQueue(book); scope.launch { snackbarHostState.showSnackbar(message = context.getString(R.string.added_to_queue, book.title), duration = SnackbarDuration.Short) } }, onLongClick = { selectedBookForDetails = book; showDetailsSheet = true }, onClick = { onBookClick(book) }) } }
+                            ) { book -> with(sharedTransitionScope) { BookListItem(book = book, isFavorite = favoriteIdsSet.contains(book.id), progress = bookProgress[book.id] ?: 0f, animatedVisibilityScope = animatedVisibilityScope, onAddToQueue = { playbackViewModel.addToQueue(book); scope.launch { snackbarHostState.showSnackbar(message = context.getString(R.string.added_to_queue, capitalizeWords(book.title)), duration = SnackbarDuration.Short) } }, onLongClick = { selectedBookForDetails = book; showDetailsSheet = true }, onClick = { onBookClick(book) }) } }
                         }
                     } else {
                         // AJUSTE DINÁMICO DE COLUMNAS: Solo 4 si es tableta Y horizontal. En móvil horizontal 3.
@@ -231,7 +235,7 @@ fun MainScreen(
                             items(
                                 items = displayedBooks,
                                 key = { it.id }
-                            ) { book -> with(sharedTransitionScope) { BookGridItem(book = book, isFavorite = favoriteIdsSet.contains(book.id), progress = bookProgress[book.id] ?: 0f, animatedVisibilityScope = animatedVisibilityScope, onAddToQueue = { playbackViewModel.addToQueue(book); scope.launch { snackbarHostState.showSnackbar(message = context.getString(R.string.added_to_queue, book.title), duration = SnackbarDuration.Short) } }, onLongClick = { selectedBookForDetails = book; showDetailsSheet = true }, onClick = { onBookClick(book) }) } }
+                            ) { book -> with(sharedTransitionScope) { BookGridItem(book = book, isFavorite = favoriteIdsSet.contains(book.id), progress = bookProgress[book.id] ?: 0f, animatedVisibilityScope = animatedVisibilityScope, onAddToQueue = { playbackViewModel.addToQueue(book); scope.launch { snackbarHostState.showSnackbar(message = context.getString(R.string.added_to_queue, capitalizeWords(book.title)), duration = SnackbarDuration.Short) } }, onLongClick = { selectedBookForDetails = book; showDetailsSheet = true }, onClick = { onBookClick(book) }) } }
                         }
                     }
                 }
@@ -263,24 +267,24 @@ fun BookDetailsContent(book: Music, allBooks: List<Music> = emptyList(), onEditM
         Spacer(Modifier.height(16.dp))
         Text(text = displayTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
         Text(text = displayArtist, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
-        if (siblingCount > 0) { Surface(modifier = Modifier.padding(top = 8.dp), shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)) { Text(text = "+ $siblingCount archivos en esta colección", modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) } }
+        if (siblingCount > 0) { Surface(modifier = Modifier.padding(top = 8.dp), shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)) { Text(text = stringResource(R.string.files_in_collection, siblingCount), modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) } }
         Spacer(Modifier.height(24.dp))
         Button(onClick = { openFolder(context, book.path) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer), shape = RoundedCornerShape(16.dp)) { Icon(Icons.AutoMirrored.Filled.OpenInNew, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.view_in_folder)) }
         Spacer(Modifier.height(8.dp))
-        Button(onClick = { onEditMetadata(book.id) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer), shape = RoundedCornerShape(16.dp)) { Icon(Icons.Default.Edit, null); Spacer(Modifier.width(8.dp)); Text("Editar metadatos") }
+        Button(onClick = { onEditMetadata(book.id) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer), shape = RoundedCornerShape(16.dp)) { Icon(Icons.Default.Edit, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.edit_metadata)) }
         Spacer(Modifier.height(16.dp))
         Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                DetailRow(icon = Icons.Default.Description, label = "Nombre del archivo", value = book.fileName)
-                DetailRow(icon = Icons.Default.Folder, label = "Ubicación", value = book.path)
-                DetailRow(icon = Icons.Default.SdCard, label = "Tamaño", value = formatFileSize(book.fileSize))
-                DetailRow(icon = Icons.Default.Timer, label = "Duración", value = formatDuration(book.duration))
-                DetailRow(icon = Icons.Default.AudioFile, label = "Formato", value = book.path.substringAfterLast(".").uppercase())
+                DetailRow(icon = Icons.Default.Description, label = stringResource(R.string.detail_file_name), value = book.fileName)
+                DetailRow(icon = Icons.Default.Folder, label = stringResource(R.string.detail_location), value = book.path)
+                DetailRow(icon = Icons.Default.SdCard, label = stringResource(R.string.detail_size), value = formatFileSize(book.fileSize))
+                DetailRow(icon = Icons.Default.Timer, label = stringResource(R.string.detail_duration), value = formatDuration(book.duration))
+                DetailRow(icon = Icons.Default.AudioFile, label = stringResource(R.string.detail_format), value = book.path.substringAfterLast(".").uppercase())
                 if (metadata != null) {
-                    if (metadata.album != null) DetailRow(icon = Icons.Default.Album, label = "Serie", value = metadata.album)
-                    if (metadata.year != null) DetailRow(icon = Icons.Default.CalendarToday, label = "Año", value = metadata.year)
-                    if (metadata.genre != null) DetailRow(icon = Icons.Default.Category, label = "Género", value = metadata.genre)
-                    if (metadata.trackNumber != null) DetailRow(icon = Icons.Default.Numbers, label = "Nº Volumen", value = metadata.trackNumber.toString())
+                    if (metadata.album != null) DetailRow(icon = Icons.Default.Album, label = stringResource(R.string.detail_series), value = metadata.album)
+                    if (metadata.year != null) DetailRow(icon = Icons.Default.CalendarToday, label = stringResource(R.string.detail_year), value = metadata.year)
+                    if (metadata.genre != null) DetailRow(icon = Icons.Default.Category, label = stringResource(R.string.detail_genre), value = metadata.genre)
+                    if (metadata.trackNumber != null) DetailRow(icon = Icons.Default.Numbers, label = stringResource(R.string.detail_volume), value = metadata.trackNumber.toString())
                 }
             }
         }
@@ -312,8 +316,8 @@ fun openFolder(context: android.content.Context, path: String) {
             android.content.Intent(android.content.Intent.ACTION_GET_CONTENT).apply { setDataAndType(android.net.Uri.parse(file.parent ?: ""), "*/*"); addCategory(android.content.Intent.CATEGORY_OPENABLE) }
         }
         intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-        context.startActivity(android.content.Intent.createChooser(intent, "Selecciona un explorador"))
-    } catch (e: Exception) { android.widget.Toast.makeText(context, "No se encontró un explorador compatible", android.widget.Toast.LENGTH_SHORT).show() }
+        context.startActivity(android.content.Intent.createChooser(intent, context.getString(R.string.select_explorer)))
+    } catch (e: Exception) { android.widget.Toast.makeText(context, context.getString(R.string.no_explorer_found), android.widget.Toast.LENGTH_SHORT).show() }
 }
 
 @OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class, androidx.compose.foundation.ExperimentalFoundationApi::class)

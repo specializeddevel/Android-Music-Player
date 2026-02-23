@@ -33,7 +33,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val libraryRootUris: StateFlow<List<String>> = _libraryRootUris.asStateFlow()
 
     private val _scanAllMemory = MutableStateFlow(
-        prefs.getBoolean("scan_all_memory", true)
+        prefs.getBoolean("scan_all_memory", false)
     )
     val scanAllMemory: StateFlow<Boolean> = _scanAllMemory.asStateFlow()
 

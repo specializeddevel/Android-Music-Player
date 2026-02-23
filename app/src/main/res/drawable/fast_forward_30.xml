@@ -1,15 +1,10 @@
 <!-- drawable/fast_forward_30.xml -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="24dp"
-    android:height="24dp"
+    android:height="36dp"
+    android:width="36dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
-    <!-- Flecha de avance rápido -->
     <path
         android:fillColor="#000000"
-        android:pathData="M2,12L8,6V18L2,12M8,12L14,6V18L8,12" />
-    <!-- Número 30 -->
-    <path
-        android:fillColor="#000000"
-        android:pathData="M16,8H18V10H16V8M16,11H18V13H16V11M16,14H18V16H16V14M19,8H21V10H19V8M19,11H21V13H19V11M19,14H21V16H19V14" />
+        android:pathData="M11.5,3C6.85,3 2.92,6.03 1.53,10.22L3.9,11C4.95,7.81 7.96,5.5 11.5,5.5C13.46,5.5 15.23,6.22 16.62,7.38L14,10H21V3L18.4,5.6C16.55,4 14.15,3 11.5,3M5,12H7A2,2 0 0,1 9,14V15.5A1.5,1.5 0 0,1 7.5,17A1.5,1.5 0 0,1 9,18.5V20C9,21.11 8.1,22 7,22H5V20H7V18H5V16H7V14H5V12M11,14A2,2 0 0,1 13,12H15C16.11,12 17,12.9 17,14V20C17,21.11 16.11,22 15,22H13A2,2 0 0,1 11,20V14M13,14V20H15V14H13Z" />
 </vector>

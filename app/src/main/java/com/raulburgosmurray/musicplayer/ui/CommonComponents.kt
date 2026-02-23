@@ -78,6 +78,15 @@ fun generateBookColors(title: String): Pair<Color, Color> {
 
 @Composable
 fun BookPlaceholder(title: String, modifier: Modifier = Modifier) {
+    val displayTitle = remember(title) {
+        title
+            .replace(Regex("\\.[a-zA-Z0-9]{2,4}$"), "")
+            .replace("_", " ")
+            .replace("-", " ")
+            .split(" ")
+            .filter { it.isNotEmpty() }
+            .joinToString(" ") { word -> word.lowercase().replaceFirstChar { it.titlecase() } }
+    }
     val colors = remember(title) { generateBookColors(title) }
     val gradient = Brush.verticalGradient(
         colors = listOf(colors.first, colors.second),
@@ -105,7 +114,7 @@ fun BookPlaceholder(title: String, modifier: Modifier = Modifier) {
             )
             
             Text(
-                text = title,
+                text = displayTitle,
                 style = MaterialTheme.typography.titleLarge,
                 color = Color.White,
                 fontWeight = FontWeight.Bold,

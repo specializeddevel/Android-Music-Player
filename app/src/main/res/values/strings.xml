@@ -162,4 +162,64 @@
     <string name="theme_system">System</string>
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
+    <!-- Screen lock -->
+    <string name="screen_locked">Screen locked</string>
+    <string name="unlock">Unlock</string>
+    <string name="undo">Undo</string>
+    <!-- Cover touch controls -->
+    <string name="rewind_30s">Rewind 30s</string>
+    <string name="fast_forward_30s">Fast forward 30s</string>
+    <!-- Layout toggle -->
+    <string name="layout_toggle">Toggle layout</string>
+    <!-- Library loading / empty state -->
+    <string name="scanning_progress">Scanning: %1$d / %2$d files</string>
+    <string name="loading_library">Loading library…</string>
+    <string name="no_audiobooks">No audiobooks</string>
+    <string name="no_audiobooks_in_memory">No audiobooks found in memory</string>
+    <string name="no_audiobooks_in_folder">Add audio files to your selected folder to get started</string>
+    <string name="scan_memory_btn">Scan memory</string>
+    <string name="scan_folders_btn">Scan folders</string>
+    <!-- Book details sheet -->
+    <string name="files_in_collection">+%1$d files in this collection</string>
+    <string name="edit_metadata">Edit metadata</string>
+    <string name="detail_file_name">File name</string>
+    <string name="detail_location">Location</string>
+    <string name="detail_size">Size</string>
+    <string name="detail_duration">Duration</string>
+    <string name="detail_format">Format</string>
+    <string name="detail_series">Series</string>
+    <string name="detail_year">Year</string>
+    <string name="detail_genre">Genre</string>
+    <string name="detail_volume">Vol. No.</string>
+    <string name="select_explorer">Select a file explorer</string>
+    <string name="no_explorer_found">No compatible explorer found</string>
+    <!-- Metadata editor -->
+    <string name="edit_metadata_title">Edit Metadata</string>
+    <string name="field_title">Title</string>
+    <string name="field_title_placeholder">Audiobook title</string>
+    <string name="field_author_label">Author</string>
+    <string name="field_author_placeholder">Author name</string>
+    <string name="field_series_placeholder">Series name (optional)</string>
+    <string name="field_comment">Comment</string>
+    <string name="field_comment_placeholder">Additional notes (optional)</string>
+    <string name="no_genre">No genre</string>
+    <string name="book_cover">Book cover</string>
+    <string name="change_cover">Change cover</string>
+    <string name="add_cover">Add cover</string>
+    <string name="metadata_saved">Metadata saved</string>
+    <string name="changes_applied">Changes applied successfully.</string>
+    <string name="accept">Accept</string>
+    <!-- Activity history action labels -->
+    <string name="history_pause">Pause</string>
+    <string name="history_play">Play</string>
+    <string name="history_skip_forward">Skip forward %1$ds</string>
+    <string name="history_skip_backward">Skip back %1$ds</string>
+    <string name="history_manual_seek">Manual seek</string>
+    <string name="history_undo_seek">Undo seek</string>
+    <string name="history_bookmark_added">Bookmark added</string>
+    <string name="history_timer_finished">Sleep timer ended</string>
+    <!-- Transfer -->
+    <string name="ready">Ready</string>
+    <string name="no_wifi">No Wi-Fi</string>
+    <string name="detecting">Detecting…</string>
 </resources>
