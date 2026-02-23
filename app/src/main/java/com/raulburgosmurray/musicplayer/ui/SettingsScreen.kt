@@ -1,4 +1,4 @@
-﻿package com.raulburgosmurray.musicplayer.ui
+package com.raulburgosmurray.musicplayer.ui
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -37,7 +37,8 @@ fun SettingsScreen(
 ) {
     val isDynamicEnabled by viewModel.isDynamicThemingEnabled.collectAsState()
     val themeMode by viewModel.themeMode.collectAsState()
-    val libraryRootUri by viewModel.libraryRootUri.collectAsState()
+    val libraryRootUris by viewModel.libraryRootUris.collectAsState()
+    val scanAllMemory by viewModel.scanAllMemory.collectAsState()
     val historyLimit by viewModel.historyLimit.collectAsState()
     val isShakeEnabled by viewModel.isShakeEnabled.collectAsState()
     val isVibrationEnabled by viewModel.isVibrationEnabled.collectAsState()
@@ -59,12 +60,12 @@ fun SettingsScreen(
         } catch (e: Exception) {}
     }
 
-    val launcher = rememberLauncherForActivityResult(
+    val folderLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri ->
         uri?.let {
             context.contentResolver.takePersistableUriPermission(it, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            viewModel.setLibraryRootUri(it.toString())
+            viewModel.addLibraryRootUri(it.toString())
         }
     }
 
@@ -190,16 +191,73 @@ fun SettingsScreen(
             
             // Library
             Text(stringResource(R.string.library), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 16.dp))
-            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)), onClick = { launcher.launch(null) }) {
-                Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(imageVector = if (libraryRootUri == null) Icons.Default.FolderOpen else Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(32.dp), tint = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.audiobook_folder), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
-                        Text(text = libraryRootUri?.let { Uri.parse(it).path } ?: stringResource(R.string.scanning_all_memory), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            
+            // Scan All Memory Option
+            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.scan_all_memory), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.scan_all_memory_desc), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Switch(checked = scanAllMemory, onCheckedChange = { 
+                            viewModel.setScanAllMemory(it)
+                            if (it) mainViewModel.loadBooks(emptyList(), true)
+                        })
                     }
-                    if (libraryRootUri != null) {
-                        IconButton(onClick = { viewModel.setLibraryRootUri(null) }) { Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close)) }
+                }
+            }
+            
+            Spacer(Modifier.height(12.dp))
+            
+            // Folders Section
+            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(stringResource(R.string.folders_to_scan), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                        Text("${libraryRootUris.size}/3", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    
+                    Spacer(Modifier.height(12.dp))
+                    
+                    if (libraryRootUris.isNotEmpty()) {
+                        libraryRootUris.forEach { uri ->
+                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Folder, null, modifier = Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary)
+                                Spacer(Modifier.width(12.dp))
+                                Text(text = Uri.parse(uri).path ?: uri, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), maxLines = 1)
+                                IconButton(onClick = { 
+                                    viewModel.removeLibraryRootUri(uri)
+                                    if (!scanAllMemory) mainViewModel.loadBooks(libraryRootUris.filter { it != uri }, false)
+                                }) { 
+                                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close), tint = MaterialTheme.colorScheme.error) 
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                    }
+                    
+                    if (libraryRootUris.size < 3 && !scanAllMemory) {
+                        OutlinedButton(
+                            onClick = { folderLauncher.launch(null) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Add, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.add_folder))
+                        }
+                    }
+                    
+                    if (libraryRootUris.isNotEmpty() && !scanAllMemory) {
+                        Spacer(Modifier.height(8.dp))
+                        Button(
+                            onClick = { mainViewModel.loadBooks(libraryRootUris, false) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Refresh, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.rescan_folders))
+                        }
                     }
                 }
             }
@@ -254,7 +312,7 @@ fun SettingsScreen(
             Spacer(Modifier.height(24.dp))
             
             Text(stringResource(R.string.about_app), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 16.dp))
-            Text("Version 1.5.0 Modern Edition", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 8.dp))
+            Text("Version ${com.raulburgosmurray.musicplayer.BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 8.dp))
         }
     }
 }

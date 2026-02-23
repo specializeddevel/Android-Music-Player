@@ -127,7 +127,11 @@ class MainActivity : ComponentActivity() {
         } else { permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE) }
         TedPermission.create().setPermissionListener(object : PermissionListener {
             override fun onPermissionGranted() {
-                lifecycleScope.launch { mainViewModel.loadBooks(settingsViewModel.libraryRootUri.first()) }
+                lifecycleScope.launch { 
+                    val uris = settingsViewModel.libraryRootUris.first()
+                    val scanAll = settingsViewModel.scanAllMemory.first()
+                    mainViewModel.loadBooks(if (scanAll) emptyList() else uris, scanAll)
+                }
                 lifecycleScope.launch { mainViewModel.books.collect { if (it.isNotEmpty()) playbackViewModel.loadPersistedQueue(it) } }
                 startUI()
             }
@@ -140,7 +144,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             val playbackState by playbackViewModel.uiState.collectAsState()
             val isDynamicEnabled by settingsViewModel.isDynamicThemingEnabled.collectAsState()
-            val libraryUri by settingsViewModel.libraryRootUri.collectAsState()
+            val libraryRootUris by settingsViewModel.libraryRootUris.collectAsState()
+            val scanAllMemory by settingsViewModel.scanAllMemory.collectAsState()
             val themeMode by settingsViewModel.themeMode.collectAsState()
             val isDark = when (themeMode) {
                 com.raulburgosmurray.musicplayer.ui.ThemeMode.DARK   -> true
@@ -166,8 +171,9 @@ class MainActivity : ComponentActivity() {
                     val folderLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
                         if (uri != null) {
                             contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-                            settingsViewModel.setLibraryRootUri(uri.toString())
-                            mainViewModel.loadBooks(uri.toString())
+                            settingsViewModel.addLibraryRootUri(uri.toString())
+                            settingsViewModel.setScanAllMemory(false)
+                            mainViewModel.loadBooks(listOf(uri.toString()), false)
                             navController.navigate("main") { popUpTo("onboarding") { inclusive = true } }
                         }
                     }
@@ -184,10 +190,17 @@ class MainActivity : ComponentActivity() {
                     androidx.compose.animation.SharedTransitionLayout {
                         NavHost(
                             navController = navController, 
-                            startDestination = if (libraryUri.isNullOrEmpty()) "onboarding" else "main"
+                            startDestination = if (libraryRootUris.isEmpty() && !scanAllMemory) "onboarding" else "main"
                         ) {
                             composable("onboarding") {
-                                OnboardingScreen(onSelectFolder = { folderLauncher.launch(null) })
+                                OnboardingScreen(
+                                    onSelectFolder = { folderLauncher.launch(null) },
+                                    onScanAllMemory = {
+                                        settingsViewModel.setScanAllMemory(true)
+                                        mainViewModel.loadBooks(emptyList(), true)
+                                        navController.navigate("main") { popUpTo("onboarding") { inclusive = true } }
+                                    }
+                                )
                             }
 
                             composable("main") { MainScreen(mainViewModel, settingsViewModel, playbackViewModel, this@SharedTransitionLayout, this@composable, onBookClick = { handleBookClick(it, playbackViewModel, navController, "list") }, onMiniPlayerClick = { navController.navigate("player/mini") }, onFavoritesClick = { navController.navigate("favorites") }, onSettingsClick = { navController.navigate("settings") }, onReceiveClick = { navController.navigate("transfer") }, navController = navController) }
@@ -202,27 +215,31 @@ class MainActivity : ComponentActivity() {
                                 var hasCameraPermission by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) }
                                 val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { hasCameraPermission = it }
                                 
-                                LaunchedEffect(state.transferStatus) {
-                                    if (state.transferStatus?.contains("EXITO") == true || state.transferStatus?.contains("recibido") == true || state.transferStatus?.contains("Inbox") == true || state.transferStatus?.contains("Sincronizado") == true) {
-                                        delay(Constants.QR_SCAN_DELAY_MS); mainViewModel.loadBooks(settingsViewModel.libraryRootUri.value)
+                                LaunchedEffect(state.receiveSuccess) {
+                                    if (state.receiveSuccess) {
+                                        transferViewModel.clearReceiveSuccess()
+                                        mainViewModel.loadBooks(if (scanAllMemory) emptyList() else libraryRootUris, scanAllMemory)
+                                        Toast.makeText(context, context.getString(R.string.book_received), Toast.LENGTH_LONG).show()
+                                        navController.navigate("main") { popUpTo("transfer?bookId={bookId}") { inclusive = true } }
                                     }
                                 }
                                 LaunchedEffect(bookId) { if (bookId != null) transferViewModel.startServer(bookId) else { if (!hasCameraPermission) launcher.launch(Manifest.permission.CAMERA); transferViewModel.refreshLocalIp() } }
                                 
                                 if (state.showConflictDialog) {
+                                    val firstUri = libraryRootUris.firstOrNull()
                                     AlertDialog(
-                                        onDismissRequest = { transferViewModel.handleUserDecision("CANCEL", libraryUri) },
+                                        onDismissRequest = { transferViewModel.handleUserDecision("CANCEL", firstUri) },
                                         title = { Text(stringResource(R.string.book_detected)) },
                                         text = { Text(stringResource(R.string.existing_book_msg, state.pendingBookTitle ?: "")) },
                                         confirmButton = {
                                             Column {
-                                                Button(onClick = { transferViewModel.handleUserDecision("PROGRESS", libraryUri) }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.sync_progress_only)) }
+                                                Button(onClick = { transferViewModel.handleUserDecision("PROGRESS", firstUri) }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.sync_progress_only)) }
                                                 Spacer(Modifier.height(8.dp))
-                                                Button(onClick = { transferViewModel.handleUserDecision("FILE", libraryUri) }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.download_full_book)) }
+                                                Button(onClick = { transferViewModel.handleUserDecision("FILE", firstUri) }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.download_full_book)) }
                                             }
                                         },
                                         dismissButton = {
-                                            TextButton(onClick = { transferViewModel.handleUserDecision("CANCEL", libraryUri) }) { Text(stringResource(R.string.cancel)) }
+                                            TextButton(onClick = { transferViewModel.handleUserDecision("CANCEL", firstUri) }) { Text(stringResource(R.string.cancel)) }
                                         }
                                     )
                                 }
@@ -261,12 +278,22 @@ class MainActivity : ComponentActivity() {
                                                         } catch (e: Exception) { null }
                                                     }
                                                     qrBitmap?.let { Image(bitmap = it.asImageBitmap(), contentDescription = "QR", modifier = Modifier.size(300.dp)) }
+                                                    if (state.qrPositionMs > 0 && state.qrDurationMs > 0) {
+                                                        Spacer(Modifier.height(8.dp))
+                                                        val posSec = state.qrPositionMs / 1000
+                                                        val durSec = state.qrDurationMs / 1000
+                                                        Text(
+                                                            "${posSec / 60}:${String.format("%02d", posSec % 60)} / ${durSec / 60}:${String.format("%02d", durSec % 60)}",
+                                                            style = MaterialTheme.typography.bodyMedium,
+                                                            color = MaterialTheme.colorScheme.primary
+                                                        )
+                                                    }
                                                 }
                                                 Text(stringResource(R.string.qr_generated))
                                             } else { CircularProgressIndicator() }
                                         } else if (isManualEntry) {
                                             OutlinedTextField(value = targetIpText, onValueChange = { targetIpText = it }, label = { Text("IP:Puerto") }, modifier = Modifier.fillMaxWidth())
-                                            Button(onClick = { transferViewModel.receiveFromIp(targetIpText, libraryUri) }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.connecting)) }
+                                            Button(onClick = { transferViewModel.receiveFromIp(targetIpText, libraryRootUris.firstOrNull()) }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.connecting)) }
                                             TextButton(onClick = { isManualEntry = false }) { Text(stringResource(R.string.camera)) }
                                         } else {
                                             if (hasCameraPermission) {
@@ -282,7 +309,7 @@ class MainActivity : ComponentActivity() {
                                                                 imageAnalysis.setAnalyzer(Executors.newSingleThreadExecutor()) { imageProxy ->
                                                                     val mediaImage = imageProxy.image
                                                                     if (mediaImage != null) {
-                                                                        scanner.process(InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)).addOnSuccessListener { barcodes -> barcodes.forEach { it.rawValue?.let { transferViewModel.processScannedData(it, libraryUri) } } }.addOnCompleteListener { imageProxy.close() }
+                                                                        scanner.process(InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)).addOnSuccessListener { barcodes -> barcodes.forEach { it.rawValue?.let { transferViewModel.processScannedData(it, libraryRootUris.firstOrNull()) } } }.addOnCompleteListener { imageProxy.close() }
                                                                     }
                                                                 }
                                                                 cameraProvider.unbindAll(); cameraProvider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageAnalysis)

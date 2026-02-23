@@ -27,10 +27,15 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     )
     val historyLimit: StateFlow<Int> = _historyLimit.asStateFlow()
 
-    private val _libraryRootUri = MutableStateFlow(
-        prefs.getString("library_root_uri", null)
+    private val _libraryRootUris = MutableStateFlow(
+        prefs.getStringSet("library_root_uris", emptySet())?.toList() ?: emptyList()
     )
-    val libraryRootUri: StateFlow<String?> = _libraryRootUri.asStateFlow()
+    val libraryRootUris: StateFlow<List<String>> = _libraryRootUris.asStateFlow()
+
+    private val _scanAllMemory = MutableStateFlow(
+        prefs.getBoolean("scan_all_memory", false)
+    )
+    val scanAllMemory: StateFlow<Boolean> = _scanAllMemory.asStateFlow()
 
     private val _sortOrder = MutableStateFlow(
         SortOrder.valueOf(prefs.getString("sort_order", SortOrder.TITLE.name) ?: SortOrder.TITLE.name)
@@ -66,9 +71,25 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         prefs.edit().putInt("history_limit", limit).apply()
     }
 
-    fun setLibraryRootUri(uri: String?) {
-        _libraryRootUri.value = uri
-        prefs.edit().putString("library_root_uri", uri).apply()
+    fun addLibraryRootUri(uri: String) {
+        val current = _libraryRootUris.value.toMutableList()
+        if (current.size < 3 && !current.contains(uri)) {
+            current.add(uri)
+            _libraryRootUris.value = current
+            prefs.edit().putStringSet("library_root_uris", current.toSet()).apply()
+        }
+    }
+
+    fun removeLibraryRootUri(uri: String) {
+        val current = _libraryRootUris.value.toMutableList()
+        current.remove(uri)
+        _libraryRootUris.value = current
+        prefs.edit().putStringSet("library_root_uris", current.toSet()).apply()
+    }
+
+    fun setScanAllMemory(enabled: Boolean) {
+        _scanAllMemory.value = enabled
+        prefs.edit().putBoolean("scan_all_memory", enabled).apply()
     }
 
     fun setSortOrder(order: SortOrder) {

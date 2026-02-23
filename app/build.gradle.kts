@@ -4,20 +4,32 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.compose.compiler)
     id("org.jetbrains.kotlin.plugin.serialization") version "2.0.21"
+    id("androidx.room") version "2.6.1"
 }
 
 android {
     namespace = "com.raulburgosmurray.musicplayer"
     compileSdk = 35
 
-    defaultConfig {
+    // Versionado manual - cambiar estos valores para actualizar la versión
+    val versionMajor = 1
+    val versionMinor = 0
+    val versionPatch = 220226001
+    val versionCode = versionMajor * 10000 + versionMinor * 100 + versionPatch
+    val versionName = "$versionMajor.$versionMinor.$versionPatch"
+
+defaultConfig {
         applicationId = "com.raulburgosmurray.musicplayer"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        this.versionCode = versionCode
+        this.versionName = versionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    room {
+        schemaDirectory("$projectDir/schemas")
     }
 
     buildTypes {

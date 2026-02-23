@@ -28,6 +28,7 @@ import androidx.palette.graphics.Palette
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 import com.raulburgosmurray.musicplayer.PlaybackService
+import com.raulburgosmurray.musicplayer.R
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,6 +43,7 @@ import com.raulburgosmurray.musicplayer.data.BookRepository
 import com.raulburgosmurray.musicplayer.data.FavoriteRepository
 import com.raulburgosmurray.musicplayer.data.BookmarkRepository
 import com.raulburgosmurray.musicplayer.data.QueueRepository
+import com.raulburgosmurray.musicplayer.data.ProgressRepository
 import com.raulburgosmurray.musicplayer.data.Bookmark
 import com.raulburgosmurray.musicplayer.data.AudioMetadata
 import com.raulburgosmurray.musicplayer.data.MetadataJsonHelper
@@ -98,6 +100,7 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
     private val favoriteRepository = FavoriteRepository(AppDatabase.getDatabase(application).favoriteDao())
     private val bookmarkRepository = BookmarkRepository(AppDatabase.getDatabase(application).bookmarkDao())
     private val queueRepository = QueueRepository(AppDatabase.getDatabase(application).queueDao())
+    private val progressRepository = ProgressRepository(AppDatabase.getDatabase(application).progressDao())
 
     private val _uiState = MutableStateFlow(PlaybackUiState())
     val uiState: StateFlow<PlaybackUiState> = _uiState.asStateFlow()
@@ -246,7 +249,7 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
                 note = note
             )
             withContext(Dispatchers.Main) {
-                logAction("Marcador añadido")
+                logAction(getApplication<Application>().getString(R.string.history_bookmark_added))
             }
         }
     }
@@ -420,6 +423,40 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
         }
     }
 
+    private fun restorePositionIfNeeded(mediaId: String) {
+        viewModelScope.launch {
+            val progress = withContext(Dispatchers.IO) {
+                progressRepository.getProgress(mediaId)
+            }
+            
+            Log.d("PlaybackViewModel", "restorePositionIfNeeded: mediaId=$mediaId, progress=$progress")
+            
+            if (progress != null && progress.lastPosition > 0) {
+                // Wait for player to be ready (max 3 seconds)
+                val mediaController = controller
+                mediaController?.let { ctrl ->
+                    var attempts = 0
+                    while (ctrl.playbackState != androidx.media3.common.Player.STATE_READY && attempts < 6) {
+                        Log.d("PlaybackViewModel", "Waiting for player... state=${ctrl.playbackState}")
+                        delay(500)
+                        attempts++
+                    }
+                    
+                    if (ctrl.playbackState == androidx.media3.common.Player.STATE_READY) {
+                        val currentPos = ctrl.currentPosition
+                        Log.d("PlaybackViewModel", "Restoring: currentPos=$currentPos, savedPos=${progress.lastPosition}")
+                        ctrl.seekTo(progress.lastPosition)
+                        Log.d("PlaybackViewModel", "Restored position to ${progress.lastPosition}ms")
+                    } else {
+                        Log.d("PlaybackViewModel", "Player never ready, state=${ctrl.playbackState}")
+                    }
+                }
+            } else {
+                Log.d("PlaybackViewModel", "No progress or position is 0 for mediaId=$mediaId")
+            }
+        }
+    }
+
     private fun setupController() {
         val player = controller ?: return
         player.addListener(object : Player.Listener {
@@ -436,6 +473,7 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
                     chapters = emptyList(),
                     dominantColor = null
                 )
+                
                 updateCurrentMusicDetails(mediaItem?.mediaId)
                 updateDominantColor(mediaItem?.mediaMetadata?.artworkUri)
                 mediaItem?.localConfiguration?.uri?.toString()?.let { uriString ->
@@ -533,10 +571,10 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
     fun togglePlayPause() {
         controller?.let {
             if (it.isPlaying) {
-                logAction("Pausa")
+                logAction(getApplication<Application>().getString(R.string.history_pause))
                 it.pause()
             } else {
-                logAction("Reproducir")
+                logAction(getApplication<Application>().getString(R.string.history_play))
                 it.play()
             }
         }
@@ -549,26 +587,26 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
     fun undoSeek() {
         val prevPos = _uiState.value.lastPositionBeforeSeek ?: return
         val currentPos = controller?.currentPosition ?: 0L
-        logAction("Deshacer salto")
+        logAction(getApplication<Application>().getString(R.string.history_undo_seek))
         controller?.seekTo(prevPos)
         _uiState.value = _uiState.value.copy(lastPositionBeforeSeek = currentPos)
     }
 
     fun seekTo(position: Long) {
         saveCurrentPositionAsUndo()
-        logAction("Salto manual")
+        logAction(getApplication<Application>().getString(R.string.history_manual_seek))
         controller?.seekTo(position)
     }
 
     fun skipForward(millis: Long) {
         saveCurrentPositionAsUndo()
-        logAction("Adelantar ${millis/1000}s")
+        logAction(getApplication<Application>().getString(R.string.history_skip_forward, millis/1000))
         controller?.let { it.seekTo(it.currentPosition + millis) }
     }
 
     fun skipBackward(millis: Long) {
         saveCurrentPositionAsUndo()
-        logAction("Retroceder ${millis/1000}s")
+        logAction(getApplication<Application>().getString(R.string.history_skip_backward, millis/1000))
         controller?.let { it.seekTo(it.currentPosition - millis) }
     }
 
@@ -606,7 +644,7 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
                 stopShakeDetection()
                 _uiState.value = _uiState.value.copy(isShakeWaiting = false)
                 controller?.pause()
-                logAction("Temporizador finalizado")
+                logAction(getApplication<Application>().getString(R.string.history_timer_finished))
                 cancelSleepTimer() 
             }
         }.start()
@@ -624,6 +662,8 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
     fun playPlaylist(mediaItems: List<MediaItem>, startIndex: Int) {
         val player = controller
         if (player != null) {
+            val mediaId = mediaItems.getOrNull(startIndex)?.mediaId
+            
             player.stop() 
             player.setMediaItems(mediaItems, startIndex, 0)
             player.prepare()

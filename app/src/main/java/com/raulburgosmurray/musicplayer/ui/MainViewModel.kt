@@ -14,12 +14,11 @@ import com.raulburgosmurray.musicplayer.data.FavoriteRepository
 import com.raulburgosmurray.musicplayer.data.ProgressRepository
 import com.raulburgosmurray.musicplayer.data.MusicScanner
 import com.raulburgosmurray.musicplayer.data.toMusic
+import com.raulburgosmurray.musicplayer.data.toCachedBook
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-fun Music.toCachedBook(): CachedBook = CachedBook(id, title, album, artist, duration, path, artUri, fileSize, fileName)
 
 enum class SortOrder { TITLE, ARTIST, PROGRESS, RECENT }
 
@@ -61,8 +60,12 @@ class MainViewModel(application: Application, settingsViewModel: SettingsViewMod
 
     init {
         viewModelScope.launch {
-            settingsViewModel.libraryRootUri.collect { uri ->
-                if (bookRepository.getAllBooks().first().isEmpty()) loadBooks(uri)
+            combine(settingsViewModel.libraryRootUris, settingsViewModel.scanAllMemory) { uris, scanAll ->
+                Pair(uris, scanAll)
+            }.collect { (uris, scanAll) ->
+                if (bookRepository.getAllBooks().first().isEmpty()) {
+                    loadBooks(if (scanAll) emptyList() else uris, scanAll)
+                }
             }
         }
         observeFavorites(); observeProgress()
@@ -81,19 +84,26 @@ class MainViewModel(application: Application, settingsViewModel: SettingsViewMod
         viewModelScope.launch { favoriteRepository.getAllFavoriteIds().collectLatest { _favoriteIds.value = it.toSet() } }
     }
 
-    fun loadBooks(libraryRootUri: String? = null) {
+    fun loadBooks(libraryRootUris: List<String> = emptyList(), scanAllMemory: Boolean = false) {
         viewModelScope.launch {
             _isLoading.value = true
             val audioFiles = withContext(Dispatchers.IO) {
-                if (libraryRootUri != null) {
-                    val rootDoc = DocumentFile.fromTreeUri(getApplication(), Uri.parse(libraryRootUri))
-                    if (rootDoc != null) {
-                        musicScanner.scanDirectory(getApplication(), rootDoc) { processed, total ->
-                            _scanProgress.value = processed to total
-                        }
-                    } else emptyList()
-                } else {
+                if (scanAllMemory) {
                     musicScanner.scanMediaStore(getApplication())
+                } else if (libraryRootUris.isNotEmpty()) {
+                    val allMusic = mutableListOf<Music>()
+                    for (uri in libraryRootUris) {
+                        val rootDoc = DocumentFile.fromTreeUri(getApplication(), Uri.parse(uri))
+                        if (rootDoc != null) {
+                            val music = musicScanner.scanDirectory(getApplication(), rootDoc) { processed, total ->
+                                _scanProgress.value = processed to total
+                            }
+                            allMusic.addAll(music)
+                        }
+                    }
+                    allMusic
+                } else {
+                    emptyList()
                 }
             }
             withContext(Dispatchers.IO) {

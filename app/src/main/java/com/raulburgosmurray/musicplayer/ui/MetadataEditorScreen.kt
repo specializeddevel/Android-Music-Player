@@ -21,7 +21,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import com.raulburgosmurray.musicplayer.R
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -94,10 +96,10 @@ fun MetadataEditorScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Editar Metadatos", fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.edit_metadata_title), fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back_btn))
                     }
                 },
                 actions = {
@@ -106,7 +108,7 @@ fun MetadataEditorScreen(
                             onClick = { viewModel.saveMetadata() },
                             enabled = title.isNotBlank() && artist.isNotBlank()
                         ) {
-                            Icon(Icons.Default.Check, contentDescription = "Guardar")
+                            Icon(Icons.Default.Check, contentDescription = stringResource(R.string.save))
                         }
                     }
                 }
@@ -133,7 +135,7 @@ fun MetadataEditorScreen(
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Button(onClick = onBack) {
-                        Text("Volver")
+                        Text(stringResource(R.string.back_btn))
                     }
                 }
             }
@@ -164,24 +166,24 @@ fun MetadataEditorScreen(
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         EditTextField(
-                            label = "Título",
+                            label = stringResource(R.string.field_title),
                             value = title,
                             onValueChange = { title = it },
-                            placeholder = "Título del audiolibro"
+                            placeholder = stringResource(R.string.field_title_placeholder)
                         )
-                        
+
                         EditTextField(
-                            label = "Autor",
+                            label = stringResource(R.string.field_author_label),
                             value = artist,
                             onValueChange = { artist = it },
-                            placeholder = "Nombre del autor"
+                            placeholder = stringResource(R.string.field_author_placeholder)
                         )
-                        
+
                         EditTextField(
-                            label = "Serie",
+                            label = stringResource(R.string.detail_series),
                             value = album,
                             onValueChange = { album = it },
-                            placeholder = "Nombre de la serie (opcional)"
+                            placeholder = stringResource(R.string.field_series_placeholder)
                         )
                         
                         Row(
@@ -189,15 +191,15 @@ fun MetadataEditorScreen(
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             EditTextField(
-                                label = "Año",
+                                label = stringResource(R.string.detail_year),
                                 value = year,
                                 onValueChange = { year = it },
                                 placeholder = "2024",
                                 modifier = Modifier.weight(1f)
                             )
-                            
+
                             EditTextField(
-                                label = "Nº Volumen",
+                                label = stringResource(R.string.detail_volume),
                                 value = trackNumber,
                                 onValueChange = { trackNumber = it },
                                 placeholder = "1",
@@ -212,10 +214,10 @@ fun MetadataEditorScreen(
                         )
                         
                         EditTextField(
-                            label = "Comentario",
+                            label = stringResource(R.string.field_comment),
                             value = comment,
                             onValueChange = { comment = it },
-                            placeholder = "Notas adicionales (opcional)",
+                            placeholder = stringResource(R.string.field_comment_placeholder),
                             singleLine = false,
                             minLines = 3
                         )
@@ -258,7 +260,7 @@ fun CoverArtSection(
         if (displayUri != null) {
             AsyncImage(
                 model = displayUri,
-                contentDescription = "Portada del libro",
+                contentDescription = stringResource(R.string.book_cover),
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
             )
@@ -285,11 +287,11 @@ fun CoverArtSection(
             ) {
                 Icon(
                     imageVector = Icons.Default.CameraAlt,
-                    contentDescription = "Cambiar portada",
+                    contentDescription = stringResource(R.string.change_cover),
                     tint = Color.White
                 )
                 Text(
-                    text = if (displayUri != null) "Cambiar portada" else "Añadir portada",
+                    text = if (displayUri != null) stringResource(R.string.change_cover) else stringResource(R.string.add_cover),
                     color = Color.White,
                     style = MaterialTheme.typography.labelMedium
                 )
@@ -337,7 +339,7 @@ fun GenreDropdown(
             value = selectedGenre,
             onValueChange = {},
             readOnly = true,
-            label = { Text("Género") },
+            label = { Text(stringResource(R.string.detail_genre)) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier
                 .fillMaxWidth()
@@ -349,7 +351,7 @@ fun GenreDropdown(
             onDismissRequest = { expanded = false }
         ) {
             DropdownMenuItem(
-                text = { Text("Sin género") },
+                text = { Text(stringResource(R.string.no_genre)) },
                 onClick = {
                     onGenreSelected("")
                     expanded = false
@@ -393,13 +395,13 @@ fun SuccessDialog(onDismiss: () -> Unit) {
                 )
                 
                 Text(
-                    text = "Metadatos guardados",
+                    text = stringResource(R.string.metadata_saved),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
                 
                 Text(
-                    text = "Los cambios se han aplicado correctamente.",
+                    text = stringResource(R.string.changes_applied),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -408,7 +410,7 @@ fun SuccessDialog(onDismiss: () -> Unit) {
                     onClick = onDismiss,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Aceptar")
+                    Text(stringResource(R.string.accept))
                 }
             }
         }

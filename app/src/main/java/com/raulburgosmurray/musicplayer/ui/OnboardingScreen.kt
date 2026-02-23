@@ -1,9 +1,10 @@
-﻿package com.raulburgosmurray.musicplayer.ui
+package com.raulburgosmurray.musicplayer.ui
 
 import android.content.res.Configuration
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -17,7 +18,10 @@ import androidx.compose.ui.unit.sp
 import com.raulburgosmurray.musicplayer.R
 
 @Composable
-fun OnboardingScreen(onSelectFolder: () -> Unit) {
+fun OnboardingScreen(
+    onSelectFolder: () -> Unit,
+    onScanAllMemory: () -> Unit
+) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
@@ -48,10 +52,22 @@ fun OnboardingScreen(onSelectFolder: () -> Unit) {
                 )
                 Spacer(Modifier.height(32.dp))
                 Button(
+                    onClick = onScanAllMemory,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = MaterialTheme.shapes.medium
+                ) {
+                    Icon(Icons.Default.Storage, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.scan_all_memory), fontSize = 18.sp)
+                }
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(
                     onClick = onSelectFolder,
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = MaterialTheme.shapes.medium
                 ) {
+                    Icon(Icons.Default.FolderOpen, null)
+                    Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.select_folder), fontSize = 18.sp)
                 }
             }
@@ -84,10 +100,22 @@ fun OnboardingScreen(onSelectFolder: () -> Unit) {
             )
             Spacer(Modifier.height(48.dp))
             Button(
+                onClick = onScanAllMemory,
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = MaterialTheme.shapes.medium
+            ) {
+                Icon(Icons.Default.Storage, null)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.scan_all_memory), fontSize = 18.sp)
+            }
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(
                 onClick = onSelectFolder,
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = MaterialTheme.shapes.medium
             ) {
+                Icon(Icons.Default.FolderOpen, null)
+                Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.select_folder), fontSize = 18.sp)
             }
             Spacer(Modifier.height(16.dp))

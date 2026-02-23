@@ -7,12 +7,14 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -28,6 +30,7 @@ import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,6 +54,16 @@ import com.raulburgosmurray.musicplayer.Constants
 import com.raulburgosmurray.musicplayer.encodeBookId
 import com.raulburgosmurray.musicplayer.ui.PlaybackUiState
 import kotlinx.coroutines.launch
+
+private fun capitalizeWords(text: String): String {
+    return text
+        .replace(Regex("\\.[a-zA-Z0-9]{2,4}$"), "")
+        .replace("_", " ")
+        .replace("-", " ")
+        .split(" ")
+        .filter { it.isNotEmpty() }
+        .joinToString(" ") { word -> word.lowercase().replaceFirstChar { it.titlecase() } }
+}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
@@ -86,28 +99,73 @@ fun PlayerScreen(
     var showDetailsSheet by remember { mutableStateOf(false) }
     val bookmarkSheetState = rememberModalBottomSheetState()
     var showBookmarkSheet by remember { mutableStateOf(false) }
+    var showAddBookmarkDialog by remember { mutableStateOf(false) }
+    var bookmarkPositionAtCreation by remember { mutableStateOf(0L) }
 
     var showShareFileConfirmation by remember { mutableStateOf(false) }
+    var isLocked by rememberSaveable { mutableStateOf(false) }
 
     Scaffold { padding ->
-        if (shouldUseLandscapeLayout) {
-            LandscapePlayerContent(
-                state = state, viewModel = viewModel, sharedTransitionScope = sharedTransitionScope,
-                animatedVisibilityScope = animatedVisibilityScope, from = from, onBack = onBack,
-                onTransferClick = onTransferClick, onShowHistory = { showHistorySheet = true },
-                onShowQueue = { showQueueSheet = true }, onShowDetails = { showDetailsSheet = true },
-                onShowShare = { showShareFileConfirmation = true }, onShowSpeed = { showSpeedSheet = true },
-                onShowTimer = { showTimerSheet = true }
-            )
-        } else {
-            PortraitPlayerContent(
-                state = state, viewModel = viewModel, sharedTransitionScope = sharedTransitionScope,
-                animatedVisibilityScope = animatedVisibilityScope, from = from, onBack = onBack,
-                onTransferClick = onTransferClick, onShowHistory = { showHistorySheet = true },
-                onShowQueue = { showQueueSheet = true }, onShowDetails = { showDetailsSheet = true },
-                onShowShare = { showShareFileConfirmation = true }, onShowSpeed = { showSpeedSheet = true },
-                onShowTimer = { showTimerSheet = true }
-            )
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (shouldUseLandscapeLayout) {
+                LandscapePlayerContent(
+                    state = state, viewModel = viewModel, sharedTransitionScope = sharedTransitionScope,
+                    animatedVisibilityScope = animatedVisibilityScope, from = from, onBack = onBack,
+                    onTransferClick = onTransferClick, onShowHistory = { showHistorySheet = true },
+                    onShowQueue = { showQueueSheet = true }, onShowDetails = { showDetailsSheet = true },
+                    onShowShare = { showShareFileConfirmation = true }, onShowSpeed = { showSpeedSheet = true },
+                    onShowTimer = { showTimerSheet = true }, onShowBookmark = { showBookmarkSheet = true },
+                    onLock = { isLocked = true }
+                )
+            } else {
+                PortraitPlayerContent(
+                    state = state, viewModel = viewModel, sharedTransitionScope = sharedTransitionScope,
+                    animatedVisibilityScope = animatedVisibilityScope, from = from, onBack = onBack,
+                    onTransferClick = onTransferClick, onShowHistory = { showHistorySheet = true },
+                    onShowQueue = { showQueueSheet = true }, onShowDetails = { showDetailsSheet = true },
+                    onShowShare = { showShareFileConfirmation = true }, onShowSpeed = { showSpeedSheet = true },
+                    onShowTimer = { showTimerSheet = true }, onShowBookmark = { showBookmarkSheet = true },
+                    onLock = { isLocked = true }
+                )
+            }
+            if (isLocked) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    // Capa de fondo: absorbe todos los toques excepto los que van al botón de encima
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.55f))
+                            .pointerInput(Unit) {
+                                awaitPointerEventScope {
+                                    while (true) {
+                                        awaitPointerEvent(PointerEventPass.Initial)
+                                            .changes.forEach { it.consume() }
+                                    }
+                                }
+                            }
+                    )
+                    // Contenido de desbloqueo: renderizado encima, recibe los eventos primero
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Icon(Icons.Default.Lock, null, Modifier.size(48.dp), tint = Color.White)
+                        Text(stringResource(R.string.screen_locked), color = Color.White, style = MaterialTheme.typography.titleMedium)
+                        OutlinedButton(
+                            onClick = { isLocked = false },
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                            border = BorderStroke(1.dp, Color.White)
+                        ) {
+                            Icon(Icons.Default.LockOpen, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.unlock))
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -116,7 +174,8 @@ fun PlayerScreen(
     if (showHistorySheet) { ModalBottomSheet(onDismissRequest = { showHistorySheet = false }, sheetState = historySheetState) { HistorySelectorContent(history = state.history, onActionSelected = { viewModel.seekTo(it.audioPositionMs); showHistorySheet = false }) } }
     if (showQueueSheet) { ModalBottomSheet(onDismissRequest = { showQueueSheet = false }, sheetState = queueSheetState) { QueueSelectorContent(playlist = state.playlist, currentIndex = state.currentIndex, onItemClicked = { index -> viewModel.skipToQueueItem(index); showQueueSheet = false }, onRemoveItem = { viewModel.removeItemFromQueue(it) }, onShowDetails = { showDetailsSheet = true }) } }
     if (showDetailsSheet && state.currentMusicDetails != null) { ModalBottomSheet(onDismissRequest = { showDetailsSheet = false }, sheetState = detailsSheetState) { BookDetailsContent(book = state.currentMusicDetails!!, allBooks = emptyList(), onEditMetadata = { bookId -> navController.navigate("metadata_editor?bookId=${encodeBookId(bookId)}") }) } }
-    if (showBookmarkSheet) { ModalBottomSheet(onDismissRequest = { showBookmarkSheet = false }, sheetState = bookmarkSheetState) { BookmarkSelectorContent(bookmarks = state.bookmarks, onBookmarkSelected = { viewModel.seekTo(it.position); showBookmarkSheet = false }, onDeleteBookmark = { id -> viewModel.deleteBookmark(id) }) } }
+    if (showBookmarkSheet) { ModalBottomSheet(onDismissRequest = { showBookmarkSheet = false }, sheetState = bookmarkSheetState) { BookmarkSelectorContent(bookmarks = state.bookmarks, onBookmarkSelected = { viewModel.seekTo(it.position); showBookmarkSheet = false }, onDeleteBookmark = { id -> viewModel.deleteBookmark(id) }, onAddBookmark = { bookmarkPositionAtCreation = state.currentPosition; showAddBookmarkDialog = true }) } }
+    if (showAddBookmarkDialog) { AddBookmarkDialog(currentPosition = bookmarkPositionAtCreation, onDismiss = { showAddBookmarkDialog = false }, onConfirm = { note -> viewModel.addBookmark(note, bookmarkPositionAtCreation); showAddBookmarkDialog = false }) }
     if (showShareFileConfirmation) {
         AlertDialog(onDismissRequest = { showShareFileConfirmation = false }, title = { Text(stringResource(R.string.share_file_warning_title)) }, text = { Text(stringResource(R.string.share_file_warning_message)) }, confirmButton = { Button(onClick = { showShareFileConfirmation = false; viewModel.shareFile(context) }) { Text(stringResource(R.string.confirm)) } }, dismissButton = { TextButton(onClick = { showShareFileConfirmation = false }) { Text(stringResource(R.string.cancel)) } })
     }
@@ -124,21 +183,34 @@ fun PlayerScreen(
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit) {
+fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit, onShowBookmark: () -> Unit, onLock: () -> Unit) {
     val currentItem = state.currentMediaItem
+    val context = LocalContext.current
+    val mediaId = currentItem?.mediaId
+    val metadata = remember(mediaId) { mediaId?.let { com.raulburgosmurray.musicplayer.data.MetadataJsonHelper.loadMetadata(context, it) } }
+    val displayTitle = metadata?.title?.takeIf { it.isNotBlank() } ?: currentItem?.mediaMetadata?.title?.toString() ?: "A"
     var pressedArea by remember { mutableStateOf<CoverTapArea?>(null) }
+    var showMoreMenu by remember { mutableStateOf(false) }
     
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp).verticalScroll(rememberScrollState()).statusBarsPadding().navigationBarsPadding()) {
         Spacer(Modifier.height(16.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back_btn)) }
             Row {
+                IconButton(onClick = { viewModel.toggleFavorite() }) { Icon(if (state.isFavorite) Icons.Filled.Favorite else Icons.Default.Favorite, contentDescription = stringResource(R.string.favourites_btn), tint = if (state.isFavorite) Color.Red else LocalContentColor.current) }
                 IconButton(onClick = onShowHistory) { Icon(Icons.Default.History, null) }
                 IconButton(onClick = onShowQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null) }
-                IconButton(onClick = onShowDetails) { Icon(Icons.Default.Info, null) }
-                IconButton(onClick = onShowShare) { Icon(Icons.Default.Share, null) }
-                if (com.raulburgosmurray.musicplayer.FeatureFlags.P2P_TRANSFER) {
-                    IconButton(onClick = { currentItem?.mediaId?.let { onTransferClick(it) } }) { Icon(Icons.Default.Wifi, null) }
+                IconButton(onClick = onShowBookmark) { Icon(Icons.Default.Bookmark, null) }
+                IconButton(onClick = onLock) { Icon(Icons.Default.Lock, null) }
+                Box {
+                    IconButton(onClick = { showMoreMenu = true }) { Icon(Icons.Default.MoreVert, null) }
+                    DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
+                        DropdownMenuItem(text = { Text(stringResource(R.string.book_details)) }, leadingIcon = { Icon(Icons.Default.Info, null) }, onClick = { showMoreMenu = false; onShowDetails() })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.share_btn)) }, leadingIcon = { Icon(Icons.Default.Share, null) }, onClick = { showMoreMenu = false; onShowShare() })
+                        if (com.raulburgosmurray.musicplayer.FeatureFlags.P2P_TRANSFER) {
+                            DropdownMenuItem(text = { Text(stringResource(R.string.send)) }, leadingIcon = { Icon(Icons.Default.Wifi, null) }, onClick = { showMoreMenu = false; currentItem?.mediaId?.let { onTransferClick(it) } })
+                        }
+                    }
                 }
             }
         }
@@ -149,7 +221,7 @@ fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, 
                     AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(currentItem.mediaMetadata.artworkUri).crossfade(true).build(), contentDescription = null, modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${from}_cover_${currentItem.mediaId}"), animatedVisibilityScope = animatedVisibilityScope), contentScale = ContentScale.Crop)
                 } else {
                     Box(modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${from}_cover_${currentItem?.mediaId}"), animatedVisibilityScope = animatedVisibilityScope)) {
-                        BookPlaceholder(title = currentItem?.mediaMetadata?.title?.toString() ?: "A", modifier = Modifier.fillMaxSize())
+                        BookPlaceholder(title = displayTitle, modifier = Modifier.fillMaxSize())
                     }
                 }
             }
@@ -161,7 +233,7 @@ fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, 
                 onAreaReleased = { pressedArea = null },
                 onLeftTap = { viewModel.skipBackward(Constants.SKIP_BACKWARD_MS) },
                 onCenterTap = { viewModel.togglePlayPause() },
-                onRightTap = { viewModel.skipForward(Constants.SKIP_FORWARD_MS) }
+                onRightTap = { viewModel.skipForward(Constants.SKIP_BACKWARD_MS) }
             )
         }
         Spacer(Modifier.height(32.dp))
@@ -172,8 +244,12 @@ fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, 
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun LandscapePlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit) {
+fun LandscapePlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit, onShowBookmark: () -> Unit, onLock: () -> Unit) {
     val currentItem = state.currentMediaItem
+    val context = LocalContext.current
+    val mediaId = currentItem?.mediaId
+    val metadata = remember(mediaId) { mediaId?.let { com.raulburgosmurray.musicplayer.data.MetadataJsonHelper.loadMetadata(context, it) } }
+    val displayTitle = metadata?.title?.takeIf { it.isNotBlank() } ?: currentItem?.mediaMetadata?.title?.toString() ?: "A"
     var pressedArea by remember { mutableStateOf<CoverTapArea?>(null) }
     
     Row(modifier = Modifier.fillMaxSize().padding(16.dp).statusBarsPadding().navigationBarsPadding()) {
@@ -183,7 +259,7 @@ fun LandscapePlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel,
                     AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(currentItem.mediaMetadata.artworkUri).crossfade(true).build(), contentDescription = null, modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${from}_cover_${currentItem.mediaId}"), animatedVisibilityScope = animatedVisibilityScope), contentScale = ContentScale.Crop)
                 } else {
                     Box(modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${from}_cover_${currentItem?.mediaId}"), animatedVisibilityScope = animatedVisibilityScope)) {
-                        BookPlaceholder(title = currentItem?.mediaMetadata?.title?.toString() ?: "A", modifier = Modifier.fillMaxSize())
+                        BookPlaceholder(title = displayTitle, modifier = Modifier.fillMaxSize())
                     }
                 }
             }
@@ -195,15 +271,18 @@ fun LandscapePlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel,
                 onAreaReleased = { pressedArea = null },
                 onLeftTap = { viewModel.skipBackward(Constants.SKIP_BACKWARD_MS) },
                 onCenterTap = { viewModel.togglePlayPause() },
-                onRightTap = { viewModel.skipForward(Constants.SKIP_FORWARD_MS) }
+                onRightTap = { viewModel.skipForward(Constants.SKIP_BACKWARD_MS) }
             )
             IconButton(onClick = onBack, modifier = Modifier.padding(8.dp).background(Color.Black.copy(alpha = 0.3f), CircleShape)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) }
         }
         Spacer(Modifier.width(24.dp))
         Column(modifier = Modifier.weight(1.2f).fillMaxHeight().verticalScroll(rememberScrollState())) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                IconButton(onClick = { viewModel.toggleFavorite() }) { Icon(if (state.isFavorite) Icons.Filled.Favorite else Icons.Default.Favorite, contentDescription = stringResource(R.string.favourites_btn), tint = if (state.isFavorite) Color.Red else LocalContentColor.current) }
                 IconButton(onClick = onShowHistory) { Icon(Icons.Default.History, null) }
                 IconButton(onClick = onShowQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null) }
+                IconButton(onClick = onShowBookmark) { Icon(Icons.Default.Bookmark, null) }
+                IconButton(onClick = onLock) { Icon(Icons.Default.Lock, null) }
                 IconButton(onClick = onShowDetails) { Icon(Icons.Default.Info, null) }
                 IconButton(onClick = onShowShare) { Icon(Icons.Default.Share, null) }
                 if (com.raulburgosmurray.musicplayer.FeatureFlags.P2P_TRANSFER) {
@@ -218,6 +297,11 @@ fun LandscapePlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel,
 @Composable
 fun PlayerControls(state: PlaybackUiState, viewModel: PlaybackViewModel, onShowSpeed: () -> Unit, onShowTimer: () -> Unit) {
     val currentItem = state.currentMediaItem
+    val context = LocalContext.current
+    val mediaId = currentItem?.mediaId
+    val metadata = remember(mediaId) { mediaId?.let { com.raulburgosmurray.musicplayer.data.MetadataJsonHelper.loadMetadata(context, it) } }
+    val displayTitle = metadata?.title?.takeIf { it.isNotBlank() } ?: currentItem?.mediaMetadata?.title?.toString() ?: stringResource(R.string.unknown_title)
+    
     val isPlaying = state.isPlaying
     val progress = if (state.duration > 0) state.currentPosition.toFloat() / state.duration.toFloat() else 0f
     val duration = state.duration
@@ -226,7 +310,7 @@ fun PlayerControls(state: PlaybackUiState, viewModel: PlaybackViewModel, onShowS
     val showUndoButton = state.lastPositionBeforeSeek != null
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text(text = currentItem?.mediaMetadata?.title?.toString() ?: stringResource(R.string.unknown_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(text = displayTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(text = currentMediaItemArtist(currentItem), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
         Spacer(Modifier.height(16.dp))
         Slider(value = progress.coerceIn(0f, 1f), onValueChange = { viewModel.seekTo((it * duration).toLong()) }, modifier = Modifier.fillMaxWidth())
@@ -243,17 +327,15 @@ fun PlayerControls(state: PlaybackUiState, viewModel: PlaybackViewModel, onShowS
                 ) {
                     Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Deshacer", style = MaterialTheme.typography.labelSmall)
+                    Text(stringResource(R.string.undo), style = MaterialTheme.typography.labelSmall)
                 }
             }
         }
         Spacer(Modifier.height(16.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { viewModel.skipBackward(Constants.SKIP_BACKWARD_MS) }) { Icon(painter = painterResource(id = R.drawable.rewind_30), null, modifier = Modifier.size(32.dp)) }
             IconButton(onClick = { viewModel.skipBackward(Constants.SKIP_FORWARD_MS) }) { Icon(Icons.Default.Replay10, null, modifier = Modifier.size(40.dp)) }
             FilledIconButton(onClick = { viewModel.togglePlayPause() }, modifier = Modifier.size(64.dp), shape = RoundedCornerShape(20.dp)) { Icon(if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, null, modifier = Modifier.size(32.dp)) }
             IconButton(onClick = { viewModel.skipForward(Constants.SKIP_FORWARD_MS) }) { Icon(Icons.Default.Forward10, null, modifier = Modifier.size(40.dp)) }
-            IconButton(onClick = { viewModel.skipForward(Constants.SKIP_BACKWARD_MS) }) { Icon(painter = painterResource(id = R.drawable.fast_forward_10), null, modifier = Modifier.size(32.dp)) }
         }
         Spacer(Modifier.height(32.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -336,16 +418,19 @@ fun HistorySelectorContent(history: List<com.raulburgosmurray.musicplayer.Histor
 
 @Composable
 fun QueueSelectorContent(playlist: List<androidx.media3.common.MediaItem>, currentIndex: Int, onItemClicked: (Int) -> Unit, onRemoveItem: (Int) -> Unit, onShowDetails: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     Column(modifier = Modifier.fillMaxWidth().padding(24.dp).padding(bottom = 32.dp)) {
         Text(stringResource(R.string.playback_queue_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(16.dp))
         LazyColumn(modifier = Modifier.weight(1f, false).heightIn(max = 400.dp)) {
             items(playlist.size) { index ->
                 val item = playlist[index]
+                val itemMetadata = remember(item.mediaId) { item.mediaId?.let { com.raulburgosmurray.musicplayer.data.MetadataJsonHelper.loadMetadata(context, it) } }
+                val itemTitle = capitalizeWords(itemMetadata?.title?.takeIf { it.isNotBlank() } ?: item.mediaMetadata.title?.toString() ?: stringResource(R.string.unknown_title))
                 Surface(onClick = { onItemClicked(index) }, color = if (index == currentIndex) MaterialTheme.colorScheme.primaryContainer else Color.Transparent, shape = RoundedCornerShape(12.dp)) {
                     Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("${index + 1}", modifier = Modifier.width(24.dp), style = MaterialTheme.typography.labelSmall)
-                        Column(modifier = Modifier.weight(1f)) { Text(item.mediaMetadata.title?.toString() ?: stringResource(R.string.unknown_title), fontWeight = if (index == currentIndex) FontWeight.Bold else FontWeight.Normal); Text(item.mediaMetadata.artist?.toString() ?: stringResource(R.string.unknown_artist), style = MaterialTheme.typography.bodySmall) }
+                        Column(modifier = Modifier.weight(1f)) { Text(itemTitle, fontWeight = if (index == currentIndex) FontWeight.Bold else FontWeight.Normal); Text(capitalizeWords(item.mediaMetadata.artist?.toString() ?: stringResource(R.string.unknown_artist)), style = MaterialTheme.typography.bodySmall) }
                         IconButton(onClick = { onRemoveItem(index) }) { Icon(Icons.Default.RemoveCircleOutline, null, tint = MaterialTheme.colorScheme.error) }
                     }
                 }
@@ -355,9 +440,12 @@ fun QueueSelectorContent(playlist: List<androidx.media3.common.MediaItem>, curre
 }
 
 @Composable
-fun BookmarkSelectorContent(bookmarks: List<com.raulburgosmurray.musicplayer.data.Bookmark>, onBookmarkSelected: (com.raulburgosmurray.musicplayer.data.Bookmark) -> Unit, onDeleteBookmark: (Int) -> Unit) {
+fun BookmarkSelectorContent(bookmarks: List<com.raulburgosmurray.musicplayer.data.Bookmark>, onBookmarkSelected: (com.raulburgosmurray.musicplayer.data.Bookmark) -> Unit, onDeleteBookmark: (Int) -> Unit, onAddBookmark: () -> Unit) {
     Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
-        Text(stringResource(R.string.manual_bookmarks), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.manual_bookmarks), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            FilledIconButton(onClick = onAddBookmark) { Icon(Icons.Default.Add, null) }
+        }
         Spacer(Modifier.height(16.dp))
         if (bookmarks.isEmpty()) { Text(stringResource(R.string.no_bookmarks_yet), color = MaterialTheme.colorScheme.secondary) }
         else {
@@ -453,7 +541,7 @@ fun CoverTouchControls(
             ) {
                 Icon(
                     painter = painterResource(id = R.drawable.rewind_30),
-                    contentDescription = "Retroceder 30s",
+                    contentDescription = stringResource(R.string.rewind_30s),
                     tint = Color.White.copy(alpha = if (pressedArea == CoverTapArea.LEFT) 1f else 0.5f),
                     modifier = Modifier.size(48.dp)
                 )
@@ -474,7 +562,7 @@ fun CoverTouchControls(
             ) {
                 Icon(
                     imageVector = Icons.Default.PlayArrow,
-                    contentDescription = "Pausar/Reproducir",
+                    contentDescription = stringResource(R.string.pause_play_btn),
                     tint = Color.White.copy(alpha = if (pressedArea == CoverTapArea.CENTER) 1f else 0.5f),
                     modifier = Modifier.size(64.dp)
                 )
@@ -495,7 +583,7 @@ fun CoverTouchControls(
             ) {
                 Icon(
                     painter = painterResource(id = R.drawable.fast_forward_30),
-                    contentDescription = "Adelantar 30s",
+                    contentDescription = stringResource(R.string.fast_forward_30s),
                     tint = Color.White.copy(alpha = if (pressedArea == CoverTapArea.RIGHT) 1f else 0.5f),
                     modifier = Modifier.size(48.dp)
                 )

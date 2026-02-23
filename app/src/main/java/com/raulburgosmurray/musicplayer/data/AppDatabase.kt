@@ -5,7 +5,17 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [AudiobookProgress::class, FavoriteBook::class, Bookmark::class, QueueItem::class, CachedBook::class], version = 9, exportSchema = false)
+@Database(
+    entities = [
+        AudiobookProgress::class,
+        FavoriteBook::class,
+        Bookmark::class,
+        QueueItem::class,
+        CachedBook::class
+    ],
+    version = 10,
+    exportSchema = true
+)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun progressDao(): ProgressDao
     abstract fun favoriteDao(): FavoriteDao
@@ -24,7 +34,8 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "audiobook_database"
                 )
-                .fallbackToDestructiveMigration()
+                .addMigrations(*ALL_MIGRATIONS)
+                .fallbackToDestructiveMigrationOnDowngrade()
                 .build()
                 INSTANCE = instance
                 instance

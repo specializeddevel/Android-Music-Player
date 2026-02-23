@@ -156,4 +156,71 @@
     <string name="theme_system">Sistema</string>
     <string name="theme_light">Claro</string>
     <string name="theme_dark">Oscuro</string>
+    <!-- Claves existentes que faltaban en español -->
+    <string name="scan_all_memory">Escanear Toda la Memoria</string>
+    <string name="scan_all_memory_desc">Escanear todos los archivos de audio del dispositivo</string>
+    <string name="folders_to_scan">Carpetas a Escanear</string>
+    <string name="add_folder">Añadir Carpeta</string>
+    <string name="rescan_folders">Reescanear Carpetas</string>
+    <string name="book_details">Detalles del libro</string>
+    <!-- Bloqueo de pantalla -->
+    <string name="screen_locked">Pantalla bloqueada</string>
+    <string name="unlock">Desbloquear</string>
+    <string name="undo">Deshacer</string>
+    <!-- Controles táctiles de portada -->
+    <string name="rewind_30s">Retroceder 30s</string>
+    <string name="fast_forward_30s">Adelantar 30s</string>
+    <!-- Vista de lista/cuadrícula -->
+    <string name="layout_toggle">Cambiar vista</string>
+    <!-- Carga / estado vacío de biblioteca -->
+    <string name="scanning_progress">Escaneando: %1$d / %2$d archivos</string>
+    <string name="loading_library">Cargando biblioteca…</string>
+    <string name="no_audiobooks">No hay audiolibros</string>
+    <string name="no_audiobooks_in_memory">No se encontraron audiolibros en la memoria</string>
+    <string name="no_audiobooks_in_folder">Agrega archivos de audio a tu carpeta seleccionada para comenzar</string>
+    <string name="scan_memory_btn">Escanear memoria</string>
+    <string name="scan_folders_btn">Escanear carpetas</string>
+    <!-- Panel de detalles del libro -->
+    <string name="files_in_collection">+%1$d archivos en esta colección</string>
+    <string name="edit_metadata">Editar metadatos</string>
+    <string name="detail_file_name">Nombre del archivo</string>
+    <string name="detail_location">Ubicación</string>
+    <string name="detail_size">Tamaño</string>
+    <string name="detail_duration">Duración</string>
+    <string name="detail_format">Formato</string>
+    <string name="detail_series">Serie</string>
+    <string name="detail_year">Año</string>
+    <string name="detail_genre">Género</string>
+    <string name="detail_volume">Nº Volumen</string>
+    <string name="select_explorer">Selecciona un explorador</string>
+    <string name="no_explorer_found">No se encontró un explorador compatible</string>
+    <!-- Editor de metadatos -->
+    <string name="edit_metadata_title">Editar Metadatos</string>
+    <string name="field_title">Título</string>
+    <string name="field_title_placeholder">Título del audiolibro</string>
+    <string name="field_author_label">Autor</string>
+    <string name="field_author_placeholder">Nombre del autor</string>
+    <string name="field_series_placeholder">Nombre de la serie (opcional)</string>
+    <string name="field_comment">Comentario</string>
+    <string name="field_comment_placeholder">Notas adicionales (opcional)</string>
+    <string name="no_genre">Sin género</string>
+    <string name="book_cover">Portada del libro</string>
+    <string name="change_cover">Cambiar portada</string>
+    <string name="add_cover">Añadir portada</string>
+    <string name="metadata_saved">Metadatos guardados</string>
+    <string name="changes_applied">Los cambios se han aplicado correctamente.</string>
+    <string name="accept">Aceptar</string>
+    <!-- Etiquetas del historial de actividad -->
+    <string name="history_pause">Pausa</string>
+    <string name="history_play">Reproducir</string>
+    <string name="history_skip_forward">Adelantar %1$ds</string>
+    <string name="history_skip_backward">Retroceder %1$ds</string>
+    <string name="history_manual_seek">Salto manual</string>
+    <string name="history_undo_seek">Deshacer salto</string>
+    <string name="history_bookmark_added">Marcador añadido</string>
+    <string name="history_timer_finished">Temporizador finalizado</string>
+    <!-- Transferencia -->
+    <string name="ready">Listo</string>
+    <string name="no_wifi">Sin Wi-Fi</string>
+    <string name="detecting">Detectando…</string>
 </resources>
