@@ -28,12 +28,22 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val historyLimit: StateFlow<Int> = _historyLimit.asStateFlow()
 
     private val _libraryRootUris = MutableStateFlow(
-        prefs.getStringSet("library_root_uris", emptySet())?.toList() ?: emptyList()
+        getInitialLibraryRootUris()
     )
     val libraryRootUris: StateFlow<List<String>> = _libraryRootUris.asStateFlow()
 
+    private fun getInitialLibraryRootUris(): List<String> {
+        val isFirstRun = prefs.getBoolean("is_first_run", true)
+        return if (isFirstRun) {
+            prefs.edit().putBoolean("is_first_run", false).apply()
+            emptyList()
+        } else {
+            prefs.getStringSet("library_root_uris", emptySet())?.toList() ?: emptyList()
+        }
+    }
+
     private val _scanAllMemory = MutableStateFlow(
-        prefs.getBoolean("scan_all_memory", false)
+        if (prefs.getBoolean("is_first_run", true)) false else prefs.getBoolean("scan_all_memory", false)
     )
     val scanAllMemory: StateFlow<Boolean> = _scanAllMemory.asStateFlow()
 

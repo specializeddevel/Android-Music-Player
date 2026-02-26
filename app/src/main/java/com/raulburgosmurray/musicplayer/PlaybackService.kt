@@ -217,6 +217,12 @@ class PlaybackService : MediaSessionService() {
             try {
                 val currentProgress = database.progressDao().getProgress(currentMediaItem.mediaId)
                 val pauseToSave = if (isPausing) newPauseTimestamp else (currentProgress?.lastPauseTimestamp ?: 0L)
+                
+                // Auto-mark as read when progress reaches 99% or more
+                val progressPercent = if (duration > 0) position.toFloat() / duration.toFloat() else 0f
+                val shouldMarkAsRead = progressPercent >= 0.99f
+                val currentIsRead = currentProgress?.isRead ?: false
+                val finalIsRead = currentIsRead || shouldMarkAsRead
 
                 database.progressDao().saveProgress(
                     AudiobookProgress(
@@ -224,7 +230,8 @@ class PlaybackService : MediaSessionService() {
                         lastPosition = position, 
                         duration = duration,
                         lastPauseTimestamp = pauseToSave,
-                        playbackSpeed = speed
+                        playbackSpeed = speed,
+                        isRead = finalIsRead
                     )
                 )
                 

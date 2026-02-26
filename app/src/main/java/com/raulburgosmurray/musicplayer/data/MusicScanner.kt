@@ -20,6 +20,26 @@ class MusicScanner(
 ) {
     private val extensions = setOf("mp3", "m4a", "m4b", "aac", "wav", "ogg", "flac")
 
+    /**
+     * Check if the file path belongs to a messaging/voice recording app that should be excluded
+     */
+    private fun isExcludedPath(path: String): Boolean {
+        val lowerPath = path.lowercase()
+        return Constants.EXCLUDED_AUDIO_PATHS.any { excluded ->
+            lowerPath.contains(excluded.lowercase())
+        }
+    }
+
+    /**
+     * Check if the audio file should be included based on size and duration
+     * Audiobooks are typically larger than voice messages
+     */
+    private fun isLikelyAudiobook(sizeBytes: Long, durationMs: Long): Boolean {
+        // Must meet minimum duration (already checked in query)
+        // Additional size check: audiobooks are usually > 5MB
+        return sizeBytes >= Constants.MIN_AUDIOBOOK_SIZE_BYTES
+    }
+
     suspend fun scanDirectory(context: Context, directory: DocumentFile, onProgress: (Int, Int) -> Unit): List<Music> = withContext(Dispatchers.IO) {
         val musicList = ConcurrentHashMap<String, Music>()
         
@@ -32,6 +52,19 @@ class MusicScanner(
                 async {
                     try {
                         val id = file.uri.toString()
+                        val fileSize = file.length()
+                        val fileName = file.name ?: ""
+
+                        // Filter out files from messaging apps
+                        if (isExcludedPath(fileName)) {
+                            return@async
+                        }
+
+                        // Filter by minimum size (audiobooks are typically > 5MB)
+                        if (!isLikelyAudiobook(fileSize, 0)) {
+                            return@async
+                        }
+
                         val existingMetadata = metadataJsonHelper.loadMetadata(context, id)
                         val freshMetadata = metadataHelper.extractMetadataFromDocumentFile(context, file, directory.name)
 
@@ -50,7 +83,7 @@ class MusicScanner(
                                 duration = finalMetadata.duration,
                                 path = id,
                                 artUri = finalMetadata.artUri,
-                                fileSize = file.length(),
+                                fileSize = fileSize,
                                 fileName = finalMetadata.fileName
                             )
                             musicList[id] = music
@@ -84,7 +117,8 @@ class MusicScanner(
             MediaStore.Audio.Media.ARTIST,
             MediaStore.Audio.Media.DURATION,
             MediaStore.Audio.Media.SIZE,
-            MediaStore.Audio.Media.DISPLAY_NAME
+            MediaStore.Audio.Media.DISPLAY_NAME,
+            MediaStore.Audio.Media.DATA
         )
 
         context.contentResolver.query(
@@ -98,6 +132,19 @@ class MusicScanner(
                 val idLong = cursor.getLong(0)
                 val contentUri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, idLong)
                 val id = contentUri.toString()
+
+                val fileSize = cursor.getLong(5)
+                val filePath = cursor.getString(7) ?: ""
+
+                // Filter out files from messaging apps
+                if (isExcludedPath(filePath)) {
+                    continue
+                }
+
+                // Filter by minimum size (audiobooks are typically > 5MB)
+                if (!isLikelyAudiobook(fileSize, 0)) {
+                    continue
+                }
 
                 val existingMetadata = metadataJsonHelper.loadMetadata(context, id)
                 val freshMetadata = metadataHelper.extractMetadataFromUri(context, contentUri, cursor.getString(6) ?: "")
@@ -117,7 +164,7 @@ class MusicScanner(
                         duration = finalMetadata.duration,
                         path = id,
                         artUri = finalMetadata.artUri,
-                        fileSize = cursor.getLong(5),
+                        fileSize = fileSize,
                         fileName = cursor.getString(6) ?: ""
                     )
                     tempList.add(music)

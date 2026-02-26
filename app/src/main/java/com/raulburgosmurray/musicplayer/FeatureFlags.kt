@@ -18,4 +18,27 @@ object Constants {
     const val TRANSFER_SERVER_PORT = 50001
     const val STATEFLOW_STOP_TIMEOUT_MS = 5000L
     const val VIBRATION_DURATION_MS = 500L
+    // Audiobook filtering
+    const val MIN_AUDIOBOOK_SIZE_BYTES = 5L * 1024 * 1024 // 5 MB minimum
+    val EXCLUDED_AUDIO_PATHS = listOf(
+        "WhatsApp",
+        "Telegram",
+        "Signal",
+        "Discord",
+        "Messenger",
+        "Slack",
+        "Skype",
+        "Viber",
+        "WeChat",
+        "Line",
+        "Snapchat",
+        "Instagram",
+        "Facebook",
+        "抖音",  // Douyin
+        "快手",  // Kuaishou
+        "voice recorder",
+        "Voice Recorder",
+        "recording",
+        "Recording"
+    )
 }

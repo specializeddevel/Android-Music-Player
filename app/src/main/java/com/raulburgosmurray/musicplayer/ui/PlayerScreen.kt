@@ -201,15 +201,14 @@ fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, 
                 IconButton(onClick = onShowHistory) { Icon(Icons.Default.History, null) }
                 IconButton(onClick = onShowQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null) }
                 IconButton(onClick = onShowBookmark) { Icon(Icons.Default.Bookmark, null) }
-                IconButton(onClick = onLock) { Icon(Icons.Default.Lock, null) }
-                Box {
-                    IconButton(onClick = { showMoreMenu = true }) { Icon(Icons.Default.MoreVert, null) }
-                    DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
-                        DropdownMenuItem(text = { Text(stringResource(R.string.book_details)) }, leadingIcon = { Icon(Icons.Default.Info, null) }, onClick = { showMoreMenu = false; onShowDetails() })
-                        DropdownMenuItem(text = { Text(stringResource(R.string.share_btn)) }, leadingIcon = { Icon(Icons.Default.Share, null) }, onClick = { showMoreMenu = false; onShowShare() })
-                        if (com.raulburgosmurray.musicplayer.FeatureFlags.P2P_TRANSFER) {
-                            DropdownMenuItem(text = { Text(stringResource(R.string.send)) }, leadingIcon = { Icon(Icons.Default.Wifi, null) }, onClick = { showMoreMenu = false; currentItem?.mediaId?.let { onTransferClick(it) } })
-                        }
+                IconButton(onClick = {
+                    showMoreMenu = true
+                }) { Icon(Icons.Default.MoreVert, null) }
+                DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
+                    DropdownMenuItem(text = { Text(stringResource(R.string.book_details)) }, leadingIcon = { Icon(Icons.Default.Info, null) }, onClick = { showMoreMenu = false; onShowDetails() })
+                    DropdownMenuItem(text = { Text(stringResource(R.string.share_btn)) }, leadingIcon = { Icon(Icons.Default.Share, null) }, onClick = { showMoreMenu = false; onShowShare() })
+                    if (com.raulburgosmurray.musicplayer.FeatureFlags.P2P_TRANSFER) {
+                        DropdownMenuItem(text = { Text(stringResource(R.string.send)) }, leadingIcon = { Icon(Icons.Default.Wifi, null) }, onClick = { showMoreMenu = false; currentItem?.mediaId?.let { onTransferClick(it) } })
                     }
                 }
             }
@@ -217,9 +216,17 @@ fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, 
         Spacer(Modifier.height(24.dp))
         Box(modifier = Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(32.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
             with(sharedTransitionScope) {
-                if (currentItem?.mediaMetadata?.artworkUri != null) {
-                    AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(currentItem.mediaMetadata.artworkUri).crossfade(true).build(), contentDescription = null, modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${from}_cover_${currentItem.mediaId}"), animatedVisibilityScope = animatedVisibilityScope), contentScale = ContentScale.Crop)
-                } else {
+                var imageLoadError by remember { mutableStateOf(false) }
+                val artworkUri = currentItem?.mediaMetadata?.artworkUri?.toString()
+                if (!artworkUri.isNullOrBlank() && !imageLoadError) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current).data(artworkUri).crossfade(true).listener(onError = { _, _ -> imageLoadError = true }).build(),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${from}_cover_${currentItem?.mediaId}"), animatedVisibilityScope = animatedVisibilityScope),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+                if (artworkUri.isNullOrBlank() || imageLoadError) {
                     Box(modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${from}_cover_${currentItem?.mediaId}"), animatedVisibilityScope = animatedVisibilityScope)) {
                         BookPlaceholder(title = displayTitle, modifier = Modifier.fillMaxSize())
                     }
@@ -255,9 +262,17 @@ fun LandscapePlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel,
     Row(modifier = Modifier.fillMaxSize().padding(16.dp).statusBarsPadding().navigationBarsPadding()) {
         Box(modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(24.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
             with(sharedTransitionScope) {
-                if (currentItem?.mediaMetadata?.artworkUri != null) {
-                    AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(currentItem.mediaMetadata.artworkUri).crossfade(true).build(), contentDescription = null, modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${from}_cover_${currentItem.mediaId}"), animatedVisibilityScope = animatedVisibilityScope), contentScale = ContentScale.Crop)
-                } else {
+                var imageLoadError by remember { mutableStateOf(false) }
+                val artworkUri = currentItem?.mediaMetadata?.artworkUri?.toString()
+                if (!artworkUri.isNullOrBlank() && !imageLoadError) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current).data(artworkUri).crossfade(true).listener(onError = { _, _ -> imageLoadError = true }).build(),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${from}_cover_${currentItem?.mediaId}"), animatedVisibilityScope = animatedVisibilityScope),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+                if (artworkUri.isNullOrBlank() || imageLoadError) {
                     Box(modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${from}_cover_${currentItem?.mediaId}"), animatedVisibilityScope = animatedVisibilityScope)) {
                         BookPlaceholder(title = displayTitle, modifier = Modifier.fillMaxSize())
                     }

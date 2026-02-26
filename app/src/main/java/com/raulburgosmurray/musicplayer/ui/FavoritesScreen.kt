@@ -16,13 +16,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.documentfile.provider.DocumentFile
 import com.raulburgosmurray.musicplayer.Music
-
-import androidx.compose.ui.res.stringResource
 import com.raulburgosmurray.musicplayer.R
 import com.raulburgosmurray.musicplayer.encodeBookId
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
@@ -38,13 +40,19 @@ fun FavoritesScreen(
 ) {
     val favoriteBooks by mainViewModel.favoriteBooks.collectAsState()
     val bookProgress by mainViewModel.bookProgress.collectAsState()
+    val bookReadStatus by mainViewModel.bookReadStatus.collectAsState()
     val playbackState by playbackViewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val readStatusSet = remember(bookReadStatus) { bookReadStatus.filter { it.value }.keys }
 
     var selectedBookForDetails by remember { mutableStateOf<Music?>(null) }
     val detailsSheetState = rememberModalBottomSheetState()
     var showDetailsSheet by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text(stringResource(R.string.my_favorites), fontWeight = FontWeight.Bold) },
@@ -99,6 +107,7 @@ fun FavoritesScreen(
                         BookListItem(
                             book = book,
                             isFavorite = true,
+                            isRead = readStatusSet.contains(book.id),
                             progress = bookProgress[book.id] ?: 0f,
                             keyPrefix = "fav",
                             animatedVisibilityScope = animatedVisibilityScope,
@@ -116,11 +125,44 @@ fun FavoritesScreen(
     }
 
 if (showDetailsSheet && selectedBookForDetails != null) {
+        val currentBook = selectedBookForDetails!!
+        val isBookRead = readStatusSet.contains(currentBook.id)
         ModalBottomSheet(
             onDismissRequest = { showDetailsSheet = false },
             sheetState = detailsSheetState
         ) {
-            BookDetailsContent(book = selectedBookForDetails!!, allBooks = favoriteBooks, onEditMetadata = { bookId -> navController.navigate("metadata_editor?bookId=${encodeBookId(bookId)}") })
+            BookDetailsContent(
+                book = currentBook,
+                allBooks = favoriteBooks,
+                onEditMetadata = { bookId -> navController.navigate("metadata_editor?bookId=${encodeBookId(bookId)}") },
+                isRead = isBookRead,
+                onToggleRead = { mainViewModel.toggleReadStatus(currentBook.id) },
+                onDelete = {
+                    val bookToDelete = selectedBookForDetails!!
+                    scope.launch {
+                        val deleted = try {
+                            if (bookToDelete.path.startsWith("content://")) {
+                                val uri = Uri.parse(bookToDelete.path)
+                                val documentFile = DocumentFile.fromSingleUri(context, uri)
+                                documentFile?.delete() == true
+                            } else {
+                                val file = java.io.File(bookToDelete.path)
+                                file.delete()
+                            }
+                        } catch (e: Exception) {
+                            false
+                        }
+                        showDetailsSheet = false
+                        if (deleted) {
+                            snackbarHostState.showSnackbar(message = context.getString(R.string.delete_success), duration = SnackbarDuration.Short)
+                            // Reload books to refresh the list
+                            mainViewModel.loadBooks(emptyList(), true)
+                        } else {
+                            snackbarHostState.showSnackbar(message = context.getString(R.string.delete_error), duration = SnackbarDuration.Short)
+                        }
+                    }
+                }
+            )
         }
     }
 }

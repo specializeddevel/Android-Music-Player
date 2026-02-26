@@ -13,6 +13,20 @@ import java.io.FileOutputStream
 private const val TAG = "MetadataHelper"
 
 object MetadataHelper {
+    fun isArtUriValid(context: Context, artUri: String?): Boolean {
+        if (artUri == null) return false
+        return try {
+            if (artUri.startsWith("file://")) {
+                val file = File(artUri.removePrefix("file://"))
+                file.exists()
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     private val PREDEFINED_GENRES = listOf(
         "Terror", "Fiction", "Fantasy", "Science Fiction", "Mystery",
         "Thriller", "Romance", "Biography", "History", "Self-Help",
