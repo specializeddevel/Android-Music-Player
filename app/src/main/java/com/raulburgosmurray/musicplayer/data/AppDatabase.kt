@@ -13,7 +13,7 @@ import androidx.room.RoomDatabase
         QueueItem::class,
         CachedBook::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -34,8 +34,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "audiobook_database"
                 )
-                .addMigrations(*ALL_MIGRATIONS)
-                .fallbackToDestructiveMigrationOnDowngrade()
+                .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance
                 instance
