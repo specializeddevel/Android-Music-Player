@@ -21,4 +21,10 @@ interface ProgressDao {
 
     @Query("SELECT * FROM audiobook_progress")
     fun getAllProgressFlow(): kotlinx.coroutines.flow.Flow<List<AudiobookProgress>>
+
+    @Query("SELECT * FROM audiobook_progress WHERE isRead = 1")
+    fun getReadBooksFlow(): kotlinx.coroutines.flow.Flow<List<AudiobookProgress>>
+
+    @Query("UPDATE audiobook_progress SET isRead = :isRead, lastUpdated = :timestamp WHERE mediaId = :mediaId")
+    suspend fun updateReadStatus(mediaId: String, isRead: Boolean, timestamp: Long = System.currentTimeMillis())
 }

@@ -18,4 +18,28 @@ class ProgressRepository(private val progressDao: ProgressDao) {
 
     fun getAllProgressFlow(): Flow<List<AudiobookProgress>> = 
         progressDao.getAllProgressFlow()
+
+    fun getReadBooksFlow(): Flow<List<AudiobookProgress>> =
+        progressDao.getReadBooksFlow()
+
+    suspend fun setReadStatus(mediaId: String, isRead: Boolean) {
+        val existing = progressDao.getProgress(mediaId)
+        if (existing != null) {
+            progressDao.updateReadStatus(mediaId, isRead)
+            // If marking as unread, reset progress to zero
+            if (!isRead && existing.lastPosition > 0) {
+                progressDao.saveProgress(existing.copy(lastPosition = 0L, lastUpdated = System.currentTimeMillis()))
+            }
+        } else {
+            // Create new progress entry with isRead flag
+            progressDao.saveProgress(
+                AudiobookProgress(
+                    mediaId = mediaId,
+                    lastPosition = 0L,
+                    duration = 0L,
+                    isRead = isRead
+                )
+            )
+        }
+    }
 }

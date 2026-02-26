@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Litera</string>
     <string name="shuffle_btn">Aleatorio</string>
@@ -223,4 +223,20 @@
     <string name="ready">Listo</string>
     <string name="no_wifi">Sin Wi-Fi</string>
     <string name="detecting">Detectando…</string>
+    <!-- Conteo de audiolibros -->
+    <string name="audiobook_count_singular">audiolibro</string>
+    <string name="audiobook_count_plural">audiolibros</string>
+    <!-- Eliminar -->
+    <string name="delete_book">Eliminar</string>
+    <string name="delete_confirmation_title">¿Eliminar audiolibro?</string>
+    <string name="delete_confirmation_message">Esto eliminará permanentemente \"%1$s\" de tu dispositivo. Esta acción no se puede deshacer.</string>
+    <string name="delete_success">Audiolibro eliminado</string>
+    <string name="delete_error">Error al eliminar el audiolibro</string>
+    <!-- Estado de lectura -->
+    <string name="mark_as_read">Marcar como leído</string>
+    <string name="mark_as_unread">Marcar como no leído</string>
+    <string name="filter_all">Todos</string>
+    <string name="filter_completed">Completados</string>
+    <string name="filter_in_progress">En progreso</string>
+    <string name="filter">Filtrar</string>
 </resources>

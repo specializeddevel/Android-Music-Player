@@ -48,6 +48,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.raulburgosmurray.musicplayer.data.MetadataHelper
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
@@ -61,6 +62,8 @@ import com.raulburgosmurray.musicplayer.ui.PlaybackUiState
 import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
 
+import androidx.documentfile.provider.DocumentFile
+
 private fun capitalizeWords(text: String): String {
     return text
         .replace(Regex("\\.[a-zA-Z0-9]{2,4}$"), "")
@@ -69,6 +72,25 @@ private fun capitalizeWords(text: String): String {
         .split(" ")
         .filter { it.isNotEmpty() }
         .joinToString(" ") { word -> word.lowercase().replaceFirstChar { it.titlecase() } }
+}
+
+private fun deleteAudioFile(context: android.content.Context, path: String): Boolean {
+    return try {
+        if (path.startsWith("content://")) {
+            val uri = android.net.Uri.parse(path)
+            val documentFile = DocumentFile.fromSingleUri(context, uri)
+            documentFile?.delete() == true
+        } else if (path.startsWith("file://")) {
+            val file = java.io.File(android.net.Uri.parse(path).path ?: return false)
+            file.delete()
+        } else {
+            val file = java.io.File(path)
+            file.delete()
+        }
+    } catch (e: Exception) {
+        android.util.Log.e("MainScreen", "Error deleting file: $path", e)
+        false
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.animation.ExperimentalSharedTransitionApi::class)
@@ -89,6 +111,7 @@ fun MainScreen(
     val books by mainViewModel.books.collectAsState()
     val favoriteIds by mainViewModel.favoriteIds.collectAsState()
     val bookProgress by mainViewModel.bookProgress.collectAsState()
+    val bookReadStatus by mainViewModel.bookReadStatus.collectAsState()
     val isLoading by mainViewModel.isLoading.collectAsState()
     val scanProgress by mainViewModel.scanProgress.collectAsState()
     val playbackState by playbackViewModel.uiState.collectAsState()
@@ -122,6 +145,7 @@ fun MainScreen(
     }
 
     val favoriteIdsSet = remember(favoriteIds) { favoriteIds.toSet() }
+    val readStatusSet = remember(bookReadStatus) { bookReadStatus.filter { it.value }.keys }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -139,12 +163,38 @@ fun MainScreen(
                     }) { Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.open)) }
                     IconButton(onClick = { settingsViewModel.setLayoutMode(if (layoutMode == LayoutMode.LIST) LayoutMode.GRID else LayoutMode.LIST) }) { Icon(if (layoutMode == LayoutMode.LIST) Icons.Default.GridView else Icons.AutoMirrored.Filled.ViewList, contentDescription = stringResource(R.string.layout_toggle)) }
                     Box {
-                        IconButton(onClick = { showSortMenu = true }) { Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = stringResource(R.string.sort_title)) }
+                        val currentFilter = mainViewModel.bookFilter.collectAsState().value
+                        val hasActiveFilter = currentFilter != com.raulburgosmurray.musicplayer.ui.BookFilter.ALL
+                        IconButton(onClick = { showSortMenu = true }) { 
+                            Icon(
+                                Icons.Default.Sort, 
+                                contentDescription = stringResource(R.string.sort_title),
+                                tint = if (hasActiveFilter) MaterialTheme.colorScheme.primary else LocalContentColor.current
+                            ) 
+                        }
                         DropdownMenu(expanded = showSortMenu, onDismissRequest = { showSortMenu = false }) {
+                            // Sort section
+                            Text(
+                                stringResource(R.string.sort_title),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            )
                             DropdownMenuItem(text = { Text(stringResource(R.string.sort_title)) }, leadingIcon = { if (currentSortOrder == SortOrder.TITLE) Icon(Icons.Default.Check, null) }, onClick = { settingsViewModel.setSortOrder(SortOrder.TITLE); showSortMenu = false })
                             DropdownMenuItem(text = { Text(stringResource(R.string.sort_artist)) }, leadingIcon = { if (currentSortOrder == SortOrder.ARTIST) Icon(Icons.Default.Check, null) }, onClick = { settingsViewModel.setSortOrder(SortOrder.ARTIST); showSortMenu = false })
                             DropdownMenuItem(text = { Text(stringResource(R.string.sort_progress)) }, leadingIcon = { if (currentSortOrder == SortOrder.PROGRESS) Icon(Icons.Default.Check, null) }, onClick = { settingsViewModel.setSortOrder(SortOrder.PROGRESS); showSortMenu = false })
                             DropdownMenuItem(text = { Text(stringResource(R.string.sort_recent)) }, leadingIcon = { if (currentSortOrder == SortOrder.RECENT) Icon(Icons.Default.Check, null) }, onClick = { settingsViewModel.setSortOrder(SortOrder.RECENT); showSortMenu = false })
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                            // Filter section
+                            Text(
+                                stringResource(R.string.filter),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            )
+                            DropdownMenuItem(text = { Text(stringResource(R.string.filter_all)) }, leadingIcon = { if (currentFilter == com.raulburgosmurray.musicplayer.ui.BookFilter.ALL) Icon(Icons.Default.Check, null) }, onClick = { mainViewModel.setFilter(com.raulburgosmurray.musicplayer.ui.BookFilter.ALL); showSortMenu = false })
+                            DropdownMenuItem(text = { Text(stringResource(R.string.filter_completed)) }, leadingIcon = { if (currentFilter == com.raulburgosmurray.musicplayer.ui.BookFilter.COMPLETED) Icon(Icons.Default.Check, null) }, onClick = { mainViewModel.setFilter(com.raulburgosmurray.musicplayer.ui.BookFilter.COMPLETED); showSortMenu = false })
+                            DropdownMenuItem(text = { Text(stringResource(R.string.filter_in_progress)) }, leadingIcon = { if (currentFilter == com.raulburgosmurray.musicplayer.ui.BookFilter.IN_PROGRESS) Icon(Icons.Default.Check, null) }, onClick = { mainViewModel.setFilter(com.raulburgosmurray.musicplayer.ui.BookFilter.IN_PROGRESS); showSortMenu = false })
                         }
                     }
                     IconButton(onClick = onFavoritesClick) { Icon(Icons.Default.Favorite, contentDescription = stringResource(R.string.favourites_btn), tint = if (favoriteIds.isNotEmpty()) androidx.compose.ui.graphics.Color.Red else LocalContentColor.current) }
@@ -221,7 +271,7 @@ fun MainScreen(
                             items(
                                 items = displayedBooks,
                                 key = { it.id }
-                            ) { book -> with(sharedTransitionScope) { BookListItem(book = book, isFavorite = favoriteIdsSet.contains(book.id), progress = bookProgress[book.id] ?: 0f, animatedVisibilityScope = animatedVisibilityScope, onAddToQueue = { playbackViewModel.addToQueue(book); scope.launch { snackbarHostState.showSnackbar(message = context.getString(R.string.added_to_queue, capitalizeWords(book.title)), duration = SnackbarDuration.Short) } }, onLongClick = { selectedBookForDetails = book; showDetailsSheet = true }, onClick = { onBookClick(book) }) } }
+                            ) { book -> with(sharedTransitionScope) { BookListItem(book = book, isFavorite = favoriteIdsSet.contains(book.id), isRead = readStatusSet.contains(book.id), progress = bookProgress[book.id] ?: 0f, animatedVisibilityScope = animatedVisibilityScope, onAddToQueue = { playbackViewModel.addToQueue(book); scope.launch { snackbarHostState.showSnackbar(message = context.getString(R.string.added_to_queue, capitalizeWords(book.title)), duration = SnackbarDuration.Short) } }, onLongClick = { selectedBookForDetails = book; showDetailsSheet = true }, onClick = { onBookClick(book) }) } }
                         }
                     } else {
                         // AJUSTE DINÁMICO DE COLUMNAS: Solo 4 si es tableta Y horizontal. En móvil horizontal 3.
@@ -235,7 +285,7 @@ fun MainScreen(
                             items(
                                 items = displayedBooks,
                                 key = { it.id }
-                            ) { book -> with(sharedTransitionScope) { BookGridItem(book = book, isFavorite = favoriteIdsSet.contains(book.id), progress = bookProgress[book.id] ?: 0f, animatedVisibilityScope = animatedVisibilityScope, onAddToQueue = { playbackViewModel.addToQueue(book); scope.launch { snackbarHostState.showSnackbar(message = context.getString(R.string.added_to_queue, capitalizeWords(book.title)), duration = SnackbarDuration.Short) } }, onLongClick = { selectedBookForDetails = book; showDetailsSheet = true }, onClick = { onBookClick(book) }) } }
+                            ) { book -> with(sharedTransitionScope) { BookGridItem(book = book, isFavorite = favoriteIdsSet.contains(book.id), isRead = readStatusSet.contains(book.id), progress = bookProgress[book.id] ?: 0f, animatedVisibilityScope = animatedVisibilityScope, onAddToQueue = { playbackViewModel.addToQueue(book); scope.launch { snackbarHostState.showSnackbar(message = context.getString(R.string.added_to_queue, capitalizeWords(book.title)), duration = SnackbarDuration.Short) } }, onLongClick = { selectedBookForDetails = book; showDetailsSheet = true }, onClick = { onBookClick(book) }) } }
                         }
                     }
                 }
@@ -248,20 +298,81 @@ fun MainScreen(
             }
         }
     }
-    if (showDetailsSheet && selectedBookForDetails != null) { ModalBottomSheet(onDismissRequest = { showDetailsSheet = false }, sheetState = detailsSheetState) { BookDetailsContent(book = selectedBookForDetails!!, allBooks = books, onEditMetadata = { bookId -> navController.navigate("metadata_editor?bookId=${encodeBookId(bookId)}") }) } }
+    if (showDetailsSheet && selectedBookForDetails != null) { 
+        val currentBook = selectedBookForDetails!!
+        val isBookRead = readStatusSet.contains(currentBook.id)
+        ModalBottomSheet(onDismissRequest = { showDetailsSheet = false }, sheetState = detailsSheetState) { 
+            BookDetailsContent(
+                book = currentBook, 
+                allBooks = books, 
+                onEditMetadata = { bookId -> navController.navigate("metadata_editor?bookId=${encodeBookId(bookId)}") },
+                isRead = isBookRead,
+                onToggleRead = { mainViewModel.toggleReadStatus(currentBook.id) },
+                onDelete = {
+                    val bookToDelete = selectedBookForDetails!!
+                    scope.launch {
+                        val deleted = deleteAudioFile(context, bookToDelete.path)
+                        showDetailsSheet = false
+                        if (deleted) {
+                            snackbarHostState.showSnackbar(message = context.getString(R.string.delete_success), duration = SnackbarDuration.Short)
+                            val uris = settingsViewModel.libraryRootUris.value
+                            val scanAll = settingsViewModel.scanAllMemory.value
+                            mainViewModel.loadBooks(if (scanAll) emptyList() else uris, scanAll)
+                        } else {
+                            snackbarHostState.showSnackbar(message = context.getString(R.string.delete_error), duration = SnackbarDuration.Short)
+                        }
+                    }
+                }
+            ) 
+        } 
+    }
 }
 
 @Composable
-fun BookDetailsContent(book: Music, allBooks: List<Music> = emptyList(), onEditMetadata: (String) -> Unit = {}) {
+fun BookDetailsContent(
+    book: Music,
+    allBooks: List<Music> = emptyList(),
+    onEditMetadata: (String) -> Unit = {},
+    isRead: Boolean = false,
+    onToggleRead: (() -> Unit)? = null,
+    onDelete: (() -> Unit)? = null
+) {
     val siblingCount = allBooks.count { it.album == book.album && it.id != book.id }
     val context = LocalContext.current
     val metadata = remember { com.raulburgosmurray.musicplayer.data.MetadataJsonHelper.loadMetadata(context, book.id) }
     val rawTitle = metadata?.title?.takeIf { it.isNotBlank() } ?: book.title
     val displayTitle = capitalizeWords(rawTitle)
     val displayArtist = capitalizeWords(book.artist)
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text(stringResource(R.string.delete_confirmation_title)) },
+            text = { Text(stringResource(R.string.delete_confirmation_message, displayTitle)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteDialog = false
+                        onDelete?.invoke()
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text(stringResource(R.string.delete_book))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+    
     Column(modifier = Modifier.fillMaxWidth().padding(24.dp).padding(bottom = 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        val context = LocalContext.current
         Surface(modifier = Modifier.size(120.dp), shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
-            if (book.artUri != null) AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(book.artUri).crossfade(true).build(), contentDescription = null, contentScale = ContentScale.Crop)
+            if (MetadataHelper.isArtUriValid(context, book.artUri)) AsyncImage(model = ImageRequest.Builder(context).data(book.artUri).crossfade(true).build(), contentDescription = null, contentScale = ContentScale.Crop)
             else BookPlaceholder(title = displayTitle, modifier = Modifier.fillMaxSize())
         }
         Spacer(Modifier.height(16.dp))
@@ -272,6 +383,38 @@ fun BookDetailsContent(book: Music, allBooks: List<Music> = emptyList(), onEditM
         Button(onClick = { openFolder(context, book.path) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer), shape = RoundedCornerShape(16.dp)) { Icon(Icons.AutoMirrored.Filled.OpenInNew, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.view_in_folder)) }
         Spacer(Modifier.height(8.dp))
         Button(onClick = { onEditMetadata(book.id) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer), shape = RoundedCornerShape(16.dp)) { Icon(Icons.Default.Edit, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.edit_metadata)) }
+        if (onToggleRead != null) {
+            Spacer(Modifier.height(8.dp))
+            Button(
+                onClick = { onToggleRead.invoke() },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isRead) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = if (isRead) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSecondaryContainer
+                ),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Icon(if (isRead) Icons.Default.CheckCircle else Icons.Default.CheckCircleOutline, null)
+                Spacer(Modifier.width(8.dp))
+                Text(if (isRead) stringResource(R.string.mark_as_unread) else stringResource(R.string.mark_as_read))
+            }
+        }
+        if (onDelete != null) {
+            Spacer(Modifier.height(8.dp))
+            Button(
+                onClick = { showDeleteDialog = true },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                ),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Icon(Icons.Default.Delete, null)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.delete_book))
+            }
+        }
         Spacer(Modifier.height(16.dp))
         Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -322,17 +465,18 @@ fun openFolder(context: android.content.Context, path: String) {
 
 @OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun androidx.compose.animation.SharedTransitionScope.BookGridItem(book: Music, isFavorite: Boolean, progress: Float, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, keyPrefix: String = "grid", onAddToQueue: () -> Unit, onLongClick: () -> Unit, onClick: () -> Unit) {
+fun androidx.compose.animation.SharedTransitionScope.BookGridItem(book: Music, isFavorite: Boolean, isRead: Boolean, progress: Float, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, keyPrefix: String = "grid", onAddToQueue: () -> Unit, onLongClick: () -> Unit, onClick: () -> Unit) {
     val context = LocalContext.current
     val metadata = remember { com.raulburgosmurray.musicplayer.data.MetadataJsonHelper.loadMetadata(context, book.id) }
     val rawTitle = metadata?.title?.takeIf { it.isNotBlank() } ?: book.title
     val displayTitle = capitalizeWords(rawTitle)
     val displayArtist = capitalizeWords(book.artist)
     
-    Card(modifier = Modifier.fillMaxWidth().height(240.dp).combinedClickable(onClick = onClick, onLongClick = onLongClick), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
+    Card(modifier = Modifier.fillMaxWidth().height(240.dp).combinedClickable(onClick = onClick, onLongClick = onLongClick), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isRead) 0.3f else 0.5f))) {
+        val context = LocalContext.current
         Box(modifier = Modifier.fillMaxSize()) {
-            Surface(modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${keyPrefix}_cover_${book.id}"), animatedVisibilityScope = animatedVisibilityScope), color = MaterialTheme.colorScheme.surface) {
-                if (book.artUri != null) AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(book.artUri).crossfade(true).placeholder(R.drawable.ic_audiobook_cover).build(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            Surface(modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${keyPrefix}_cover_${book.id}"), animatedVisibilityScope = animatedVisibilityScope), color = MaterialTheme.colorScheme.surface.copy(alpha = if (isRead) 0.7f else 1f)) {
+                if (MetadataHelper.isArtUriValid(context, book.artUri)) AsyncImage(model = ImageRequest.Builder(context).data(book.artUri).crossfade(true).placeholder(R.drawable.ic_audiobook_cover).build(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                 else BookPlaceholder(title = displayTitle, modifier = Modifier.fillMaxSize())
             }
             Surface(modifier = Modifier.fillMaxWidth().align(Alignment.BottomCenter), color = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.6f)) {
@@ -351,6 +495,7 @@ fun androidx.compose.animation.SharedTransitionScope.BookGridItem(book: Music, i
             }
             IconButton(onClick = onAddToQueue, modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(32.dp).background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.4f), RoundedCornerShape(12.dp))) { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = null, tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(18.dp)) }
             if (isFavorite) Icon(Icons.Default.Favorite, contentDescription = null, tint = androidx.compose.ui.graphics.Color.Red, modifier = Modifier.align(Alignment.TopStart).padding(8.dp).size(16.dp))
+            if (isRead) Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.align(Alignment.TopStart).padding(if (isFavorite) 28.dp else 8.dp).size(16.dp))
             if (progress > 0f) LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(4.dp).align(Alignment.BottomCenter), color = MaterialTheme.colorScheme.primary, trackColor = androidx.compose.ui.graphics.Color.Transparent)
         }
     }
@@ -370,7 +515,8 @@ fun androidx.compose.animation.SharedTransitionScope.MiniPlayer(state: PlaybackU
     Surface(modifier = Modifier.fillMaxWidth().padding(8.dp).height(72.dp).clickable(onClick = onClick), shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.primaryContainer, tonalElevation = 8.dp) {
         Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
 Card(shape = RoundedCornerShape(8.dp), modifier = Modifier.size(56.dp).sharedElement(rememberSharedContentState(key = "mini_cover_${currentItem.mediaId}"), animatedVisibilityScope = animatedVisibilityScope)) {
-                if (currentItem.mediaMetadata.artworkUri != null) AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(currentItem.mediaMetadata.artworkUri).crossfade(true).placeholder(R.drawable.ic_audiobook_cover).build(), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                val artworkUri = currentItem.mediaMetadata.artworkUri?.toString()
+                if (!artworkUri.isNullOrBlank()) AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(artworkUri).crossfade(true).placeholder(R.drawable.ic_audiobook_cover).build(), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                 else CompactBookPlaceholder(title = displayLetter, modifier = Modifier.fillMaxSize())
             }
             Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp), verticalArrangement = Arrangement.Center) {
@@ -386,25 +532,27 @@ Card(shape = RoundedCornerShape(8.dp), modifier = Modifier.size(56.dp).sharedEle
 
 @OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun androidx.compose.animation.SharedTransitionScope.BookListItem(book: Music, isFavorite: Boolean, progress: Float, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, keyPrefix: String = "list", onAddToQueue: () -> Unit, onLongClick: () -> Unit, onClick: () -> Unit) {
+fun androidx.compose.animation.SharedTransitionScope.BookListItem(book: Music, isFavorite: Boolean, isRead: Boolean, progress: Float, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, keyPrefix: String = "list", onAddToQueue: () -> Unit, onLongClick: () -> Unit, onClick: () -> Unit) {
     val context = LocalContext.current
     val metadata = remember { com.raulburgosmurray.musicplayer.data.MetadataJsonHelper.loadMetadata(context, book.id) }
     val rawTitle = metadata?.title?.takeIf { it.isNotBlank() } ?: book.title
     val displayTitle = capitalizeWords(rawTitle)
     val displayArtist = capitalizeWords(book.artist)
     
-    Card(modifier = Modifier.fillMaxWidth().combinedClickable(onClick = onClick, onLongClick = onLongClick), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
+    Card(modifier = Modifier.fillMaxWidth().combinedClickable(onClick = onClick, onLongClick = onLongClick), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isRead) 0.3f else 0.5f))) {
+        val context = LocalContext.current
         Column {
             Row(modifier = Modifier.padding(12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Surface(modifier = Modifier.size(60.dp).sharedElement(rememberSharedContentState(key = "${keyPrefix}_cover_${book.id}"), animatedVisibilityScope = animatedVisibilityScope), shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surface) {
-                    if (book.artUri != null) AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(book.artUri).crossfade(true).placeholder(R.drawable.ic_audiobook_cover).build(), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                    if (MetadataHelper.isArtUriValid(context, book.artUri)) AsyncImage(model = ImageRequest.Builder(context).data(book.artUri).crossfade(true).placeholder(R.drawable.ic_audiobook_cover).build(), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                     else CompactBookPlaceholder(title = displayTitle, modifier = Modifier.fillMaxSize())
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = displayTitle, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f, false).heightIn(max = 48.dp).verticalScroll(rememberScrollState()))
-                        if (isFavorite) { Spacer(modifier = Modifier.width(8.dp)); Icon(Icons.Default.Favorite, contentDescription = null, tint = androidx.compose.ui.graphics.Color.Red, modifier = Modifier.size(16.dp)) }
+                        Text(text = displayTitle, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f, false).heightIn(max = 48.dp).verticalScroll(rememberScrollState()), color = if (isRead) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface)
+                        if (isFavorite) { Spacer(modifier = Modifier.width(4.dp)); Icon(Icons.Default.Favorite, contentDescription = null, tint = androidx.compose.ui.graphics.Color.Red, modifier = Modifier.size(16.dp)) }
+                        if (isRead) { Spacer(modifier = Modifier.width(4.dp)); Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp)) }
                     }
                     Text(text = displayArtist, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary, maxLines = 1)
                     val currentPos = (progress * book.duration).toLong()

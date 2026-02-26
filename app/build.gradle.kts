@@ -34,8 +34,8 @@ defaultConfig {
 
     buildTypes {
         debug {
-            buildConfigField("boolean", "FEATURE_P2P_TRANSFER", "true")
-            buildConfigField("boolean", "FEATURE_CLOUD_SYNC", "true")
+            buildConfigField("boolean", "FEATURE_P2P_TRANSFER", "false")
+            buildConfigField("boolean", "FEATURE_CLOUD_SYNC", "false")
         }
         release {
             isMinifyEnabled = false

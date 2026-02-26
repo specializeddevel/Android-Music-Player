@@ -222,4 +222,20 @@
     <string name="ready">Ready</string>
     <string name="no_wifi">No Wi-Fi</string>
     <string name="detecting">Detecting…</string>
+    <!-- Audiobook count -->
+    <string name="audiobook_count_singular">audiobook</string>
+    <string name="audiobook_count_plural">audiobooks</string>
+    <!-- Delete -->
+    <string name="delete_book">Delete</string>
+    <string name="delete_confirmation_title">Delete audiobook?</string>
+    <string name="delete_confirmation_message">This will permanently delete \"%1$s\" from your device. This action cannot be undone.</string>
+    <string name="delete_success">Audiobook deleted</string>
+    <string name="delete_error">Failed to delete audiobook</string>
+    <!-- Read status -->
+    <string name="mark_as_read">Mark as read</string>
+    <string name="mark_as_unread">Mark as unread</string>
+    <string name="filter_all">All</string>
+    <string name="filter_completed">Completed</string>
+    <string name="filter_in_progress">In Progress</string>
+    <string name="filter">Filter</string>
 </resources>
