@@ -14,23 +14,19 @@
         android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
 
-    <!-- P2P Transfer - only needed when FEATURE_P2P_TRANSFER is enabled -->
-    <!--
+    <!-- P2P Transfer -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.WIFI_LOCK" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
-    -->
 
-    <!-- Cloud Sync - only needed when FEATURE_CLOUD_SYNC is enabled -->
-    <!--
+    <!-- Cloud Sync -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
-    -->
 
 <application
         android:name=".ApplicationClass"
