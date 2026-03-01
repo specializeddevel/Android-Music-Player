@@ -120,7 +120,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun checkPermissions() {
-        val permissions = mutableListOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION)
+        val permissions = mutableListOf(Manifest.permission.CAMERA)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             permissions.add(Manifest.permission.READ_MEDIA_AUDIO)
             permissions.add(Manifest.permission.POST_NOTIFICATIONS)
