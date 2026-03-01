@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <declare-styleable name="timer_button_custom">
-        <attr name="numberText" format="string|reference" />
-        <attr name="unitText" format="string|reference" />
-    </declare-styleable>
-</resources>

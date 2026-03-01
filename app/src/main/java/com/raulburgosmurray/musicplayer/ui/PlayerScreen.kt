@@ -554,8 +554,8 @@ fun CoverTouchControls(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.rewind_30),
+            Icon(
+                    imageVector = Icons.Default.Replay10,
                     contentDescription = stringResource(R.string.rewind_30s),
                     tint = Color.White.copy(alpha = if (pressedArea == CoverTapArea.LEFT) 1f else 0.5f),
                     modifier = Modifier.size(48.dp)
@@ -596,8 +596,8 @@ fun CoverTouchControls(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.fast_forward_30),
+            Icon(
+                    imageVector = Icons.Default.Forward10,
                     contentDescription = stringResource(R.string.fast_forward_30s),
                     tint = Color.White.copy(alpha = if (pressedArea == CoverTapArea.RIGHT) 1f else 0.5f),
                     modifier = Modifier.size(48.dp)

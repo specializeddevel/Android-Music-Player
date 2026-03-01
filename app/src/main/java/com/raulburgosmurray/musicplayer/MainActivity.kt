@@ -83,7 +83,8 @@ class MainViewModelFactory(private val application: android.app.Application, pri
     }
 }
 
-@OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class, ExperimentalGetImage::class)
+@OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
+@Suppress("UnsafeOptInUsageError")
 class MainActivity : ComponentActivity() {
 
     private lateinit var playbackViewModel: PlaybackViewModel
@@ -120,24 +121,95 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun checkPermissions() {
-        val permissions = mutableListOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION)
+        val essentialPermissions = mutableListOf<String>()
+        val optionalPermissions = mutableListOf<String>()
+
+        essentialPermissions.add(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+                Manifest.permission.READ_MEDIA_AUDIO
+            else
+                Manifest.permission.READ_EXTERNAL_STORAGE
+        )
+
+        optionalPermissions.add(Manifest.permission.CAMERA)
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            permissions.add(Manifest.permission.READ_MEDIA_AUDIO)
-            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
-            permissions.add(Manifest.permission.NEARBY_WIFI_DEVICES)
-        } else { permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE) }
-        TedPermission.create().setPermissionListener(object : PermissionListener {
-            override fun onPermissionGranted() {
-                lifecycleScope.launch { 
-                    val uris = settingsViewModel.libraryRootUris.first()
-                    val scanAll = settingsViewModel.scanAllMemory.first()
-                    mainViewModel.loadBooks(if (scanAll) emptyList() else uris, scanAll)
+            optionalPermissions.add(Manifest.permission.POST_NOTIFICATIONS)
+            optionalPermissions.add(Manifest.permission.NEARBY_WIFI_DEVICES)
+        }
+
+        TedPermission.create()
+            .setPermissionListener(object : PermissionListener {
+                override fun onPermissionGranted() {
+                    checkOptionalPermissions(optionalPermissions)
                 }
-                lifecycleScope.launch { mainViewModel.books.collect { if (it.isNotEmpty()) playbackViewModel.loadPersistedQueue(it) } }
-                startUI()
-            }
-            override fun onPermissionDenied(deniedPermissions: MutableList<String>?) { startUI() }
-        }).setPermissions(*permissions.toTypedArray()).check()
+                override fun onPermissionDenied(deniedPermissions: MutableList<String>?) {
+                    checkOptionalPermissions(optionalPermissions)
+                }
+            })
+            .setPermissions(*essentialPermissions.toTypedArray())
+            .check()
+    }
+
+    private fun checkOptionalPermissions(optionalPermissions: List<String>) {
+        if (optionalPermissions.isEmpty()) {
+            loadBooksAndStartUI()
+            return
+        }
+
+        val currentPerm = optionalPermissions.first()
+        val remaining = optionalPermissions.drop(1)
+
+        val (rationaleTitle, rationaleMessage, deniedTitle, deniedMessage) = when (currentPerm) {
+            Manifest.permission.CAMERA -> Quad(
+                R.string.camera_permission_title,
+                R.string.camera_permission_rationale,
+                R.string.camera_permission_denied_title,
+                R.string.camera_permission_denied_message
+            )
+            Manifest.permission.POST_NOTIFICATIONS -> Quad(
+                R.string.notification_permission_title,
+                R.string.notification_permission_rationale,
+                R.string.notification_permission_denied_title,
+                R.string.notification_permission_denied_message
+            )
+            Manifest.permission.NEARBY_WIFI_DEVICES -> Quad(
+                R.string.wifi_permission_title,
+                R.string.wifi_permission_rationale,
+                R.string.wifi_permission_denied_title,
+                R.string.wifi_permission_denied_message
+            )
+            else -> Quad(R.string.app_name, R.string.app_name, R.string.app_name, R.string.app_name)
+        }
+
+        TedPermission.create()
+            .setPermissionListener(object : PermissionListener {
+                override fun onPermissionGranted() {
+                    checkOptionalPermissions(remaining)
+                }
+                override fun onPermissionDenied(deniedPermissions: MutableList<String>?) {
+                    checkOptionalPermissions(remaining)
+                }
+            })
+            .setRationaleTitle(rationaleTitle)
+            .setRationaleMessage(rationaleMessage)
+            .setDeniedTitle(deniedTitle)
+            .setDeniedMessage(deniedMessage)
+            .setGotoSettingButton(true)
+            .setPermissions(currentPerm)
+            .check()
+    }
+
+    private data class Quad<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
+
+    private fun loadBooksAndStartUI() {
+        lifecycleScope.launch { 
+            val uris = settingsViewModel.libraryRootUris.first()
+            val scanAll = settingsViewModel.scanAllMemory.first()
+            mainViewModel.loadBooks(if (scanAll) emptyList() else uris, scanAll)
+        }
+        lifecycleScope.launch { mainViewModel.books.collect { if (it.isNotEmpty()) playbackViewModel.loadPersistedQueue(it) } }
+        startUI()
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
