@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Camera permission -->
+    <string name="camera_permission_title">📷 Accès à la caméra</string>
+    <string name="camera_permission_rationale">Nous avons besoin de l\'accès à la caméra pour:\n\n• Scanner les codes QR pour le transfert P2P\n• Connecter facilement les appareils à proximité\n\nAucune photo ou vidéo n\'est enregistrée.</string>
+    <string name="camera_permission_denied_title">📷 Autorisation caméra refusée</string>
+    <string name="camera_permission_denied_message">Sans accès à la caméra, vous ne pourrez pas scanner les codes QR pour le transfert P2P.\n\nVous pouvez l\'activer à tout moment dans Paramètres → Apps → Litera → Autorisations.</string>
+    <!-- Storage/Audio permission -->
+    <string name="storage_permission_title">🎧 Accès aux fichiers audio</string>
+    <string name="storage_permission_rationale">Nous avons besoin de l\'accès à vos fichiers audio pour:\n\n• Trouver et lister tous les livres audio\n• Lire vos livres audio préférés\n• Suivre votre progression d\'écoute</string>
+    <string name="storage_permission_denied_title">🎧 Autorisation stockage refusée</string>
+    <string name="storage_permission_denied_message">Sans cette autorisation, l\'application ne peut pas trouver vos livres audio.\n\nVous pouvez l\'activer à tout moment dans Paramètres → Apps → Litera → Autorisations.</string>
+    <!-- Notification permission -->
+    <string name="notification_permission_title">🔔 Notifications</string>
+    <string name="notification_permission_rationale">Les notifications vous permettent de:\n\n• Voir les contrôles de lecture en multitâche\n• Recevoir des alertes de minuterie\n• Contrôler l\'audio depuis n\'importe où</string>
+    <string name="notification_permission_denied_title">🔔 Notifications désactivées</string>
+    <string name="notification_permission_denied_message">Vous ne verrez pas les contrôles de lecture dans la barre de notification.\n\nVous pouvez les activer à tout moment dans Paramètres → Apps → Litera → Autorisations.</string>
+    <!-- WiFi/Network permission -->
+    <string name="wifi_permission_title">📡 Appareils à proximité</string>
+    <string name="wifi_permission_rationale">Cette autorisation permet à l\'application de:\n\n• Découvrir les appareils à proximité pour le transfert P2P\n• Transférer des livres audio sans internet\n• Se connecter via Wi-Fi Direct</string>
+    <string name="wifi_permission_denied_title">📡 Autorisation Wi-Fi refusée</string>
+    <string name="wifi_permission_denied_message">Sans cette autorisation, vous ne pourrez pas transférer de livres audio vers des appareils à proximité.\n\nVous pouvez l\'activer à tout moment dans Paramètres → Apps → Litera → Autorisations.</string>
+</resources>

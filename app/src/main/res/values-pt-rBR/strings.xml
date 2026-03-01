@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Camera permission -->
+    <string name="camera_permission_title">📷 Acesso à Câmera</string>
+    <string name="camera_permission_rationale">Precisamos do acesso à câmera para:\n\n• Escanear códigos QR para transferência P2P\n• Conectar com dispositivos próximos facilmente\n\nNenhuma foto ou vídeo é gravado.</string>
+    <string name="camera_permission_denied_title">📷 Permissão de Câmera Negada</string>
+    <string name="camera_permission_denied_message">Sem acesso à câmera, você não poderá escanear códigos QR para transferência P2P.\n\nVocê pode ativar a qualquer momento em Configurações → Apps → Litera → Permissões.</string>
+    <!-- Storage/Audio permission -->
+    <string name="storage_permission_title">🎧 Acesso a Arquivos de Áudio</string>
+    <string name="storage_permission_rationale">Precisamos do acesso aos seus arquivos de áudio para:\n\n• Encontrar e listar todos os audiolivros\n• Reproduzir seus audiolivros favoritos\n• Acompanhar seu progresso de escucha</string>
+    <string name="storage_permission_denied_title">🎧 Permissão de Armazenamento Negada</string>
+    <string name="storage_permission_denied_message">Sem essa permissão, o app não consegue encontrar seus audiolivros.\n\nVocê pode ativar a qualquer momento em Configurações → Apps → Litera → Permissões.</string>
+    <!-- Notification permission -->
+    <string name="notification_permission_title">🔔 Notificações</string>
+    <string name="notification_permission_rationale">As notificações permitem que você:\n\n• Veja os controles de reprodução ao usar outros apps\n• Receba alertas do timer de sono\n• Controle o áudio de qualquer lugar</string>
+    <string name="notification_permission_denied_title">🔔 Notificações Desativadas</string>
+    <string name="notification_permission_denied_message">Você não verá os controles de reprodução na barra de notificações.\n\nVocê pode ativar a qualquer momento em Configurações → Apps → Litera → Permissões.</string>
+    <!-- WiFi/Network permission -->
+    <string name="wifi_permission_title">📡 Dispositivos Próximos</string>
+    <string name="wifi_permission_rationale">Essa permissão permite que o app:\n\n• Descubra dispositivos próximos para transferência P2P\n• Transfira audiolivros sem internet\n• Conecte-se via Wi-Fi Direct</string>
+    <string name="wifi_permission_denied_title">📡 Permissão de Wi-Fi Negada</string>
+    <string name="wifi_permission_denied_message">Sem essa permissão, você não conseguirá transferir audiolivros para dispositivos próximos.\n\nVocê pode ativar a qualquer momento em Configurações → Apps → Litera → Permissões.</string>
+</resources>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Camera permission -->
+    <string name="camera_permission_title">📷 Kamerazugriff</string>
+    <string name="camera_permission_rationale">Wir benötigen Kamerazugriff für:\n\n• QR-Codes für P2P-Hörbuch-Übertragung scannen\n• Einfache Verbindung mit nearby-Geräten\n\nEs werden keine Fotos oder Videos aufgenommen.</string>
+    <string name="camera_permission_denied_title">📷 Kameraberechtigung verweigert</string>
+    <string name="camera_permission_denied_message">Ohne Kamerazugriff können Sie keine QR-Codes für P2P-Übertragung scannen.\n\nSie können ihn jederzeit in Einstellungen → Apps → Litera → Berechtigungen aktivieren.</string>
+    <!-- Storage/Audio permission -->
+    <string name="storage_permission_title">🎧 Zugriff auf Audiodateien</string>
+    <string name="storage_permission_rationale">Wir benötigen Zugriff auf Ihre Audiodateien für:\n\n• Alle Hörbücher auf Ihrem Gerät finden und auflisten\n• Ihre Lieblings-Hörbücher abspielen\n• Ihren Hörfortschritt verfolgen</string>
+    <string name="storage_permission_denied_title">🎧 Speicherberechtigung verweigert</string>
+    <string name="storage_permission_denied_message">Ohne diese Berechtigung kann die App Ihre Hörbücher nicht finden.\n\nSie können sie jederzeit in Einstellungen → Apps → Litera → Berechtigungen aktivieren.</string>
+    <!-- Notification permission -->
+    <string name="notification_permission_title">🔔 Benachrichtigungen</string>
+    <string name="notification_permission_rationale">Benachrichtigungen ermöglichen Ihnen:\n\n• Wiedergabesteuerung bei Multitasking sehen\n• Schlaf-Timer-Benachrichtigungen erhalten\n• Audio von überall steuern</string>
+    <string name="notification_permission_denied_title">🔔 Benachrichtigungen deaktiviert</string>
+    <string name="notification_permission_denied_message">Sie sehen keine Wiedergabesteuerung in der Benachrichtigungsleiste.\n\nSie können sie jederzeit in Einstellungen → Apps → Litera → Berechtigungen aktivieren.</string>
+    <!-- WiFi/Network permission -->
+    <string name="wifi_permission_title">📡 Geräte in der Nähe</string>
+    <string name="wifi_permission_rationale">Diese Berechtigung ermöglicht der App:\n\n• Geräte in der Nähe für P2P-Übertragung entdecken\n• Hörbücher ohne Internet übertragen\n• Verbindung über Wi-Fi Direct</string>
+    <string name="wifi_permission_denied_title">📡 WLAN-Berechtigung verweigert</string>
+    <string name="wifi_permission_denied_message">Ohne diese Berechtigung können Sie keine Hörbücher auf nahegelegene Geräte übertragen.\n\nSie können sie jederzeit in Einstellungen → Apps → Litera → Berechtigungen aktivieren.</string>
+</resources>
