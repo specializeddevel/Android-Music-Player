@@ -137,7 +137,13 @@ class MainActivity : ComponentActivity() {
                 startUI()
             }
             override fun onPermissionDenied(deniedPermissions: MutableList<String>?) { startUI() }
-        }).setPermissions(*permissions.toTypedArray()).check()
+        })
+            .setRationaleTitle(R.string.camera_permission_title)
+            .setRationaleMessage(R.string.camera_permission_rationale)
+            .setDeniedTitle(R.string.camera_permission_denied_title)
+            .setDeniedMessage(R.string.camera_permission_denied_message)
+            .setGotoSettingButton(true)
+            .setPermissions(*permissions.toTypedArray()).check()
     }
 
     @OptIn(ExperimentalMaterial3Api::class)

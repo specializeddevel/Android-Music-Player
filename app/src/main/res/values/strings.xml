@@ -238,4 +238,9 @@
     <string name="filter_completed">Completed</string>
     <string name="filter_in_progress">In Progress</string>
     <string name="filter">Filter</string>
+    <!-- Camera permission -->
+    <string name="camera_permission_title">Camera Access</string>
+    <string name="camera_permission_rationale">Camera access is needed to scan QR codes for peer-to-peer audiobook transfer between devices. No photos or videos are recorded.</string>
+    <string name="camera_permission_denied_title">Camera Permission Denied</string>
+    <string name="camera_permission_denied_message">Without camera access, you won\'t be able to scan QR codes for P2P transfer. You can enable it anytime in Settings.</string>
 </resources>
