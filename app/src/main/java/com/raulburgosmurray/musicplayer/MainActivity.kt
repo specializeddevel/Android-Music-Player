@@ -120,30 +120,86 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun checkPermissions() {
-        val permissions = mutableListOf(Manifest.permission.CAMERA)
+        val essentialPermissions = mutableListOf<String>()
+        val optionalPermissions = mutableListOf<String>()
+
+        essentialPermissions.add(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+                Manifest.permission.READ_MEDIA_AUDIO
+            else
+                Manifest.permission.READ_EXTERNAL_STORAGE
+        )
+
+        optionalPermissions.add(Manifest.permission.CAMERA)
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            permissions.add(Manifest.permission.READ_MEDIA_AUDIO)
-            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
-            permissions.add(Manifest.permission.NEARBY_WIFI_DEVICES)
-        } else { permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE) }
-        TedPermission.create().setPermissionListener(object : PermissionListener {
-            override fun onPermissionGranted() {
-                lifecycleScope.launch { 
-                    val uris = settingsViewModel.libraryRootUris.first()
-                    val scanAll = settingsViewModel.scanAllMemory.first()
-                    mainViewModel.loadBooks(if (scanAll) emptyList() else uris, scanAll)
+            optionalPermissions.add(Manifest.permission.POST_NOTIFICATIONS)
+            optionalPermissions.add(Manifest.permission.NEARBY_WIFI_DEVICES)
+        }
+
+        TedPermission.create()
+            .setPermissionListener(object : PermissionListener {
+                override fun onPermissionGranted() {
+                    checkOptionalPermissions(optionalPermissions)
                 }
-                lifecycleScope.launch { mainViewModel.books.collect { if (it.isNotEmpty()) playbackViewModel.loadPersistedQueue(it) } }
-                startUI()
-            }
-            override fun onPermissionDenied(deniedPermissions: MutableList<String>?) { startUI() }
-        })
-            .setRationaleTitle(R.string.camera_permission_title)
-            .setRationaleMessage(R.string.camera_permission_rationale)
-            .setDeniedTitle(R.string.camera_permission_denied_title)
-            .setDeniedMessage(R.string.camera_permission_denied_message)
+                override fun onPermissionDenied(deniedPermissions: MutableList<String>?) {
+                    checkOptionalPermissions(optionalPermissions)
+                }
+            })
+            .setPermissions(*essentialPermissions.toTypedArray())
+            .check()
+    }
+
+    private fun checkOptionalPermissions(optionalPermissions: List<String>) {
+        if (optionalPermissions.isEmpty()) {
+            loadBooksAndStartUI()
+            return
+        }
+
+        val cameraPerm = Manifest.permission.CAMERA
+        val isCamera = optionalPermissions.contains(cameraPerm)
+
+        val rationaleTitle = if (isCamera) R.string.camera_permission_title else R.string.wifi_permission_title
+        val rationaleMessage = if (isCamera) R.string.camera_permission_rationale else R.string.wifi_permission_rationale
+        val deniedTitle = if (isCamera) R.string.camera_permission_denied_title else R.string.wifi_permission_denied_title
+        val deniedMessage = if (isCamera) R.string.camera_permission_denied_message else R.string.wifi_permission_denied_message
+
+        TedPermission.create()
+            .setPermissionListener(object : PermissionListener {
+                override fun onPermissionGranted() {
+                    val remaining = optionalPermissions.filter { it != cameraPerm }
+                    if (remaining.isNotEmpty()) {
+                        checkOptionalPermissions(remaining)
+                    } else {
+                        loadBooksAndStartUI()
+                    }
+                }
+                override fun onPermissionDenied(deniedPermissions: MutableList<String>?) {
+                    val remaining = optionalPermissions.filter { it != cameraPerm }
+                    if (remaining.isNotEmpty()) {
+                        checkOptionalPermissions(remaining)
+                    } else {
+                        loadBooksAndStartUI()
+                    }
+                }
+            })
+            .setRationaleTitle(rationaleTitle)
+            .setRationaleMessage(rationaleMessage)
+            .setDeniedTitle(deniedTitle)
+            .setDeniedMessage(deniedMessage)
             .setGotoSettingButton(true)
-            .setPermissions(*permissions.toTypedArray()).check()
+            .setPermissions(*optionalPermissions.toTypedArray())
+            .check()
+    }
+
+    private fun loadBooksAndStartUI() {
+        lifecycleScope.launch { 
+            val uris = settingsViewModel.libraryRootUris.first()
+            val scanAll = settingsViewModel.scanAllMemory.first()
+            mainViewModel.loadBooks(if (scanAll) emptyList() else uris, scanAll)
+        }
+        lifecycleScope.launch { mainViewModel.books.collect { if (it.isNotEmpty()) playbackViewModel.loadPersistedQueue(it) } }
+        startUI()
     }
 
     @OptIn(ExperimentalMaterial3Api::class)

@@ -243,4 +243,19 @@
     <string name="camera_permission_rationale">Camera access is needed to scan QR codes for peer-to-peer audiobook transfer between devices. No photos or videos are recorded.</string>
     <string name="camera_permission_denied_title">Camera Permission Denied</string>
     <string name="camera_permission_denied_message">Without camera access, you won\'t be able to scan QR codes for P2P transfer. You can enable it anytime in Settings.</string>
+    <!-- Storage/Audio permission -->
+    <string name="storage_permission_title">Audio Files Access</string>
+    <string name="storage_permission_rationale">This app needs access to your audio files to find and play audiobooks stored on your device.</string>
+    <string name="storage_permission_denied_title">Storage Permission Denied</string>
+    <string name="storage_permission_denied_message">Without this permission, the app cannot find your audiobooks. You can enable it anytime in Settings.</string>
+    <!-- Notification permission -->
+    <string name="notification_permission_title">Notifications</string>
+    <string name="notification_permission_rationale">Notifications allow you to see playback controls and sleep timer alerts when the app is in the background.</string>
+    <string name="notification_permission_denied_title">Notification Permission Denied</string>
+    <string name="notification_permission_denied_message">You won\'t see playback controls in the notification bar. You can enable it anytime in Settings.</string>
+    <!-- WiFi/Network permission -->
+    <string name="wifi_permission_title">Nearby Devices</string>
+    <string name="wifi_permission_rationale">This permission allows the app to discover nearby devices for peer-to-peer audiobook transfer via Wi-Fi Direct.</string>
+    <string name="wifi_permission_denied_title">Wi-Fi Permission Denied</string>
+    <string name="wifi_permission_denied_message">Without this permission, you won\'t be able to transfer audiobooks to nearby devices. You can enable it anytime in Settings.</string>
 </resources>
