@@ -1,35 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Paleta Profesional de Audiolibros -->
-    <color name="primary_book">#4E342E</color> <!-- Café profundo -->
-    <color name="primary_light_book">#7B5E57</color>
-    <color name="accent_book">#BF360C</color> <!-- Terracota para acentos -->
-    
-    <!-- Fondos Relajantes -->
-    <color name="background_paper">#F5F5F1</color> <!-- Color papel viejo -->
-    <color name="background_dark">#1A1A1A</color>
-    
-    <!-- Colores de Texto -->
-    <color name="text_primary">#212121</color>
-    <color name="text_secondary">#757575</color>
-
-    <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF2600EE</color>
-    <color name="purple_700">#FF3700b3</color>
-    <color name="teal_200">#FF03DAC5</color>
-    <color name="teal_700">#FF018786</color>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
-    <!--    custom colors-->
-    <color name="icon_tint_color">@android:color/holo_red_dark</color>
-    <color name="cool_blue">#0091EA</color>
-    <color name="cool_green">#FF64DD17</color>
-    <color name="cool_pink">#FFF50057</color>
-    <color name="yellow">#FFFFD600</color>
-    <color name="red">#FF0000</color>
-    <!-- Permission dialog colors -->
-    <color name="permission_dialog_bg">#FFFFFF</color>
-    <color name="permission_title">#1A1A1A</color>
-    <color name="permission_message">#424242</color>
-    <color name="permission_button">#BF360C</color>
+    <!-- Only keep colors actually used in XML resources -->
+    <color name="primary_book">#4E342E</color>
 </resources>

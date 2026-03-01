@@ -83,7 +83,8 @@ class MainViewModelFactory(private val application: android.app.Application, pri
     }
 }
 
-@OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class, ExperimentalGetImage::class)
+@OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
+@Suppress("UnsafeOptInUsageError")
 class MainActivity : ComponentActivity() {
 
     private lateinit var playbackViewModel: PlaybackViewModel

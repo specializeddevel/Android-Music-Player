@@ -266,12 +266,22 @@ fun MainScreen(
                         }
                     }
                 } else {
+                    val onQueueClick: (Music) -> Unit = { book ->
+                        playbackViewModel.addToQueue(book)
+                        scope.launch { snackbarHostState.showSnackbar(message = context.getString(R.string.added_to_queue, capitalizeWords(book.title)), duration = SnackbarDuration.Short) }
+                    }
+                    val onBookLongClick: (Music) -> Unit = { book ->
+                        selectedBookForDetails = book
+                        showDetailsSheet = true
+                    }
+                    
                     if (layoutMode == LayoutMode.LIST) {
                         LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             items(
                                 items = displayedBooks,
-                                key = { it.id }
-                            ) { book -> with(sharedTransitionScope) { BookListItem(book = book, isFavorite = favoriteIdsSet.contains(book.id), isRead = readStatusSet.contains(book.id), progress = bookProgress[book.id] ?: 0f, animatedVisibilityScope = animatedVisibilityScope, onAddToQueue = { playbackViewModel.addToQueue(book); scope.launch { snackbarHostState.showSnackbar(message = context.getString(R.string.added_to_queue, capitalizeWords(book.title)), duration = SnackbarDuration.Short) } }, onLongClick = { selectedBookForDetails = book; showDetailsSheet = true }, onClick = { onBookClick(book) }) } }
+                                key = { it.id },
+                                contentType = { "book" }
+                            ) { book -> with(sharedTransitionScope) { BookListItem(book = book, isFavorite = favoriteIdsSet.contains(book.id), isRead = readStatusSet.contains(book.id), progress = bookProgress[book.id] ?: 0f, animatedVisibilityScope = animatedVisibilityScope, onAddToQueue = { onQueueClick(book) }, onLongClick = { onBookLongClick(book) }, onClick = { onBookClick(book) }) } }
                         }
                     } else {
                         // AJUSTE DINÁMICO DE COLUMNAS: Solo 4 si es tableta Y horizontal. En móvil horizontal 3.
@@ -284,8 +294,9 @@ fun MainScreen(
                         LazyVerticalGrid(columns = GridCells.Fixed(columns), modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                             items(
                                 items = displayedBooks,
-                                key = { it.id }
-                            ) { book -> with(sharedTransitionScope) { BookGridItem(book = book, isFavorite = favoriteIdsSet.contains(book.id), isRead = readStatusSet.contains(book.id), progress = bookProgress[book.id] ?: 0f, animatedVisibilityScope = animatedVisibilityScope, onAddToQueue = { playbackViewModel.addToQueue(book); scope.launch { snackbarHostState.showSnackbar(message = context.getString(R.string.added_to_queue, capitalizeWords(book.title)), duration = SnackbarDuration.Short) } }, onLongClick = { selectedBookForDetails = book; showDetailsSheet = true }, onClick = { onBookClick(book) }) } }
+                                key = { it.id },
+                                contentType = { "book" }
+                            ) { book -> with(sharedTransitionScope) { BookGridItem(book = book, isFavorite = favoriteIdsSet.contains(book.id), isRead = readStatusSet.contains(book.id), progress = bookProgress[book.id] ?: 0f, animatedVisibilityScope = animatedVisibilityScope, onAddToQueue = { onQueueClick(book) }, onLongClick = { onBookLongClick(book) }, onClick = { onBookClick(book) }) } }
                         }
                     }
                 }
@@ -467,10 +478,10 @@ fun openFolder(context: android.content.Context, path: String) {
 @Composable
 fun androidx.compose.animation.SharedTransitionScope.BookGridItem(book: Music, isFavorite: Boolean, isRead: Boolean, progress: Float, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, keyPrefix: String = "grid", onAddToQueue: () -> Unit, onLongClick: () -> Unit, onClick: () -> Unit) {
     val context = LocalContext.current
-    val metadata = remember { com.raulburgosmurray.musicplayer.data.MetadataJsonHelper.loadMetadata(context, book.id) }
+    val metadata = remember(book.id) { com.raulburgosmurray.musicplayer.data.MetadataJsonHelper.loadMetadata(context, book.id) }
     val rawTitle = metadata?.title?.takeIf { it.isNotBlank() } ?: book.title
-    val displayTitle = capitalizeWords(rawTitle)
-    val displayArtist = capitalizeWords(book.artist)
+    val displayTitle = remember(rawTitle) { capitalizeWords(rawTitle) }
+    val displayArtist = remember(book.artist) { capitalizeWords(book.artist) }
     
     Card(modifier = Modifier.fillMaxWidth().height(240.dp).combinedClickable(onClick = onClick, onLongClick = onLongClick), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isRead) 0.3f else 0.5f))) {
         val context = LocalContext.current
@@ -506,11 +517,13 @@ fun androidx.compose.animation.SharedTransitionScope.BookGridItem(book: Music, i
 fun androidx.compose.animation.SharedTransitionScope.MiniPlayer(state: PlaybackUiState, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, onTogglePlay: () -> Unit, onClick: () -> Unit) {
     val currentItem = state.currentMediaItem ?: return
     val context = LocalContext.current
+    val unknownArtistText = stringResource(R.string.unknown_artist)
     val metadata = remember(currentItem.mediaId) { currentItem.mediaId?.let { com.raulburgosmurray.musicplayer.data.MetadataJsonHelper.loadMetadata(context, it) } }
     val rawTitle = metadata?.title?.takeIf { it.isNotBlank() } ?: currentItem.mediaMetadata.title?.toString() ?: stringResource(R.string.unknown_title)
-    val displayTitle = capitalizeWords(rawTitle)
-    val displayArtist = capitalizeWords(currentItem.mediaMetadata.artist?.toString() ?: stringResource(R.string.unknown_artist))
-    val displayLetter = displayTitle.firstOrNull()?.uppercase() ?: "A"
+    val displayTitle = remember(rawTitle) { capitalizeWords(rawTitle) }
+    val rawArtist = currentItem.mediaMetadata.artist?.toString() ?: unknownArtistText
+    val displayArtist = remember(rawArtist) { capitalizeWords(rawArtist) }
+    val displayLetter = remember(displayTitle) { displayTitle.firstOrNull()?.uppercase() ?: "A" }
     
     Surface(modifier = Modifier.fillMaxWidth().padding(8.dp).height(72.dp).clickable(onClick = onClick), shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.primaryContainer, tonalElevation = 8.dp) {
         Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -534,10 +547,10 @@ Card(shape = RoundedCornerShape(8.dp), modifier = Modifier.size(56.dp).sharedEle
 @Composable
 fun androidx.compose.animation.SharedTransitionScope.BookListItem(book: Music, isFavorite: Boolean, isRead: Boolean, progress: Float, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, keyPrefix: String = "list", onAddToQueue: () -> Unit, onLongClick: () -> Unit, onClick: () -> Unit) {
     val context = LocalContext.current
-    val metadata = remember { com.raulburgosmurray.musicplayer.data.MetadataJsonHelper.loadMetadata(context, book.id) }
+    val metadata = remember(book.id) { com.raulburgosmurray.musicplayer.data.MetadataJsonHelper.loadMetadata(context, book.id) }
     val rawTitle = metadata?.title?.takeIf { it.isNotBlank() } ?: book.title
-    val displayTitle = capitalizeWords(rawTitle)
-    val displayArtist = capitalizeWords(book.artist)
+    val displayTitle = remember(rawTitle) { capitalizeWords(rawTitle) }
+    val displayArtist = remember(book.artist) { capitalizeWords(book.artist) }
     
     Card(modifier = Modifier.fillMaxWidth().combinedClickable(onClick = onClick, onLongClick = onLongClick), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isRead) 0.3f else 0.5f))) {
         val context = LocalContext.current

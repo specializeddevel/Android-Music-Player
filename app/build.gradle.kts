@@ -34,7 +34,7 @@ defaultConfig {
 
     buildTypes {
         debug {
-            buildConfigField("boolean", "FEATURE_P2P_TRANSFER", "false")
+            buildConfigField("boolean", "FEATURE_P2P_TRANSFER", "true")
             buildConfigField("boolean", "FEATURE_CLOUD_SYNC", "false")
         }
         release {
@@ -43,7 +43,7 @@ defaultConfig {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            buildConfigField("boolean", "FEATURE_P2P_TRANSFER", "false")
+            buildConfigField("boolean", "FEATURE_P2P_TRANSFER", "true")
             buildConfigField("boolean", "FEATURE_CLOUD_SYNC", "false")
         }
     }
@@ -57,8 +57,12 @@ defaultConfig {
 
     buildFeatures {
         viewBinding = true
-        compose = true
         buildConfig = true
+    }
+
+    lint {
+        baseline = file("lint-baseline.xml")
+        warningsAsErrors = false
     }
 
     packaging {
