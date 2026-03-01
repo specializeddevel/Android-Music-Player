@@ -156,31 +156,38 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        val cameraPerm = Manifest.permission.CAMERA
-        val isCamera = optionalPermissions.contains(cameraPerm)
+        val currentPerm = optionalPermissions.first()
+        val remaining = optionalPermissions.drop(1)
 
-        val rationaleTitle = if (isCamera) R.string.camera_permission_title else R.string.wifi_permission_title
-        val rationaleMessage = if (isCamera) R.string.camera_permission_rationale else R.string.wifi_permission_rationale
-        val deniedTitle = if (isCamera) R.string.camera_permission_denied_title else R.string.wifi_permission_denied_title
-        val deniedMessage = if (isCamera) R.string.camera_permission_denied_message else R.string.wifi_permission_denied_message
+        val (rationaleTitle, rationaleMessage, deniedTitle, deniedMessage) = when (currentPerm) {
+            Manifest.permission.CAMERA -> Quad(
+                R.string.camera_permission_title,
+                R.string.camera_permission_rationale,
+                R.string.camera_permission_denied_title,
+                R.string.camera_permission_denied_message
+            )
+            Manifest.permission.POST_NOTIFICATIONS -> Quad(
+                R.string.notification_permission_title,
+                R.string.notification_permission_rationale,
+                R.string.notification_permission_denied_title,
+                R.string.notification_permission_denied_message
+            )
+            Manifest.permission.NEARBY_WIFI_DEVICES -> Quad(
+                R.string.wifi_permission_title,
+                R.string.wifi_permission_rationale,
+                R.string.wifi_permission_denied_title,
+                R.string.wifi_permission_denied_message
+            )
+            else -> Quad(R.string.app_name, R.string.app_name, R.string.app_name, R.string.app_name)
+        }
 
         TedPermission.create()
             .setPermissionListener(object : PermissionListener {
                 override fun onPermissionGranted() {
-                    val remaining = optionalPermissions.filter { it != cameraPerm }
-                    if (remaining.isNotEmpty()) {
-                        checkOptionalPermissions(remaining)
-                    } else {
-                        loadBooksAndStartUI()
-                    }
+                    checkOptionalPermissions(remaining)
                 }
                 override fun onPermissionDenied(deniedPermissions: MutableList<String>?) {
-                    val remaining = optionalPermissions.filter { it != cameraPerm }
-                    if (remaining.isNotEmpty()) {
-                        checkOptionalPermissions(remaining)
-                    } else {
-                        loadBooksAndStartUI()
-                    }
+                    checkOptionalPermissions(remaining)
                 }
             })
             .setRationaleTitle(rationaleTitle)
@@ -188,9 +195,11 @@ class MainActivity : ComponentActivity() {
             .setDeniedTitle(deniedTitle)
             .setDeniedMessage(deniedMessage)
             .setGotoSettingButton(true)
-            .setPermissions(*optionalPermissions.toTypedArray())
+            .setPermissions(currentPerm)
             .check()
     }
+
+    private data class Quad<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
 
     private fun loadBooksAndStartUI() {
         lifecycleScope.launch { 
