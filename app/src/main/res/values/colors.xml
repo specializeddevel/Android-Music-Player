@@ -27,4 +27,9 @@
     <color name="cool_pink">#FFF50057</color>
     <color name="yellow">#FFFFD600</color>
     <color name="red">#FF0000</color>
+    <!-- Permission dialog colors -->
+    <color name="permission_dialog_bg">#FFFFFF</color>
+    <color name="permission_title">#1A1A1A</color>
+    <color name="permission_message">#424242</color>
+    <color name="permission_button">#BF360C</color>
 </resources>

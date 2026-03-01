@@ -240,20 +240,20 @@
     <string name="filter_in_progress">En progreso</string>
     <string name="filter">Filtrar</string>
     <!-- Permisos -->
-    <string name="camera_permission_title">Acceso a Cámara</string>
-    <string name="camera_permission_rationale">El acceso a la cámara es necesario para escanear códigos QR y transferir audiolibros entre dispositivos. No se graban fotos ni vídeos.</string>
-    <string name="camera_permission_denied_title">Permiso de Cámara Denegado</string>
-    <string name="camera_permission_denied_message">Sin acceso a la cámara, no podrás escanear códigos QR para transferencia P2P. Puedes activarlo en cualquier momento en Ajustes.</string>
-    <string name="storage_permission_title">Acceso a Archivos de Audio</string>
-    <string name="storage_permission_rationale">Esta app necesita acceso a tus archivos de audio para encontrar y reproducir los audiolibros almacenados en tu dispositivo.</string>
-    <string name="storage_permission_denied_title">Permiso de Almacenamiento Denegado</string>
-    <string name="storage_permission_denied_message">Sin este permiso, la app no podrá encontrar tus audiolibros. Puedes activarlo en cualquier momento en Ajustes.</string>
-    <string name="notification_permission_title">Notificaciones</string>
-    <string name="notification_permission_rationale">Las notificaciones te permiten ver los controles de reproducción y las alertas del temporizador cuando la app está en segundo plano.</string>
-    <string name="notification_permission_denied_title">Permiso de Notificaciones Denegado</string>
-    <string name="notification_permission_denied_message">No verás los controles de reproducción en la barra de notificaciones. Puedes activarlo en cualquier momento en Ajustes.</string>
-    <string name="wifi_permission_title">Dispositivos Cercanos</string>
-    <string name="wifi_permission_rationale">Este permiso permite a la app descubrir dispositivos cercanos para transferir audiolibros mediante Wi-Fi Direct.</string>
-    <string name="wifi_permission_denied_title">Permiso de Wi-Fi Denegado</string>
-    <string name="wifi_permission_denied_message">Sin este permiso, no podrás transferir audiolibros a dispositivos cercanos. Puedes activarlo en cualquier momento en Ajustes.</string>
+    <string name="camera_permission_title">📷 Acceso a Cámara</string>
+    <string name="camera_permission_rationale">Necesitamos acceso a la cámara para:\n\n• Escanear códigos QR para transferencia P2P\n• Conectar con dispositivos cercanos fácilmente\n\nNo se graban fotos ni vídeos.</string>
+    <string name="camera_permission_denied_title">📷 Permiso de Cámara Denegado</string>
+    <string name="camera_permission_denied_message">Sin acceso a la cámara, no podrás escanear códigos QR para transferencia P2P.\n\nPuedes activarlo en cualquier momento en Ajustes → Apps → Litera → Permisos.</string>
+    <string name="storage_permission_title">🎧 Acceso a Archivos de Audio</string>
+    <string name="storage_permission_rationale">Necesitamos acceso a tus archivos de audio para:\n\n• Encontrar y listar todos los audiolibros\n• Reproducir tus audiolibros favoritos\n• Seguimiento del progreso de escucha</string>
+    <string name="storage_permission_denied_title">🎧 Permiso de Almacenamiento Denegado</string>
+    <string name="storage_permission_denied_message">Sin este permiso, la app no podrá encontrar tus audiolibros.\n\nPuedes activarlo en cualquier momento en Ajustes → Apps → Litera → Permisos.</string>
+    <string name="notification_permission_title">🔔 Notificaciones</string>
+    <string name="notification_permission_rationale">Las notificaciones te permiten:\n\n• Ver controles de reproducción mientras usas otras apps\n• Recibir alertas del temporizador de sueño\n• Controlar el audio desde cualquier lugar</string>
+    <string name="notification_permission_denied_title">🔔 Notificaciones Desactivadas</string>
+    <string name="notification_permission_denied_message">No verás los controles de reproducción en la barra de notificaciones.\n\nPuedes activarlo en cualquier momento en Ajustes → Apps → Litera → Permisos.</string>
+    <string name="wifi_permission_title">📡 Dispositivos Cercanos</string>
+    <string name="wifi_permission_rationale">Este permiso permite a la app:\n\n• Descubrir dispositivos cercanos para transferencia P2P\n• Transferir audiolibros sin internet\n• Conectarse mediante Wi-Fi Direct</string>
+    <string name="wifi_permission_denied_title">📡 Permiso de Wi-Fi Denegado</string>
+    <string name="wifi_permission_denied_message">Sin este permiso, no podrás transferir audiolibros a dispositivos cercanos.\n\nPuedes activarlo en cualquier momento en Ajustes → Apps → Litera → Permisos.</string>
 </resources>
