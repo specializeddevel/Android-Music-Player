@@ -18,6 +18,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.BackHandler
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.camera.core.ExperimentalGetImage
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -82,7 +83,7 @@ class MainViewModelFactory(private val application: android.app.Application, pri
     }
 }
 
-@OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
+@OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class, ExperimentalGetImage::class)
 class MainActivity : ComponentActivity() {
 
     private lateinit var playbackViewModel: PlaybackViewModel
