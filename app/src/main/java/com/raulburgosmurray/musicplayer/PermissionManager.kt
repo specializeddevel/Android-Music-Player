@@ -4,6 +4,7 @@ import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import com.gun0912.tedpermission.PermissionListener
 import com.gun0912.tedpermission.normal.TedPermission
+import com.raulburgosmurray.musicplayer.R
 
 object PermissionManager {
     private val BASE_PERMISSIONS = arrayOf(
@@ -46,13 +47,14 @@ object PermissionManager {
     fun checkAndRequestPermissions(activity: AppCompatActivity, listener: PermissionListener) {
         val permissionsToRequest = getRequiredMusicPermissions()
 
+        val ctx = activity.applicationContext
         TedPermission.create()
             .setPermissionListener(listener)
             .setPermissions(*permissionsToRequest)
-            .setRationaleTitle("Required permissions")
-            .setRationaleMessage("This app requires access to your audio files on this device. Please grant the necessary permission to proceed.")
-            .setDeniedTitle("Denied permissions")
-            .setDeniedMessage("If you don’t allow the required permissions, the app might not work properly. You can enable them anytime from your device settings")
+            .setRationaleTitle(ctx.getString(R.string.storage_permission_title))
+            .setRationaleMessage(ctx.getString(R.string.storage_permission_rationale))
+            .setDeniedTitle(ctx.getString(R.string.storage_permission_denied_title))
+            .setDeniedMessage(ctx.getString(R.string.storage_permission_denied_message))
             .setGotoSettingButton(true)
             .check()
     }

@@ -17,9 +17,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+import android.util.Log
 import androidx.annotation.VisibleForTesting
 
 class SyncViewModel(application: Application) : AndroidViewModel(application) {
+    companion object { private const val TAG = "SyncViewModel" }
     private val progressRepository = ProgressRepository(AppDatabase.getDatabase(application).progressDao())
     private val prefs = application.getSharedPreferences("sync_prefs", Context.MODE_PRIVATE)
 
@@ -79,7 +81,7 @@ class SyncViewModel(application: Application) : AndroidViewModel(application) {
                     prefs.edit().putLong("last_sync_time", now).apply()
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                Log.e(TAG, "Error during sync", e)
             } finally {
                 _isSyncing.value = false
             }
@@ -98,7 +100,7 @@ class SyncViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 driveService.uploadProgress(localProgress)
             } catch (e: Exception) {
-                e.printStackTrace()
+                Log.e(TAG, "Error during sync", e)
             }
         }
     }
