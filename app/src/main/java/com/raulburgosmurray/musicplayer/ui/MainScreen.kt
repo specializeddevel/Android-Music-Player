@@ -59,6 +59,7 @@ import com.raulburgosmurray.musicplayer.Music
 import com.raulburgosmurray.musicplayer.R
 import com.raulburgosmurray.musicplayer.encodeBookId
 import com.raulburgosmurray.musicplayer.ui.PlaybackUiState
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
 
@@ -128,11 +129,23 @@ fun MainScreen(
     var isChangingLayout by remember { mutableStateOf(false) }
     var displayedBooks by remember { mutableStateOf<List<Music>>(emptyList()) }
     
-    LaunchedEffect(books, searchQuery, layoutMode) {
+    // Debounce search: wait for the user to stop typing before filtering.
+    // Books list and layout changes apply immediately; only searchQuery is debounced.
+    LaunchedEffect(books, layoutMode) {
         isChangingLayout = true
         displayedBooks = if (searchQuery.isEmpty()) books
         else books.filter { it.title.contains(searchQuery, ignoreCase = true) || it.artist.contains(searchQuery, ignoreCase = true) }
         isChangingLayout = false
+    }
+    LaunchedEffect(searchQuery) {
+        if (searchQuery.isEmpty()) {
+            displayedBooks = books
+        } else {
+            delay(300)
+            displayedBooks = books.filter {
+                it.title.contains(searchQuery, ignoreCase = true) || it.artist.contains(searchQuery, ignoreCase = true)
+            }
+        }
     }
 
     val favoriteIdsSet = remember(favoriteIds) { favoriteIds.toSet() }
