@@ -120,9 +120,10 @@ class SyncViewModel(application: Application) : AndroidViewModel(application) {
             when {
                 l != null && c != null -> {
                     // Quedarnos con el más reciente
-                    if (c.lastUpdated > l.lastUpdated) merged.add(c)
+                    merged.add(if (c.lastUpdated > l.lastUpdated) c else l)
                 }
                 l == null && c != null -> merged.add(c) // Nuevo desde la nube
+                l != null && c == null -> merged.add(l) // Solo en local, conservar
             }
         }
 
