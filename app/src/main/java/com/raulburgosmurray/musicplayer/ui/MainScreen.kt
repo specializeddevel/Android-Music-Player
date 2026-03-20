@@ -489,7 +489,7 @@ fun androidx.compose.animation.SharedTransitionScope.BookGridItem(book: Music, i
         val context = LocalContext.current
         Box(modifier = Modifier.fillMaxSize()) {
             Surface(modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${keyPrefix}_cover_${book.id}"), animatedVisibilityScope = animatedVisibilityScope), color = MaterialTheme.colorScheme.surface.copy(alpha = if (isRead) 0.7f else 1f)) {
-                val artRequest = remember(book.artUri) { ImageRequest.Builder(context).data(book.artUri).crossfade(true).placeholder(R.drawable.ic_audiobook_cover).error(R.drawable.ic_audiobook_cover).build() }
+                val artRequest = remember(book.artUri) { ImageRequest.Builder(context).data(book.artUri).placeholder(R.drawable.ic_audiobook_cover).error(R.drawable.ic_audiobook_cover).build() }
                 if (!book.artUri.isNullOrBlank()) AsyncImage(model = artRequest, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                 else BookPlaceholder(title = displayTitle, modifier = Modifier.fillMaxSize())
             }
