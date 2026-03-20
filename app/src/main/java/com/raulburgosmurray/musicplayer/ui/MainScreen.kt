@@ -482,20 +482,15 @@ fun openFolder(context: android.content.Context, path: String) {
 @Composable
 fun androidx.compose.animation.SharedTransitionScope.BookGridItem(book: Music, isFavorite: Boolean, isRead: Boolean, progress: Float, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, keyPrefix: String = "grid", onAddToQueue: () -> Unit, onLongClick: () -> Unit, onClick: () -> Unit) {
     val context = LocalContext.current
-    val metadata by produceState<com.raulburgosmurray.musicplayer.data.AudioMetadata?>(initialValue = null, key1 = book.id) {
-        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            com.raulburgosmurray.musicplayer.data.MetadataJsonHelper.loadMetadata(context, book.id)
-        }
-    }
-    val rawTitle = metadata?.title?.takeIf { it.isNotBlank() } ?: book.title
-    val displayTitle = remember(rawTitle) { capitalizeWords(rawTitle) }
+    val displayTitle = remember(book.title) { capitalizeWords(book.title) }
     val displayArtist = remember(book.artist) { capitalizeWords(book.artist) }
     
     Card(modifier = Modifier.fillMaxWidth().height(240.dp).combinedClickable(onClick = onClick, onLongClick = onLongClick), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isRead) 0.3f else 0.5f))) {
         val context = LocalContext.current
         Box(modifier = Modifier.fillMaxSize()) {
             Surface(modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${keyPrefix}_cover_${book.id}"), animatedVisibilityScope = animatedVisibilityScope), color = MaterialTheme.colorScheme.surface.copy(alpha = if (isRead) 0.7f else 1f)) {
-                if (!book.artUri.isNullOrBlank()) AsyncImage(model = ImageRequest.Builder(context).data(book.artUri).crossfade(true).placeholder(R.drawable.ic_audiobook_cover).error(R.drawable.ic_audiobook_cover).build(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                val artRequest = remember(book.artUri) { ImageRequest.Builder(context).data(book.artUri).crossfade(true).placeholder(R.drawable.ic_audiobook_cover).error(R.drawable.ic_audiobook_cover).build() }
+                if (!book.artUri.isNullOrBlank()) AsyncImage(model = artRequest, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                 else BookPlaceholder(title = displayTitle, modifier = Modifier.fillMaxSize())
             }
             Surface(modifier = Modifier.fillMaxWidth().align(Alignment.BottomCenter), color = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.6f)) {
@@ -555,13 +550,7 @@ Card(shape = RoundedCornerShape(8.dp), modifier = Modifier.size(56.dp).sharedEle
 @Composable
 fun androidx.compose.animation.SharedTransitionScope.BookListItem(book: Music, isFavorite: Boolean, isRead: Boolean, progress: Float, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, keyPrefix: String = "list", onAddToQueue: () -> Unit, onLongClick: () -> Unit, onClick: () -> Unit) {
     val context = LocalContext.current
-    val metadata by produceState<com.raulburgosmurray.musicplayer.data.AudioMetadata?>(initialValue = null, key1 = book.id) {
-        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            com.raulburgosmurray.musicplayer.data.MetadataJsonHelper.loadMetadata(context, book.id)
-        }
-    }
-    val rawTitle = metadata?.title?.takeIf { it.isNotBlank() } ?: book.title
-    val displayTitle = remember(rawTitle) { capitalizeWords(rawTitle) }
+    val displayTitle = remember(book.title) { capitalizeWords(book.title) }
     val displayArtist = remember(book.artist) { capitalizeWords(book.artist) }
     
     Card(modifier = Modifier.fillMaxWidth().combinedClickable(onClick = onClick, onLongClick = onLongClick), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isRead) 0.3f else 0.5f))) {
@@ -569,7 +558,8 @@ fun androidx.compose.animation.SharedTransitionScope.BookListItem(book: Music, i
         Column {
             Row(modifier = Modifier.padding(12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Surface(modifier = Modifier.size(60.dp).sharedElement(rememberSharedContentState(key = "${keyPrefix}_cover_${book.id}"), animatedVisibilityScope = animatedVisibilityScope), shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surface) {
-                    if (!book.artUri.isNullOrBlank()) AsyncImage(model = ImageRequest.Builder(context).data(book.artUri).crossfade(true).placeholder(R.drawable.ic_audiobook_cover).error(R.drawable.ic_audiobook_cover).build(), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                    val artRequest = remember(book.artUri) { ImageRequest.Builder(context).data(book.artUri).crossfade(true).placeholder(R.drawable.ic_audiobook_cover).error(R.drawable.ic_audiobook_cover).build() }
+                    if (!book.artUri.isNullOrBlank()) AsyncImage(model = artRequest, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                     else CompactBookPlaceholder(title = displayTitle, modifier = Modifier.fillMaxSize())
                 }
                 Spacer(modifier = Modifier.width(16.dp))

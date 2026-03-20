@@ -13,6 +13,7 @@ import com.raulburgosmurray.musicplayer.data.BookRepository
 import com.raulburgosmurray.musicplayer.data.FavoriteRepository
 import com.raulburgosmurray.musicplayer.data.ProgressRepository
 import com.raulburgosmurray.musicplayer.data.MusicScanner
+import com.raulburgosmurray.musicplayer.data.MetadataJsonHelper
 import com.raulburgosmurray.musicplayer.data.toMusic
 import com.raulburgosmurray.musicplayer.data.toCachedBook
 import kotlinx.coroutines.Dispatchers
@@ -38,7 +39,16 @@ class MainViewModel(application: Application, settingsViewModel: SettingsViewMod
     val scanProgress = _scanProgress.asStateFlow()
     
     private val _books = bookRepository.getAllBooks()
-        .map { list -> list.map { it.toMusic() } }
+        .map { list ->
+            val context = getApplication<Application>()
+            list.map { cached ->
+                val editedTitle = MetadataJsonHelper.loadMetadata(context, cached.id)
+                    ?.title?.takeIf { it.isNotBlank() }
+                val music = cached.toMusic()
+                if (editedTitle != null) music.copy(title = editedTitle) else music
+            }
+        }
+        .flowOn(Dispatchers.IO)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(Constants.STATEFLOW_STOP_TIMEOUT_MS), emptyList())
     
     val sortOrder = settingsViewModel.sortOrder
