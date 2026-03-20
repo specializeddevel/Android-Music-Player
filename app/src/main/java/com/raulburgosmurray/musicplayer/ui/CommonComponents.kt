@@ -28,6 +28,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.abs
 
+fun capitalizeWords(text: String): String {
+    return text
+        .replace(Regex("\\.[a-zA-Z0-9]{2,4}$"), "")
+        .replace("_", " ")
+        .replace("-", " ")
+        .split(" ")
+        .filter { it.isNotEmpty() }
+        .joinToString(" ") { word -> word.lowercase().replaceFirstChar { it.titlecase() } }
+}
+
 private fun hueToRgb(p: Float, q: Float, t: Float): Float {
     var tNorm = t
     if (tNorm < 0f) tNorm += 1f

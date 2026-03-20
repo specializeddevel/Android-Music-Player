@@ -55,15 +55,6 @@ import com.raulburgosmurray.musicplayer.encodeBookId
 import com.raulburgosmurray.musicplayer.ui.PlaybackUiState
 import kotlinx.coroutines.launch
 
-private fun capitalizeWords(text: String): String {
-    return text
-        .replace(Regex("\\.[a-zA-Z0-9]{2,4}$"), "")
-        .replace("_", " ")
-        .replace("-", " ")
-        .split(" ")
-        .filter { it.isNotEmpty() }
-        .joinToString(" ") { word -> word.lowercase().replaceFirstChar { it.titlecase() } }
-}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable

@@ -64,15 +64,6 @@ import java.util.concurrent.Executors
 
 import androidx.documentfile.provider.DocumentFile
 
-private fun capitalizeWords(text: String): String {
-    return text
-        .replace(Regex("\\.[a-zA-Z0-9]{2,4}$"), "")
-        .replace("_", " ")
-        .replace("-", " ")
-        .split(" ")
-        .filter { it.isNotEmpty() }
-        .joinToString(" ") { word -> word.lowercase().replaceFirstChar { it.titlecase() } }
-}
 
 private fun deleteAudioFile(context: android.content.Context, path: String): Boolean {
     return try {
