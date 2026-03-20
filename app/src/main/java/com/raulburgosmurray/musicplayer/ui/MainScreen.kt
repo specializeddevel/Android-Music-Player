@@ -59,6 +59,8 @@ import com.raulburgosmurray.musicplayer.Music
 import com.raulburgosmurray.musicplayer.R
 import com.raulburgosmurray.musicplayer.encodeBookId
 import com.raulburgosmurray.musicplayer.ui.PlaybackUiState
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
@@ -484,34 +486,47 @@ fun androidx.compose.animation.SharedTransitionScope.BookGridItem(book: Music, i
     val context = LocalContext.current
     val displayTitle = remember(book.title) { capitalizeWords(book.title) }
     val displayArtist = remember(book.artist) { capitalizeWords(book.artist) }
-    
-    Card(modifier = Modifier.fillMaxWidth().height(240.dp).combinedClickable(onClick = onClick, onLongClick = onLongClick), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isRead) 0.3f else 0.5f))) {
-        val context = LocalContext.current
-        Box(modifier = Modifier.fillMaxSize()) {
-            Surface(modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${keyPrefix}_cover_${book.id}"), animatedVisibilityScope = animatedVisibilityScope), color = MaterialTheme.colorScheme.surface.copy(alpha = if (isRead) 0.7f else 1f)) {
-                val artRequest = remember(book.artUri) { ImageRequest.Builder(context).data(book.artUri).placeholder(R.drawable.ic_audiobook_cover).error(R.drawable.ic_audiobook_cover).build() }
-                if (!book.artUri.isNullOrBlank()) AsyncImage(model = artRequest, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                else BookPlaceholder(title = displayTitle, modifier = Modifier.fillMaxSize())
-            }
-            Surface(modifier = Modifier.fillMaxWidth().align(Alignment.BottomCenter), color = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.6f)) {
-                Column(modifier = Modifier.padding(8.dp)) {
-                    Text(text = displayTitle, style = MaterialTheme.typography.labelLarge, color = androidx.compose.ui.graphics.Color.White, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Text(text = displayArtist, style = MaterialTheme.typography.labelSmall, color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.8f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    val currentPos = (progress * book.duration).toLong()
-                    Text(
-                        text = if (progress > 0f) "${formatDuration(currentPos)} / ${formatDuration(book.duration)}" else formatDuration(book.duration),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-            IconButton(onClick = onAddToQueue, modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(32.dp).background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.4f), RoundedCornerShape(12.dp))) { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = null, tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(18.dp)) }
-            if (isFavorite) Icon(Icons.Default.Favorite, contentDescription = null, tint = androidx.compose.ui.graphics.Color.Red, modifier = Modifier.align(Alignment.TopStart).padding(8.dp).size(16.dp))
-            if (isRead) Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.align(Alignment.TopStart).padding(if (isFavorite) 28.dp else 8.dp).size(16.dp))
-            if (progress > 0f) LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(4.dp).align(Alignment.BottomCenter), color = MaterialTheme.colorScheme.primary, trackColor = androidx.compose.ui.graphics.Color.Transparent)
+    val artRequest = remember(book.artUri) { ImageRequest.Builder(context).data(book.artUri).placeholder(R.drawable.ic_audiobook_cover).error(R.drawable.ic_audiobook_cover).build() }
+    val coverAlpha = if (isRead) 0.7f else 1f
+    val primaryColor = MaterialTheme.colorScheme.primary
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(240.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .sharedElement(rememberSharedContentState(key = "${keyPrefix}_cover_${book.id}"), animatedVisibilityScope = animatedVisibilityScope)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+    ) {
+        // Cover image or placeholder — fills entire card
+        if (!book.artUri.isNullOrBlank()) {
+            AsyncImage(model = artRequest, contentDescription = null, contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().graphicsLayer(alpha = coverAlpha))
+        } else {
+            BookPlaceholder(title = displayTitle, modifier = Modifier.fillMaxSize().graphicsLayer(alpha = coverAlpha))
         }
+
+        // Bottom text overlay
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.BottomCenter)
+                .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.6f))
+                .padding(8.dp)
+        ) {
+            Text(text = displayTitle, style = MaterialTheme.typography.labelLarge, color = androidx.compose.ui.graphics.Color.White, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(text = displayArtist, style = MaterialTheme.typography.labelSmall, color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.8f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            val currentPos = remember(progress, book.duration) { (progress * book.duration).toLong() }
+            Text(text = if (progress > 0f) "${formatDuration(currentPos)} / ${formatDuration(book.duration)}" else formatDuration(book.duration), style = MaterialTheme.typography.labelSmall, color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+
+        // Queue button
+        IconButton(onClick = onAddToQueue, modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(32.dp).background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.4f), RoundedCornerShape(12.dp))) {
+            Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = null, tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(18.dp))
+        }
+        if (isFavorite) Icon(Icons.Default.Favorite, contentDescription = null, tint = androidx.compose.ui.graphics.Color.Red, modifier = Modifier.align(Alignment.TopStart).padding(8.dp).size(16.dp))
+        if (isRead) Icon(Icons.Default.CheckCircle, contentDescription = null, tint = primaryColor, modifier = Modifier.align(Alignment.TopStart).padding(if (isFavorite) 28.dp else 8.dp).size(16.dp))
+        if (progress > 0f) LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(4.dp).align(Alignment.BottomCenter), color = primaryColor, trackColor = androidx.compose.ui.graphics.Color.Transparent)
     }
 }
 
