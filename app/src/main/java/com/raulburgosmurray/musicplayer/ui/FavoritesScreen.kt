@@ -102,7 +102,7 @@ fun FavoritesScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(favoriteBooks) { book ->
+                items(items = favoriteBooks, key = { it.id }, contentType = { "book" }) { book ->
                     with(sharedTransitionScope) {
                         BookListItem(
                             book = book,

@@ -20,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration.Companion.seconds
 
 enum class SortOrder { TITLE, ARTIST, PROGRESS, RECENT }
 enum class BookFilter { ALL, COMPLETED, IN_PROGRESS }
@@ -102,11 +103,13 @@ class MainViewModel(application: Application, settingsViewModel: SettingsViewMod
 
     private fun observeProgress() {
         viewModelScope.launch {
-            progressRepository.getAllProgressFlow().collect { list ->
-                _bookProgress.value = list.associate { it.mediaId to if (it.duration > 0) it.lastPosition.toFloat() / it.duration.toFloat() else 0f }
-                _bookActivityTimestamps.value = list.associate { it.mediaId to it.lastPauseTimestamp }
-                _bookReadStatus.value = list.associate { it.mediaId to it.isRead }
-            }
+            progressRepository.getAllProgressFlow()
+                .debounce(2.seconds)
+                .collect { list ->
+                    _bookProgress.value = list.associate { it.mediaId to if (it.duration > 0) it.lastPosition.toFloat() / it.duration.toFloat() else 0f }
+                    _bookActivityTimestamps.value = list.associate { it.mediaId to it.lastPauseTimestamp }
+                    _bookReadStatus.value = list.associate { it.mediaId to it.isRead }
+                }
         }
     }
 
