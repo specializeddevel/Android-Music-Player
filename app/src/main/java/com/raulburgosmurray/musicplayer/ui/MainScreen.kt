@@ -482,7 +482,11 @@ fun openFolder(context: android.content.Context, path: String) {
 @Composable
 fun androidx.compose.animation.SharedTransitionScope.BookGridItem(book: Music, isFavorite: Boolean, isRead: Boolean, progress: Float, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, keyPrefix: String = "grid", onAddToQueue: () -> Unit, onLongClick: () -> Unit, onClick: () -> Unit) {
     val context = LocalContext.current
-    val metadata = remember(book.id) { com.raulburgosmurray.musicplayer.data.MetadataJsonHelper.loadMetadata(context, book.id) }
+    val metadata by produceState<com.raulburgosmurray.musicplayer.data.AudioMetadata?>(initialValue = null, key1 = book.id) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            com.raulburgosmurray.musicplayer.data.MetadataJsonHelper.loadMetadata(context, book.id)
+        }
+    }
     val rawTitle = metadata?.title?.takeIf { it.isNotBlank() } ?: book.title
     val displayTitle = remember(rawTitle) { capitalizeWords(rawTitle) }
     val displayArtist = remember(book.artist) { capitalizeWords(book.artist) }
@@ -491,7 +495,7 @@ fun androidx.compose.animation.SharedTransitionScope.BookGridItem(book: Music, i
         val context = LocalContext.current
         Box(modifier = Modifier.fillMaxSize()) {
             Surface(modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${keyPrefix}_cover_${book.id}"), animatedVisibilityScope = animatedVisibilityScope), color = MaterialTheme.colorScheme.surface.copy(alpha = if (isRead) 0.7f else 1f)) {
-                if (MetadataHelper.isArtUriValid(context, book.artUri)) AsyncImage(model = ImageRequest.Builder(context).data(book.artUri).crossfade(true).placeholder(R.drawable.ic_audiobook_cover).build(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                if (!book.artUri.isNullOrBlank()) AsyncImage(model = ImageRequest.Builder(context).data(book.artUri).crossfade(true).placeholder(R.drawable.ic_audiobook_cover).error(R.drawable.ic_audiobook_cover).build(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                 else BookPlaceholder(title = displayTitle, modifier = Modifier.fillMaxSize())
             }
             Surface(modifier = Modifier.fillMaxWidth().align(Alignment.BottomCenter), color = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.6f)) {
@@ -551,7 +555,11 @@ Card(shape = RoundedCornerShape(8.dp), modifier = Modifier.size(56.dp).sharedEle
 @Composable
 fun androidx.compose.animation.SharedTransitionScope.BookListItem(book: Music, isFavorite: Boolean, isRead: Boolean, progress: Float, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, keyPrefix: String = "list", onAddToQueue: () -> Unit, onLongClick: () -> Unit, onClick: () -> Unit) {
     val context = LocalContext.current
-    val metadata = remember(book.id) { com.raulburgosmurray.musicplayer.data.MetadataJsonHelper.loadMetadata(context, book.id) }
+    val metadata by produceState<com.raulburgosmurray.musicplayer.data.AudioMetadata?>(initialValue = null, key1 = book.id) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            com.raulburgosmurray.musicplayer.data.MetadataJsonHelper.loadMetadata(context, book.id)
+        }
+    }
     val rawTitle = metadata?.title?.takeIf { it.isNotBlank() } ?: book.title
     val displayTitle = remember(rawTitle) { capitalizeWords(rawTitle) }
     val displayArtist = remember(book.artist) { capitalizeWords(book.artist) }
@@ -561,13 +569,13 @@ fun androidx.compose.animation.SharedTransitionScope.BookListItem(book: Music, i
         Column {
             Row(modifier = Modifier.padding(12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Surface(modifier = Modifier.size(60.dp).sharedElement(rememberSharedContentState(key = "${keyPrefix}_cover_${book.id}"), animatedVisibilityScope = animatedVisibilityScope), shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surface) {
-                    if (MetadataHelper.isArtUriValid(context, book.artUri)) AsyncImage(model = ImageRequest.Builder(context).data(book.artUri).crossfade(true).placeholder(R.drawable.ic_audiobook_cover).build(), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                    if (!book.artUri.isNullOrBlank()) AsyncImage(model = ImageRequest.Builder(context).data(book.artUri).crossfade(true).placeholder(R.drawable.ic_audiobook_cover).error(R.drawable.ic_audiobook_cover).build(), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                     else CompactBookPlaceholder(title = displayTitle, modifier = Modifier.fillMaxSize())
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = displayTitle, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f, false).heightIn(max = 48.dp).verticalScroll(rememberScrollState()), color = if (isRead) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface)
+                        Text(text = displayTitle, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f, false), maxLines = 2, overflow = TextOverflow.Ellipsis, color = if (isRead) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface)
                         if (isFavorite) { Spacer(modifier = Modifier.width(4.dp)); Icon(Icons.Default.Favorite, contentDescription = null, tint = androidx.compose.ui.graphics.Color.Red, modifier = Modifier.size(16.dp)) }
                         if (isRead) { Spacer(modifier = Modifier.width(4.dp)); Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp)) }
                     }
