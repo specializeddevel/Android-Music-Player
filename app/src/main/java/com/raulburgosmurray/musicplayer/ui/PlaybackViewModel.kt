@@ -304,8 +304,8 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
         }
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val inputStream = getApplication<Application>().contentResolver.openInputStream(artworkUri)
-                val bitmap = BitmapFactory.decodeStream(inputStream)
+                val bitmap = getApplication<Application>().contentResolver
+                    .openInputStream(artworkUri)?.use { BitmapFactory.decodeStream(it) }
                 if (bitmap != null) {
                     Palette.from(bitmap).generate { palette ->
                         val color = palette?.getVibrantColor(0) ?: palette?.getDominantColor(0)
@@ -313,6 +313,7 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
                             _uiState.value = _uiState.value.copy(dominantColor = color)
                         }
                     }
+                    bitmap.recycle()
                 }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(dominantColor = null)
