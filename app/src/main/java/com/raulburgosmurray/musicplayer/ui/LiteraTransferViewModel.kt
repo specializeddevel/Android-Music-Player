@@ -147,7 +147,10 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
                     
                     withContext(Dispatchers.Main) { _uiState.value = _uiState.value.copy(transferStatus = context.getString(R.string.sending, title)) }
 
-                    val inputStream: InputStream = if (path.startsWith("content://")) { context.contentResolver.openInputStream(Uri.parse(path))!! } else { FileInputStream(File(path)) }
+                    val inputStream: InputStream = if (path.startsWith("content://")) {
+                        context.contentResolver.openInputStream(Uri.parse(path))
+                            ?: throw IllegalStateException("No se pudo abrir el archivo: $path")
+                    } else { FileInputStream(File(path)) }
                     inputStream.use { i ->
                         val buffer = ByteArray(65536); var bytesRead: Int
                         while (i.read(buffer).also { bytesRead = it } != -1) { output.write(buffer, 0, bytesRead) }
