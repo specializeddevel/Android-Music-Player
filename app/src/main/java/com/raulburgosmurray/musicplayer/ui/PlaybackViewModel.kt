@@ -63,6 +63,7 @@ import com.raulburgosmurray.musicplayer.ui.formatDuration
 
 data class PlaybackUiState(
     val isPlaying: Boolean = false,
+    val playWhenReady: Boolean = false,
     val currentPosition: Long = 0,
     val duration: Long = 0,
     val currentMediaItem: MediaItem? = null,
@@ -466,6 +467,10 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
                 if (isPlaying) startProgressUpdate() else stopProgressUpdate()
             }
 
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                _uiState.value = _uiState.value.copy(playWhenReady = playWhenReady)
+            }
+
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 _uiState.value = _uiState.value.copy(
                     currentMediaItem = mediaItem,
@@ -509,6 +514,7 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
         _uiState.value = _uiState.value.copy(
             isConnected = true,
             isPlaying = player.isPlaying,
+            playWhenReady = player.playWhenReady,
             currentMediaItem = player.currentMediaItem,
             duration = player.duration,
             currentPosition = player.currentPosition,

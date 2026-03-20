@@ -320,7 +320,7 @@ fun PlayerControls(state: PlaybackUiState, viewModel: PlaybackViewModel, onShowS
     }
     val displayTitle = metadata?.title?.takeIf { it.isNotBlank() } ?: currentItem?.mediaMetadata?.title?.toString() ?: stringResource(R.string.unknown_title)
     
-    val isPlaying = state.isPlaying
+    val isPlaying = state.playWhenReady
     val progress = if (state.duration > 0) state.currentPosition.toFloat() / state.duration.toFloat() else 0f
     val duration = state.duration
     val position = state.currentPosition

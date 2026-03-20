@@ -554,7 +554,7 @@ Card(shape = RoundedCornerShape(8.dp), modifier = Modifier.size(56.dp).sharedEle
                 Text(text = displayTitle, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.basicMarquee())
                 Text(text = displayArtist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, modifier = Modifier.basicMarquee())
             }
-            IconButton(onClick = onTogglePlay) { Icon(if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, contentDescription = stringResource(R.string.pause_play_btn), modifier = Modifier.size(32.dp), tint = MaterialTheme.colorScheme.primary) }
+            IconButton(onClick = onTogglePlay) { Icon(if (state.playWhenReady) Icons.Default.Pause else Icons.Default.PlayArrow, contentDescription = stringResource(R.string.pause_play_btn), modifier = Modifier.size(32.dp), tint = MaterialTheme.colorScheme.primary) }
         }
         val progress = if (state.duration > 0) state.currentPosition.toFloat() / state.duration.toFloat() else 0f
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomStart) { LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(3.dp), color = MaterialTheme.colorScheme.primary, trackColor = androidx.compose.ui.graphics.Color.Transparent) }
