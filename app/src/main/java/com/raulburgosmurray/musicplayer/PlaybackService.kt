@@ -21,6 +21,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 
 class PlaybackService : MediaSessionService() {
 
@@ -32,6 +34,7 @@ class PlaybackService : MediaSessionService() {
     private var player: ExoPlayer? = null
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var saveProgressJob: Job? = null
+    private var smartRewindJob: Job? = null
     private lateinit var database: AppDatabase
 
     @OptIn(UnstableApi::class)
@@ -103,12 +106,11 @@ class PlaybackService : MediaSessionService() {
     }
 
     private fun restorePositionOnTransition(mediaId: String) {
-        val p = player ?: return
         serviceScope.launch(Dispatchers.IO) {
             try {
                 val progress = database.progressDao().getProgress(mediaId)
-                launch(Dispatchers.Main) {
-                    val currentPlayer = player ?: return@launch
+                withContext(Dispatchers.Main) {
+                    val currentPlayer = player ?: return@withContext
                     if (progress != null) {
                         if (Math.abs(currentPlayer.currentPosition - progress.lastPosition) > 1000) {
                             currentPlayer.seekTo(progress.lastPosition)
@@ -127,26 +129,29 @@ class PlaybackService : MediaSessionService() {
     }
 
     private fun applySmartRewindOnPlay() {
+        // Cancel any in-flight rewind from a previous rapid play/pause to avoid
+        // multiple concurrent seeks, which can crash ExoPlayer with BT headphones.
+        smartRewindJob?.cancel()
         val p = player ?: return
         val currentItem = p.currentMediaItem ?: return
         val mediaId = currentItem.mediaId
-        
-        serviceScope.launch(Dispatchers.IO) {
+
+        smartRewindJob = serviceScope.launch(Dispatchers.IO) {
             try {
                 val progress = database.progressDao().getProgress(mediaId)
                 val lastPause = progress?.lastPauseTimestamp ?: 0L
-                
+
                 if (lastPause > 0) {
                     val elapsed = System.currentTimeMillis() - lastPause
                     val rewindMs = calculateRewindMs(elapsed)
-                    
+
                     progress?.let {
                         database.progressDao().saveProgress(it.copy(lastPauseTimestamp = 0L))
                     }
 
-                    if (rewindMs > 0) {
-                        launch(Dispatchers.Main) {
-                            val currentPlayer = player ?: return@launch
+                    if (rewindMs > 0 && isActive) {
+                        withContext(Dispatchers.Main) {
+                            val currentPlayer = player ?: return@withContext
                             val newPos = (currentPlayer.currentPosition - rewindMs).coerceAtLeast(0L)
                             currentPlayer.seekTo(newPos)
                         }
@@ -180,7 +185,7 @@ class PlaybackService : MediaSessionService() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ApplicationClass.EXIT) {
             stopPeriodicSave()
-            saveCurrentProgress(isPausing = true)
+            saveCurrentProgressBlocking()
             releaseResources()
             stopSelf()
         }
@@ -246,8 +251,43 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
+    /**
+     * Saves progress synchronously using runBlocking to guarantee completion before the
+     * service process is killed. Only called during shutdown paths (EXIT, onTaskRemoved,
+     * onDestroy). Normal playback saves use the async saveCurrentProgress().
+     */
+    private fun saveCurrentProgressBlocking() {
+        val p = player ?: return
+        if (p.playbackState == Player.STATE_IDLE) return
+        val currentMediaItem = p.currentMediaItem ?: return
+        val position = p.currentPosition
+        val duration = p.duration
+        val speed = p.playbackParameters.speed
+        if (duration <= 0 || position < 0) return
+
+        runBlocking(Dispatchers.IO) {
+            try {
+                val existing = database.progressDao().getProgress(currentMediaItem.mediaId)
+                val progressPercent = position.toFloat() / duration.toFloat()
+                database.progressDao().saveProgress(
+                    AudiobookProgress(
+                        mediaId = currentMediaItem.mediaId,
+                        lastPosition = position,
+                        duration = duration,
+                        lastPauseTimestamp = System.currentTimeMillis(),
+                        playbackSpeed = speed,
+                        isRead = (existing?.isRead ?: false) || progressPercent >= 0.99f
+                    )
+                )
+            } catch (e: Exception) {
+                Log.e("PlaybackService", "Error guardando progreso al cerrar", e)
+            }
+        }
+    }
+
     override fun onTaskRemoved(rootIntent: Intent?) {
-        saveCurrentProgress(isPausing = true)
+        stopPeriodicSave()
+        saveCurrentProgressBlocking()
         releaseResources()
         stopSelf()
         super.onTaskRemoved(rootIntent)
@@ -255,7 +295,7 @@ class PlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         stopPeriodicSave()
-        saveCurrentProgress(isPausing = true)
+        saveCurrentProgressBlocking()
         releaseResources()
         super.onDestroy()
     }
