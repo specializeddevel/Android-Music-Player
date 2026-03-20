@@ -20,6 +20,11 @@ class MusicScanner(
 ) {
     private val extensions = setOf("mp3", "m4a", "m4b", "aac", "wav", "ogg", "flac")
 
+    companion object {
+        private const val TAG = "MusicScanner"
+        private const val MAX_SCAN_DEPTH = 20
+    }
+
     /**
      * Check if the file path belongs to a messaging/voice recording app that should be excluded
      */
@@ -175,15 +180,31 @@ class MusicScanner(
         tempList
     }
 
+    // Iterative traversal with an explicit stack to avoid stack overflow on deep directory trees.
+    // MAX_SCAN_DEPTH prevents runaway traversal in pathological symlink/mount structures.
     private fun collectAudioFiles(directory: DocumentFile): List<DocumentFile> {
         val files = mutableListOf<DocumentFile>()
-        directory.listFiles()?.forEach { file ->
-            if (file.isDirectory) {
-                files.addAll(collectAudioFiles(file))
-            } else {
-                val name = file.name?.lowercase() ?: ""
-                if (extensions.any { name.endsWith(".$it") }) {
-                    files.add(file)
+        val stack = ArrayDeque<Pair<DocumentFile, Int>>()
+        stack.addLast(directory to 0)
+
+        while (stack.isNotEmpty()) {
+            val (current, depth) = stack.removeLast()
+            if (depth > MAX_SCAN_DEPTH) continue
+
+            val children = current.listFiles()
+            if (children == null) {
+                Log.w(TAG, "listFiles() returned null for '${current.name}'")
+                continue
+            }
+
+            for (file in children) {
+                if (file.isDirectory) {
+                    stack.addLast(file to depth + 1)
+                } else {
+                    val name = file.name?.lowercase() ?: ""
+                    if (extensions.any { name.endsWith(".$it") }) {
+                        files.add(file)
+                    }
                 }
             }
         }
