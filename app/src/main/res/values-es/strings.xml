@@ -258,4 +258,5 @@
     <string name="wifi_permission_denied_message">Sin este permiso, no podrás transferir audiolibros a dispositivos cercanos.\n\nPuedes activarlo en cualquier momento en Ajustes → Apps → Litera → Permisos.</string>
     <string name="equalizer_title">Ecualizador</string>
     <string name="equalizer_not_available">El ecualizador no está disponible en este dispositivo</string>
+    <string name="pitch_selector">Tono</string>
 </resources>

@@ -249,4 +249,5 @@
     <string name="wifi_permission_denied_message">Sans cette autorisation, vous ne pourrez pas transférer de livres audio vers des appareils à proximité.\n\nVous pouvez l\'activer à tout moment dans Paramètres → Apps → Litera → Autorisations.</string>
     <string name="equalizer_title">Égaliseur</string>
     <string name="equalizer_not_available">L\'égaliseur n\'est pas disponible sur cet appareil</string>
+    <string name="pitch_selector">Hauteur</string>
 </resources>
