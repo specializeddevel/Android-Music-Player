@@ -390,23 +390,40 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
             pendingBooksToLoadQueue = allBooks
             return
         }
-        
+
         if (player.mediaItemCount > 0) {
             isQueueLoaded = true
-            return 
+            return
         }
 
         viewModelScope.launch {
             val savedQueue = withContext(Dispatchers.IO) { queueRepository.getQueueSnapshot() }
-            if (savedQueue.isNotEmpty()) {
-                val itemsToLoad = savedQueue.mapNotNull { savedItem ->
-                    allBooks.find { it.id == savedItem.mediaId }?.toMediaItem()
+            if (savedQueue.isEmpty()) {
+                isQueueLoaded = true
+                return@launch
+            }
+
+            // Filter out books that no longer exist in storage
+            val existingBookIds = allBooks.map { it.id }.toSet()
+            val (validItems, orphanedItems) = savedQueue.partition { existingBookIds.contains(it.mediaId) }
+
+            // Remove orphaned items from DB
+            if (orphanedItems.isNotEmpty()) {
+                withContext(Dispatchers.IO) {
+                    queueRepository.updateFullQueue(validItems.mapIndexed { index, item ->
+                        com.raulburgosmurray.musicplayer.data.QueueItem(mediaId = item.mediaId, orderIndex = index)
+                    })
                 }
-                if (itemsToLoad.isNotEmpty()) {
-                    player.setMediaItems(itemsToLoad)
-                    player.prepare()
-                    updatePlaylistState()
-                }
+            }
+
+            // Load only valid items
+            val itemsToLoad = validItems.mapNotNull { savedItem ->
+                allBooks.find { it.id == savedItem.mediaId }?.toMediaItem()
+            }
+            if (itemsToLoad.isNotEmpty()) {
+                player.setMediaItems(itemsToLoad)
+                player.prepare()
+                updatePlaylistState()
             }
             isQueueLoaded = true
         }
