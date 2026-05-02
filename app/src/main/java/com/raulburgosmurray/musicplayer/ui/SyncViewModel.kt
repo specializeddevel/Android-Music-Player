@@ -54,7 +54,8 @@ class SyncViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _isSyncing.value = true
             try {
-                val driveService = GoogleDriveService(context, account.email!!)
+                val email = account.email ?: return@launch
+                val driveService = GoogleDriveService(context, email)
                 
                 // 1. Descargar de la nube
                 val cloudProgress = driveService.downloadProgress()
@@ -94,7 +95,8 @@ class SyncViewModel(application: Application) : AndroidViewModel(application) {
         
         viewModelScope.launch {
             try {
-                val driveService = GoogleDriveService(context, account.email!!)
+                val email = account.email ?: return@launch
+                val driveService = GoogleDriveService(context, email)
                 val localProgress = withContext(Dispatchers.IO) {
                     progressRepository.getAllProgress()
                 }

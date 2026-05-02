@@ -106,8 +106,10 @@ class MainActivity : ComponentActivity() {
         settingsViewModel = ViewModelProvider(this)[SettingsViewModel::class.java]
         syncViewModel = ViewModelProvider(this)[SyncViewModel::class.java]
         transferViewModel = ViewModelProvider(this)[LiteraTransferViewModel::class.java]
-        val filter = IntentFilter(PlaybackService.SYNC_ACTION)
-        ContextCompat.registerReceiver(this, syncReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        if (FeatureFlags.CLOUD_SYNC) {
+            val filter = IntentFilter(PlaybackService.SYNC_ACTION)
+            ContextCompat.registerReceiver(this, syncReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        }
         val mainViewModelFactory = MainViewModelFactory(application, settingsViewModel)
         mainViewModel = ViewModelProvider(this, mainViewModelFactory)[MainViewModel::class.java]
         playbackViewModel = ViewModelProvider(this)[PlaybackViewModel::class.java]

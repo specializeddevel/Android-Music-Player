@@ -111,7 +111,7 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
                 wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Litera:TransferWake").apply { acquire(15*60*1000L) }
                 wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "Litera:WifiLock").apply { acquire() }
 
-                serverSocket = ServerSocket(); serverSocket?.reuseAddress = true; serverSocket?.bind(InetSocketAddress(ip, Constants.TRANSFER_SERVER_PORT))
+                serverSocket = ServerSocket(); serverSocket?.reuseAddress = true; serverSocket?.soTimeout = Constants.SOCKET_ACCEPT_TIMEOUT_MS; serverSocket?.bind(InetSocketAddress(ip, Constants.TRANSFER_SERVER_PORT))
 
                 while (isActive) {
                     val clientSocket = try { serverSocket?.accept() } catch (e: Exception) { null } ?: break

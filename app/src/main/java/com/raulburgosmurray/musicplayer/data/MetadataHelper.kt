@@ -19,6 +19,8 @@ object MetadataHelper {
             if (artUri.startsWith("file://")) {
                 val file = File(artUri.removePrefix("file://"))
                 file.exists()
+            } else if (artUri.startsWith("content://")) {
+                context.contentResolver.query(Uri.parse(artUri), null, null, null, null)?.use { it.moveToFirst() } ?: false
             } else {
                 false
             }

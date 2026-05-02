@@ -15,6 +15,7 @@ object Constants {
     const val QR_SCAN_DELAY_MS = 1500L
     const val SOCKET_CONNECT_TIMEOUT_MS = 10000
     const val SOCKET_READ_TIMEOUT_MS = 60000
+    const val SOCKET_ACCEPT_TIMEOUT_MS = 30000
     const val TRANSFER_SERVER_PORT = 50001
     const val STATEFLOW_STOP_TIMEOUT_MS = 5000L
     const val VIBRATION_DURATION_MS = 500L

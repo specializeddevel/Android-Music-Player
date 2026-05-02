@@ -235,7 +235,7 @@ fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, 
                 onAreaReleased = { pressedArea = null },
                 onLeftTap = { viewModel.skipBackward(Constants.SKIP_BACKWARD_MS) },
                 onCenterTap = { viewModel.togglePlayPause() },
-                onRightTap = { viewModel.skipForward(Constants.SKIP_BACKWARD_MS) }
+                onRightTap = { viewModel.skipForward(Constants.SKIP_FORWARD_MS) }
             )
         }
         Spacer(Modifier.height(32.dp))
@@ -285,7 +285,7 @@ fun LandscapePlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel,
                 onAreaReleased = { pressedArea = null },
                 onLeftTap = { viewModel.skipBackward(Constants.SKIP_BACKWARD_MS) },
                 onCenterTap = { viewModel.togglePlayPause() },
-                onRightTap = { viewModel.skipForward(Constants.SKIP_BACKWARD_MS) }
+                onRightTap = { viewModel.skipForward(Constants.SKIP_FORWARD_MS) }
             )
             IconButton(onClick = onBack, modifier = Modifier.padding(8.dp).background(Color.Black.copy(alpha = 0.3f), CircleShape)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) }
         }
