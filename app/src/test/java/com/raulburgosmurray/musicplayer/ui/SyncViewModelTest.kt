@@ -71,7 +71,7 @@ class SyncViewModelTest {
     }
 
     @Test
-    fun `mergeProgress does not upsert when local progress is newer than cloud`() = runTest {
+    fun `mergeProgress keeps local progress when it is newer than cloud`() = runTest {
         // Given
         val viewModel = SyncViewModel(application)
         val mediaId = "book1"
@@ -86,8 +86,10 @@ class SyncViewModelTest {
         // When
         viewModel.mergeProgress(local, cloud)
 
-        // Then
-        coVerify(exactly = 0) { progressDao.upsertAll(any()) }
+        // Then: local (newer) is persisted
+        coVerify { progressDao.upsertAll(match { list ->
+            list.size == 1 && list[0].lastPosition == 1000L && list[0].mediaId == mediaId
+        }) }
     }
 
     @Test
