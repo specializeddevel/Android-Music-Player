@@ -120,6 +120,7 @@ fun MainScreen(
     
     val context = LocalContext.current
     var searchQuery by remember { mutableStateOf("") }
+    var showSearchBar by remember { mutableStateOf(false) }
     var showSortMenu by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -147,6 +148,11 @@ fun MainScreen(
             displayedBooks = books.filter {
                 it.title.contains(searchQuery, ignoreCase = true) || it.artist.contains(searchQuery, ignoreCase = true)
             }
+        }
+    }
+    LaunchedEffect(showSearchBar) {
+        if (!showSearchBar) {
+            searchQuery = ""
         }
     }
 
@@ -203,6 +209,7 @@ fun MainScreen(
                             DropdownMenuItem(text = { Text(stringResource(R.string.filter_in_progress)) }, leadingIcon = { if (currentFilter == com.raulburgosmurray.musicplayer.ui.BookFilter.IN_PROGRESS) Icon(Icons.Default.Check, null) }, onClick = { mainViewModel.setFilter(com.raulburgosmurray.musicplayer.ui.BookFilter.IN_PROGRESS); showSortMenu = false })
                         }
                     }
+                    IconButton(onClick = { showSearchBar = !showSearchBar }) { Icon(Icons.Default.Search, contentDescription = stringResource(R.string.search_placeholder), tint = if (showSearchBar || searchQuery.isNotEmpty()) MaterialTheme.colorScheme.primary else LocalContentColor.current) }
                     IconButton(onClick = onFavoritesClick) { Icon(Icons.Default.Favorite, contentDescription = stringResource(R.string.favourites_btn), tint = if (favoriteIds.isNotEmpty()) androidx.compose.ui.graphics.Color.Red else LocalContentColor.current) }
                     IconButton(onClick = onSettingsClick) { Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings)) }
                 }
@@ -211,7 +218,9 @@ fun MainScreen(
         bottomBar = { if (playbackState.currentMediaItem != null) { with(sharedTransitionScope) { MiniPlayer(state = playbackState, animatedVisibilityScope = animatedVisibilityScope, onTogglePlay = { playbackViewModel.togglePlayPause() }, onClick = onMiniPlayerClick) } } }
 ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            SearchBar(inputField = { SearchBarDefaults.InputField(query = searchQuery, onQueryChange = { searchQuery = it }, onSearch = { }, expanded = false, onExpandedChange = { }, placeholder = { Text(stringResource(R.string.search_placeholder)) }, leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) }) }, expanded = false, onExpandedChange = { }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {}
+            androidx.compose.animation.AnimatedVisibility(visible = showSearchBar) {
+                SearchBar(inputField = { SearchBarDefaults.InputField(query = searchQuery, onQueryChange = { searchQuery = it }, onSearch = { }, expanded = false, onExpandedChange = { }, placeholder = { Text(stringResource(R.string.search_placeholder)) }, leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) }) }, expanded = false, onExpandedChange = { }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {}
+            }
             Box(modifier = Modifier.fillMaxSize()) {
                 if (isLoading && books.isEmpty()) {
                     Column(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
