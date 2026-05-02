@@ -647,6 +647,15 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
     fun setPlaybackSpeed(speed: Float) {
         controller?.setPlaybackSpeed(speed)
         _uiState.value = _uiState.value.copy(playbackSpeed = speed)
+        // Persist speed per-book
+        _uiState.value.currentMusicDetails?.id?.let { mediaId ->
+            viewModelScope.launch(Dispatchers.IO) {
+                val existing = progressRepository.getProgress(mediaId)
+                if (existing != null) {
+                    progressRepository.saveProgress(existing.copy(playbackSpeed = speed))
+                }
+            }
+        }
     }
 
     fun setPitch(pitch: Float) {
@@ -812,26 +821,20 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
     private fun restorePerBookSettings(mediaId: String) {
         viewModelScope.launch(Dispatchers.IO) {
             val progress = progressRepository.getProgress(mediaId) ?: return@launch
-            // Restore EQ preset
-            if (progress.eqPresetName.isNotEmpty()) {
-                try {
-                    val preset = EqPreset.valueOf(progress.eqPresetName)
-                    withContext(Dispatchers.Main) {
+            withContext(Dispatchers.Main) {
+                val speed = progress.playbackSpeed.coerceAtLeast(0.1f)
+                val pitch = progress.pitch.coerceAtLeast(0.1f)
+                controller?.setPlaybackParameters(
+                    androidx.media3.common.PlaybackParameters(speed, pitch)
+                )
+                _uiState.value = _uiState.value.copy(playbackSpeed = speed, pitch = pitch)
+                // Restore EQ preset
+                if (progress.eqPresetName.isNotEmpty()) {
+                    try {
+                        val preset = EqPreset.valueOf(progress.eqPresetName)
                         equalizerManager.applyPreset(preset)
                         _uiState.value = _uiState.value.copy(eqPreset = preset)
-                    }
-                } catch (_: IllegalArgumentException) {}
-            }
-            // Restore pitch
-            if (progress.pitch > 0f) {
-                withContext(Dispatchers.Main) {
-                    controller?.setPlaybackParameters(
-                        androidx.media3.common.PlaybackParameters(
-                            controller?.playbackParameters?.speed ?: 1.0f,
-                            progress.pitch
-                        )
-                    )
-                    _uiState.value = _uiState.value.copy(pitch = progress.pitch)
+                    } catch (_: IllegalArgumentException) {}
                 }
             }
         }
