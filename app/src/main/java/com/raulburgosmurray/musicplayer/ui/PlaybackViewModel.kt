@@ -319,8 +319,8 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
                         if (color != 0 && color != null) {
                             _uiState.value = _uiState.value.copy(dominantColor = color)
                         }
+                        bitmap.recycle()
                     }
-                    bitmap.recycle()
                 }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(dominantColor = null)
