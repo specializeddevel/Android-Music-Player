@@ -478,6 +478,15 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
             }
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                // Auto-mark previous book as read when playback advances automatically
+                if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
+                    _uiState.value.currentMusicDetails?.id?.let { previousId ->
+                        viewModelScope.launch(Dispatchers.IO) {
+                            progressRepository.setReadStatus(previousId, true)
+                        }
+                    }
+                }
+
                 _uiState.value = _uiState.value.copy(
                     currentMediaItem = mediaItem,
                     currentIndex = player.currentMediaItemIndex,
@@ -508,6 +517,13 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
                 )
                 if (playbackState == Player.STATE_READY) {
                     attachEqualizer()
+                }
+                if (playbackState == Player.STATE_ENDED) {
+                    _uiState.value.currentMusicDetails?.id?.let { mediaId ->
+                        viewModelScope.launch(Dispatchers.IO) {
+                            progressRepository.setReadStatus(mediaId, true)
+                        }
+                    }
                 }
             }
 
