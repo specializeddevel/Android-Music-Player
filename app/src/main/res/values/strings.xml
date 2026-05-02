@@ -258,4 +258,6 @@
     <string name="wifi_permission_rationale">This permission allows the app to:\n\n• Discover nearby devices for P2P transfer\n• Transfer audiobooks without internet\n• Connect via Wi-Fi Direct</string>
     <string name="wifi_permission_denied_title">📡 Wi-Fi Permission Denied</string>
     <string name="wifi_permission_denied_message">Without this permission, you won\'t be able to transfer audiobooks to nearby devices. You can enable it anytime in Settings.</string>
+    <string name="equalizer_title">Equalizer</string>
+    <string name="equalizer_not_available">Equalizer is not available on this device</string>
 </resources>

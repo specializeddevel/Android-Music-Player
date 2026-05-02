@@ -51,6 +51,7 @@ import coil.request.ImageRequest
 import com.raulburgosmurray.musicplayer.Music
 import com.raulburgosmurray.musicplayer.R
 import com.raulburgosmurray.musicplayer.Constants
+import com.raulburgosmurray.musicplayer.EqPreset
 import com.raulburgosmurray.musicplayer.encodeBookId
 import com.raulburgosmurray.musicplayer.ui.PlaybackUiState
 import kotlinx.coroutines.launch
@@ -92,6 +93,8 @@ fun PlayerScreen(
     var showBookmarkSheet by remember { mutableStateOf(false) }
     var showAddBookmarkDialog by remember { mutableStateOf(false) }
     var bookmarkPositionAtCreation by remember { mutableStateOf(0L) }
+    val eqSheetState = rememberModalBottomSheetState()
+    var showEqSheet by remember { mutableStateOf(false) }
 
     var showShareFileConfirmation by remember { mutableStateOf(false) }
     var isLocked by rememberSaveable { mutableStateOf(false) }
@@ -106,6 +109,7 @@ fun PlayerScreen(
                     onShowQueue = { showQueueSheet = true }, onShowDetails = { showDetailsSheet = true },
                     onShowShare = { showShareFileConfirmation = true }, onShowSpeed = { showSpeedSheet = true },
                     onShowTimer = { showTimerSheet = true }, onShowBookmark = { showBookmarkSheet = true },
+                    onShowEqualizer = { showEqSheet = true },
                     onLock = { isLocked = true }
                 )
             } else {
@@ -116,6 +120,7 @@ fun PlayerScreen(
                     onShowQueue = { showQueueSheet = true }, onShowDetails = { showDetailsSheet = true },
                     onShowShare = { showShareFileConfirmation = true }, onShowSpeed = { showSpeedSheet = true },
                     onShowTimer = { showTimerSheet = true }, onShowBookmark = { showBookmarkSheet = true },
+                    onShowEqualizer = { showEqSheet = true },
                     onLock = { isLocked = true }
                 )
             }
@@ -166,6 +171,7 @@ fun PlayerScreen(
     if (showQueueSheet) { ModalBottomSheet(onDismissRequest = { showQueueSheet = false }, sheetState = queueSheetState) { QueueSelectorContent(playlist = state.playlist, currentIndex = state.currentIndex, onItemClicked = { index -> viewModel.skipToQueueItem(index); showQueueSheet = false }, onRemoveItem = { viewModel.removeItemFromQueue(it) }, onShowDetails = { showDetailsSheet = true }) } }
     if (showDetailsSheet && state.currentMusicDetails != null) { ModalBottomSheet(onDismissRequest = { showDetailsSheet = false }, sheetState = detailsSheetState) { BookDetailsContent(book = state.currentMusicDetails!!, allBooks = emptyList(), onEditMetadata = { bookId -> navController.navigate("metadata_editor?bookId=${encodeBookId(bookId)}") }) } }
     if (showBookmarkSheet) { ModalBottomSheet(onDismissRequest = { showBookmarkSheet = false }, sheetState = bookmarkSheetState) { BookmarkSelectorContent(bookmarks = state.bookmarks, onBookmarkSelected = { viewModel.seekTo(it.position); showBookmarkSheet = false }, onDeleteBookmark = { id -> viewModel.deleteBookmark(id) }, onAddBookmark = { bookmarkPositionAtCreation = state.currentPosition; showAddBookmarkDialog = true }) } }
+    if (showEqSheet) { ModalBottomSheet(onDismissRequest = { showEqSheet = false }, sheetState = eqSheetState) { EqualizerSelectorContent(currentPreset = state.eqPreset, isAvailable = state.eqAvailable, onPresetSelected = { viewModel.setEqPreset(it); showEqSheet = false }) } }
     if (showAddBookmarkDialog) { AddBookmarkDialog(currentPosition = bookmarkPositionAtCreation, onDismiss = { showAddBookmarkDialog = false }, onConfirm = { note -> viewModel.addBookmark(note, bookmarkPositionAtCreation); showAddBookmarkDialog = false }) }
     if (showShareFileConfirmation) {
         AlertDialog(onDismissRequest = { showShareFileConfirmation = false }, title = { Text(stringResource(R.string.share_file_warning_title)) }, text = { Text(stringResource(R.string.share_file_warning_message)) }, confirmButton = { Button(onClick = { showShareFileConfirmation = false; viewModel.shareFile(context) }) { Text(stringResource(R.string.confirm)) } }, dismissButton = { TextButton(onClick = { showShareFileConfirmation = false }) { Text(stringResource(R.string.cancel)) } })
@@ -174,7 +180,7 @@ fun PlayerScreen(
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit, onShowBookmark: () -> Unit, onLock: () -> Unit) {
+fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit, onShowBookmark: () -> Unit, onShowEqualizer: () -> Unit, onLock: () -> Unit) {
     val currentItem = state.currentMediaItem
     val context = LocalContext.current
     val mediaId = currentItem?.mediaId
@@ -196,6 +202,7 @@ fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, 
                 IconButton(onClick = onShowHistory) { Icon(Icons.Default.History, null) }
                 IconButton(onClick = onShowQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null) }
                 IconButton(onClick = onShowBookmark) { Icon(Icons.Default.Bookmark, null) }
+                IconButton(onClick = onShowEqualizer) { Icon(Icons.Default.Equalizer, null) }
                 IconButton(onClick = {
                     showMoreMenu = true
                 }) { Icon(Icons.Default.MoreVert, null) }
@@ -246,7 +253,7 @@ fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, 
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun LandscapePlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit, onShowBookmark: () -> Unit, onLock: () -> Unit) {
+fun LandscapePlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit, onShowBookmark: () -> Unit, onShowEqualizer: () -> Unit, onLock: () -> Unit) {
     val currentItem = state.currentMediaItem
     val context = LocalContext.current
     val mediaId = currentItem?.mediaId
@@ -296,6 +303,7 @@ fun LandscapePlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel,
                 IconButton(onClick = onShowHistory) { Icon(Icons.Default.History, null) }
                 IconButton(onClick = onShowQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null) }
                 IconButton(onClick = onShowBookmark) { Icon(Icons.Default.Bookmark, null) }
+                IconButton(onClick = onShowEqualizer) { Icon(Icons.Default.Equalizer, null) }
                 IconButton(onClick = onLock) { Icon(Icons.Default.Lock, null) }
                 IconButton(onClick = onShowDetails) { Icon(Icons.Default.Info, null) }
                 IconButton(onClick = onShowShare) { Icon(Icons.Default.Share, null) }
@@ -497,6 +505,30 @@ fun ChapterSelectorContent(chapters: List<com.raulburgosmurray.musicplayer.Chapt
                     }
                 }
             } }
+        }
+    }
+}
+
+@Composable
+fun EqualizerSelectorContent(currentPreset: EqPreset, isAvailable: Boolean, onPresetSelected: (EqPreset) -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth().padding(24.dp).padding(bottom = 32.dp)) {
+        Text(stringResource(R.string.equalizer_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(16.dp))
+        if (!isAvailable) {
+            Text(stringResource(R.string.equalizer_not_available), color = MaterialTheme.colorScheme.secondary)
+        } else {
+            EqPreset.values().forEach { preset ->
+                Surface(
+                    onClick = { onPresetSelected(preset) },
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (preset == currentPreset) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+                ) {
+                    Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(preset.displayName, fontWeight = if (preset == currentPreset) FontWeight.Bold else FontWeight.Normal)
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
         }
     }
 }

@@ -256,4 +256,6 @@
     <string name="wifi_permission_rationale">Este permiso permite a la app:\n\n• Descubrir dispositivos cercanos para transferencia P2P\n• Transferir audiolibros sin internet\n• Conectarse mediante Wi-Fi Direct</string>
     <string name="wifi_permission_denied_title">📡 Permiso de Wi-Fi Denegado</string>
     <string name="wifi_permission_denied_message">Sin este permiso, no podrás transferir audiolibros a dispositivos cercanos.\n\nPuedes activarlo en cualquier momento en Ajustes → Apps → Litera → Permisos.</string>
+    <string name="equalizer_title">Ecualizador</string>
+    <string name="equalizer_not_available">El ecualizador no está disponible en este dispositivo</string>
 </resources>

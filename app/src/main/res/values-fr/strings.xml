@@ -247,4 +247,6 @@
     <string name="wifi_permission_rationale">Cette autorisation permet à l\'application de:\n\n• Découvrir les appareils à proximité pour le transfert P2P\n• Transférer des livres audio sans internet\n• Se connecter via Wi-Fi Direct</string>
     <string name="wifi_permission_denied_title">📡 Autorisation Wi-Fi refusée</string>
     <string name="wifi_permission_denied_message">Sans cette autorisation, vous ne pourrez pas transférer de livres audio vers des appareils à proximité.\n\nVous pouvez l\'activer à tout moment dans Paramètres → Apps → Litera → Autorisations.</string>
+    <string name="equalizer_title">Égaliseur</string>
+    <string name="equalizer_not_available">L\'égaliseur n\'est pas disponible sur cet appareil</string>
 </resources>
