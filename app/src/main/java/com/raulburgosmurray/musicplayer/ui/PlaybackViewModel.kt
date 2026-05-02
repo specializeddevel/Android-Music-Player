@@ -29,6 +29,8 @@ import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 import com.raulburgosmurray.musicplayer.PlaybackService
 import com.raulburgosmurray.musicplayer.R
+import com.raulburgosmurray.musicplayer.EqPreset
+import com.raulburgosmurray.musicplayer.EqualizerManager
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -81,7 +83,9 @@ data class PlaybackUiState(
     val dominantColor: Int? = null,
     val isShakeWaiting: Boolean = false,
     val currentMusicDetails: com.raulburgosmurray.musicplayer.Music? = null,
-    val currentMetadata: AudioMetadata? = null
+    val currentMetadata: AudioMetadata? = null,
+    val eqPreset: EqPreset = EqPreset.FLAT,
+    val eqAvailable: Boolean = false
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -96,6 +100,7 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
     private var originalTimerMinutes: Int = 0
     private var sensorManager: SensorManager? = null
     private var shakeDetector: com.raulburgosmurray.musicplayer.ShakeDetector? = null
+    private val equalizerManager = EqualizerManager()
     
     private val bookRepository = BookRepository(AppDatabase.getDatabase(application).cachedBookDao())
     private val favoriteRepository = FavoriteRepository(AppDatabase.getDatabase(application).favoriteDao())
@@ -500,6 +505,9 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
                     isReady = playbackState == Player.STATE_READY,
                     duration = player.duration
                 )
+                if (playbackState == Player.STATE_READY) {
+                    attachEqualizer()
+                }
             }
 
             override fun onPlaybackParametersChanged(playbackParameters: androidx.media3.common.PlaybackParameters) {
@@ -743,8 +751,23 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
         }
     }
 
+    fun setEqPreset(preset: EqPreset) {
+        equalizerManager.applyPreset(preset)
+        _uiState.value = _uiState.value.copy(eqPreset = preset, eqAvailable = equalizerManager.isAvailable)
+    }
+
+    private fun attachEqualizer() {
+        val app = getApplication<Application>() as com.raulburgosmurray.musicplayer.ApplicationClass
+        val sessionId = app.audioSessionId
+        if (sessionId != -1) {
+            equalizerManager.attach(sessionId)
+            _uiState.value = _uiState.value.copy(eqAvailable = equalizerManager.isAvailable)
+        }
+    }
+
     override fun onCleared() {
         sleepTimer?.cancel()
+        equalizerManager.release()
         releaseController()
         super.onCleared()
     }

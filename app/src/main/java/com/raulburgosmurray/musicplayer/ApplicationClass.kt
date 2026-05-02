@@ -20,6 +20,9 @@ class ApplicationClass: Application() {
         const val EXIT = "exit"
     }
 
+    @Volatile
+    var audioSessionId: Int = -1
+
     override fun onCreate() {
         super.onCreate()
         Coil.setImageLoader(

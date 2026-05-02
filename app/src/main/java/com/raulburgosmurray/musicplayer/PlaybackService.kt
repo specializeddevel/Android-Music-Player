@@ -53,6 +53,7 @@ class PlaybackService : MediaSessionService() {
             .setHandleAudioBecomingNoisy(true)         // TRUE pausa automáticamente al desconectar audífonos
             .setWakeMode(C.WAKE_MODE_LOCAL)           // Optimizado para archivos locales
             .build().apply {
+                (application as ApplicationClass).audioSessionId = audioSessionId
                 addListener(object : Player.Listener {
                     override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                         mediaItem?.let { item ->
