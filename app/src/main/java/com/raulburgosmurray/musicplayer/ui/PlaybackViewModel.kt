@@ -738,12 +738,32 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
     fun playPlaylist(mediaItems: List<MediaItem>, startIndex: Int) {
         val player = controller
         if (player != null) {
-            val mediaId = mediaItems.getOrNull(startIndex)?.mediaId
-            
-            player.stop() 
-            player.setMediaItems(mediaItems, startIndex, 0)
-            player.prepare()
-            player.play()
+            val isSingleBook = mediaItems.size == 1
+            val alreadyHasQueue = player.mediaItemCount > 0
+
+            if (isSingleBook && alreadyHasQueue) {
+                // Add single book to existing queue and play it without clearing
+                val newItem = mediaItems[startIndex]
+                val existingIndex = (0 until player.mediaItemCount).indexOfFirst {
+                    player.getMediaItemAt(it).mediaId == newItem.mediaId
+                }
+                if (existingIndex >= 0) {
+                    // Book already in queue: jump to it
+                    player.seekTo(existingIndex, 0)
+                    player.play()
+                } else {
+                    // New book: append and play it
+                    player.addMediaItem(newItem)
+                    player.seekTo(player.mediaItemCount - 1, 0)
+                    player.play()
+                }
+            } else {
+                // Multi-book selection or empty player: replace queue
+                player.stop()
+                player.setMediaItems(mediaItems, startIndex, 0)
+                player.prepare()
+                player.play()
+            }
         } else {
             pendingPlaylist = Pair(mediaItems, startIndex)
         }
