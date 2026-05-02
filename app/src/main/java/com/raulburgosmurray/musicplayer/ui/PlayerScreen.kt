@@ -202,7 +202,7 @@ fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, 
                 IconButton(onClick = onShowHistory) { Icon(Icons.Default.History, null) }
                 IconButton(onClick = onShowQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null) }
                 IconButton(onClick = onShowBookmark) { Icon(Icons.Default.Bookmark, null) }
-                IconButton(onClick = onShowEqualizer) { Icon(Icons.Default.Equalizer, null) }
+                IconButton(onClick = onShowEqualizer) { Icon(Icons.Default.Equalizer, null, tint = if (state.eqPreset != EqPreset.FLAT) Color.Red else LocalContentColor.current) }
                 IconButton(onClick = {
                     showMoreMenu = true
                 }) { Icon(Icons.Default.MoreVert, null) }
@@ -303,7 +303,7 @@ fun LandscapePlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel,
                 IconButton(onClick = onShowHistory) { Icon(Icons.Default.History, null) }
                 IconButton(onClick = onShowQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null) }
                 IconButton(onClick = onShowBookmark) { Icon(Icons.Default.Bookmark, null) }
-                IconButton(onClick = onShowEqualizer) { Icon(Icons.Default.Equalizer, null) }
+                IconButton(onClick = onShowEqualizer) { Icon(Icons.Default.Equalizer, null, tint = if (state.eqPreset != EqPreset.FLAT) Color.Red else LocalContentColor.current) }
                 IconButton(onClick = onLock) { Icon(Icons.Default.Lock, null) }
                 IconButton(onClick = onShowDetails) { Icon(Icons.Default.Info, null) }
                 IconButton(onClick = onShowShare) { Icon(Icons.Default.Share, null) }
@@ -390,11 +390,11 @@ fun SpeedSelectorContent(currentSpeed: Float, currentPitch: Float, onSpeedSelect
     Column(modifier = Modifier.fillMaxWidth().padding(24.dp).padding(bottom = 32.dp)) {
         Text(stringResource(R.string.playback_speed_selector), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(16.dp))
-        LazyVerticalGrid(columns = GridCells.Fixed(3), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+        LazyVerticalGrid(columns = GridCells.Fixed(4), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             items(speeds) { speed ->
                 val isSelected = speed == currentSpeed
-                Surface(onClick = { onSpeedSelected(speed) }, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer, contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer, shape = RoundedCornerShape(16.dp), modifier = Modifier.height(60.dp)) {
-                    Box(contentAlignment = Alignment.Center) { Text("${speed}x", fontWeight = FontWeight.Bold) }
+                Surface(onClick = { onSpeedSelected(speed) }, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer, contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.height(48.dp)) {
+                    Box(contentAlignment = Alignment.Center) { Text("${speed}x", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium) }
                 }
             }
         }
