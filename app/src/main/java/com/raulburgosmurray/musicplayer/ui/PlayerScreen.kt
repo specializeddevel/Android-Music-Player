@@ -401,11 +401,11 @@ fun SpeedSelectorContent(currentSpeed: Float, currentPitch: Float, onSpeedSelect
         Spacer(Modifier.height(24.dp))
         Text(stringResource(R.string.pitch_selector), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(16.dp))
-        LazyVerticalGrid(columns = GridCells.Fixed(3), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+        LazyVerticalGrid(columns = GridCells.Fixed(5), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             items(pitches) { pitch ->
                 val isSelected = pitch == currentPitch
-                Surface(onClick = { onPitchSelected(pitch) }, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer, contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer, shape = RoundedCornerShape(16.dp), modifier = Modifier.height(60.dp)) {
-                    Box(contentAlignment = Alignment.Center) { Text("${pitch}x", fontWeight = FontWeight.Bold) }
+                Surface(onClick = { onPitchSelected(pitch) }, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer, contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.height(44.dp)) {
+                    Box(contentAlignment = Alignment.Center) { Text("${pitch}x", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium) }
                 }
             }
         }

@@ -50,9 +50,13 @@ abstract class AppDatabase : RoomDatabase() {
         // v12 → v13: added eqPresetName column for per-book equalizer preset
         val MIGRATION_12_13 = object : Migration(12, 13) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL(
-                    "ALTER TABLE audiobook_progress ADD COLUMN eqPresetName TEXT NOT NULL DEFAULT ''"
-                )
+                try {
+                    db.execSQL(
+                        "ALTER TABLE audiobook_progress ADD COLUMN eqPresetName TEXT NOT NULL DEFAULT ''"
+                    )
+                } catch (e: android.database.sqlite.SQLiteException) {
+                    // Column may already exist from a previous install; ignore
+                }
             }
         }
 
