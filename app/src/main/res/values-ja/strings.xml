@@ -249,5 +249,9 @@
     <string name="wifi_permission_denied_message">この権限があると、近くのデバイスにオーディオブックを転送できません。\n\n設定 → アプリ → Litera → 権限でいつでも有効にできます。</string>
     <string name="equalizer_title">イコライザー</string>
     <string name="equalizer_not_available">このデバイスではイコライザーは使用できません</string>
+    <string name="eq_preset_flat">フラット</string>
+    <string name="eq_preset_voice_boost">ボイスブースト</string>
+    <string name="eq_preset_bass_cut">バスカット</string>
+    <string name="eq_preset_clarity">クラリティ</string>
     <string name="pitch_selector">ピッチ</string>
 </resources>

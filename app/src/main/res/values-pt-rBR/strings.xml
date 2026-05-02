@@ -249,5 +249,9 @@
     <string name="wifi_permission_denied_message">Sem essa permissão, você não conseguirá transferir audiolivros para dispositivos próximos.\n\nVocê pode ativar a qualquer momento em Configurações → Apps → Litera → Permissões.</string>
     <string name="equalizer_title">Equalizador</string>
     <string name="equalizer_not_available">O equalizador não está disponível neste dispositivo</string>
+    <string name="eq_preset_flat">Plano</string>
+    <string name="eq_preset_voice_boost">Reforço de Voz</string>
+    <string name="eq_preset_bass_cut">Corte de Graves</string>
+    <string name="eq_preset_clarity">Clareza</string>
     <string name="pitch_selector">Tom</string>
 </resources>

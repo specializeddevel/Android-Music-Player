@@ -249,5 +249,9 @@
     <string name="wifi_permission_denied_message">Ohne diese Berechtigung können Sie keine Hörbücher auf nahegelegene Geräte übertragen.\n\nSie kann sie jederzeit in Einstellungen → Apps → Litera → Berechtigungen aktivieren.</string>
     <string name="equalizer_title">Equalizer</string>
     <string name="equalizer_not_available">Equalizer ist auf diesem Gerät nicht verfügbar</string>
+    <string name="eq_preset_flat">Flat</string>
+    <string name="eq_preset_voice_boost">Stimme Boost</string>
+    <string name="eq_preset_bass_cut">Bass Cut</string>
+    <string name="eq_preset_clarity">Klarheit</string>
     <string name="pitch_selector">Tonhöhe</string>
 </resources>

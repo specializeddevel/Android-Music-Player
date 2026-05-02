@@ -260,5 +260,9 @@
     <string name="wifi_permission_denied_message">Without this permission, you won\'t be able to transfer audiobooks to nearby devices. You can enable it anytime in Settings.</string>
     <string name="equalizer_title">Equalizer</string>
     <string name="equalizer_not_available">Equalizer is not available on this device</string>
+    <string name="eq_preset_flat">Flat</string>
+    <string name="eq_preset_voice_boost">Voice Boost</string>
+    <string name="eq_preset_bass_cut">Bass Cut</string>
+    <string name="eq_preset_clarity">Clarity</string>
     <string name="pitch_selector">Pitch</string>
 </resources>

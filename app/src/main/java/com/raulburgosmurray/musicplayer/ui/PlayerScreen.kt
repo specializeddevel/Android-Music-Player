@@ -522,6 +522,14 @@ fun ChapterSelectorContent(chapters: List<com.raulburgosmurray.musicplayer.Chapt
 }
 
 @Composable
+fun eqPresetDisplayName(preset: EqPreset): String = when (preset) {
+    EqPreset.FLAT -> stringResource(R.string.eq_preset_flat)
+    EqPreset.VOICE_BOOST -> stringResource(R.string.eq_preset_voice_boost)
+    EqPreset.BASS_CUT -> stringResource(R.string.eq_preset_bass_cut)
+    EqPreset.CLARITY -> stringResource(R.string.eq_preset_clarity)
+}
+
+@Composable
 fun EqualizerSelectorContent(currentPreset: EqPreset, isAvailable: Boolean, onPresetSelected: (EqPreset) -> Unit) {
     Column(modifier = Modifier.fillMaxWidth().padding(24.dp).padding(bottom = 32.dp)) {
         Text(stringResource(R.string.equalizer_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -536,7 +544,7 @@ fun EqualizerSelectorContent(currentPreset: EqPreset, isAvailable: Boolean, onPr
                     color = if (preset == currentPreset) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
                 ) {
                     Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(preset.displayName, fontWeight = if (preset == currentPreset) FontWeight.Bold else FontWeight.Normal)
+                        Text(eqPresetDisplayName(preset), fontWeight = if (preset == currentPreset) FontWeight.Bold else FontWeight.Normal)
                     }
                 }
                 Spacer(Modifier.height(8.dp))
