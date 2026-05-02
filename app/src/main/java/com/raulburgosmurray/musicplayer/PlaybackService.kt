@@ -97,11 +97,11 @@ class PlaybackService : MediaSessionService() {
 
     private fun calculateRewindMs(elapsed: Long): Long {
         return when {
-            elapsed < 10_000 -> 2_000L
-            elapsed < 300_000 -> 3_000L
-            elapsed < 1_800_000 -> 5_000L
-            elapsed < 7_200_000 -> 10_000L
-            else -> 20_000L
+            elapsed < Constants.SMART_REWIND_VERY_SHORT_PAUSE_MS -> Constants.SMART_REWIND_VERY_SHORT_AMOUNT_MS
+            elapsed < Constants.SMART_REWIND_SHORT_PAUSE_MS -> Constants.SMART_REWIND_SHORT_AMOUNT_MS
+            elapsed < Constants.SMART_REWIND_MEDIUM_PAUSE_MS -> Constants.SMART_REWIND_MEDIUM_AMOUNT_MS
+            elapsed < Constants.SMART_REWIND_LONG_PAUSE_MS -> Constants.SMART_REWIND_LONG_AMOUNT_MS
+            else -> Constants.SMART_REWIND_VERY_LONG_AMOUNT_MS
         }
     }
 
