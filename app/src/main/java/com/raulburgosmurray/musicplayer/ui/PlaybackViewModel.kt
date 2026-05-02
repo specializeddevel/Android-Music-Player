@@ -497,6 +497,7 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
                 
                 updateCurrentMusicDetails(mediaItem?.mediaId)
                 updateDominantColor(mediaItem?.mediaMetadata?.artworkUri)
+                mediaItem?.mediaId?.let { restorePerBookSettings(it) }
                 mediaItem?.localConfiguration?.uri?.toString()?.let { uriString ->
                     if (uriString != lastScannedUri) {
                         extractChapters(uriString)
@@ -653,6 +654,15 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
             it.setPlaybackParameters(androidx.media3.common.PlaybackParameters(it.playbackParameters.speed, pitch))
         }
         _uiState.value = _uiState.value.copy(pitch = pitch)
+        // Persist pitch per-book
+        _uiState.value.currentMusicDetails?.id?.let { mediaId ->
+            viewModelScope.launch(Dispatchers.IO) {
+                val existing = progressRepository.getProgress(mediaId)
+                if (existing != null) {
+                    progressRepository.saveProgress(existing.copy(pitch = pitch))
+                }
+            }
+        }
     }
 
     fun startSleepTimer(minutes: Int) {
@@ -779,6 +789,15 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
     fun setEqPreset(preset: EqPreset) {
         equalizerManager.applyPreset(preset)
         _uiState.value = _uiState.value.copy(eqPreset = preset, eqAvailable = equalizerManager.isAvailable)
+        // Persist eq preset per-book
+        _uiState.value.currentMusicDetails?.id?.let { mediaId ->
+            viewModelScope.launch(Dispatchers.IO) {
+                val existing = progressRepository.getProgress(mediaId)
+                if (existing != null) {
+                    progressRepository.saveProgress(existing.copy(eqPresetName = preset.name))
+                }
+            }
+        }
     }
 
     private fun attachEqualizer() {
@@ -787,6 +806,34 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
         if (sessionId != -1) {
             equalizerManager.attach(sessionId)
             _uiState.value = _uiState.value.copy(eqAvailable = equalizerManager.isAvailable)
+        }
+    }
+
+    private fun restorePerBookSettings(mediaId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val progress = progressRepository.getProgress(mediaId) ?: return@launch
+            // Restore EQ preset
+            if (progress.eqPresetName.isNotEmpty()) {
+                try {
+                    val preset = EqPreset.valueOf(progress.eqPresetName)
+                    withContext(Dispatchers.Main) {
+                        equalizerManager.applyPreset(preset)
+                        _uiState.value = _uiState.value.copy(eqPreset = preset)
+                    }
+                } catch (_: IllegalArgumentException) {}
+            }
+            // Restore pitch
+            if (progress.pitch > 0f) {
+                withContext(Dispatchers.Main) {
+                    controller?.setPlaybackParameters(
+                        androidx.media3.common.PlaybackParameters(
+                            controller?.playbackParameters?.speed ?: 1.0f,
+                            progress.pitch
+                        )
+                    )
+                    _uiState.value = _uiState.value.copy(pitch = progress.pitch)
+                }
+            }
         }
     }
 

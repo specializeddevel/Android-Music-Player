@@ -122,6 +122,16 @@ class PlaybackService : MediaSessionService() {
                         currentPlayer.setPlaybackParameters(
                             androidx.media3.common.PlaybackParameters(speed, pitch)
                         )
+                        // Restaurar equalizer preset si existe
+                        if (progress.eqPresetName.isNotEmpty()) {
+                            try {
+                                val preset = EqPreset.valueOf(progress.eqPresetName)
+                                // El equalizer se restaurará via PlaybackViewModel.attachEqualizer
+                                // Guardamos en prefs para que el ViewModel lo lea
+                                getSharedPreferences("eq_prefs", MODE_PRIVATE).edit()
+                                    .putString("eq_preset", preset.name).apply()
+                            } catch (_: IllegalArgumentException) {}
+                        }
                     } else {
                         // Libro nuevo: resetear velocidad y pitch a 1.0f por defecto
                         currentPlayer.setPlaybackParameters(
@@ -237,6 +247,8 @@ class PlaybackService : MediaSessionService() {
                 val currentIsRead = currentProgress?.isRead ?: false
                 val finalIsRead = currentIsRead || shouldMarkAsRead
 
+                val eqName = getSharedPreferences("eq_prefs", MODE_PRIVATE)
+                    .getString("eq_preset", "") ?: ""
                 database.progressDao().saveProgress(
                     AudiobookProgress(
                         mediaId = currentMediaItem.mediaId,
@@ -245,6 +257,7 @@ class PlaybackService : MediaSessionService() {
                         lastPauseTimestamp = pauseToSave,
                         playbackSpeed = speed,
                         pitch = pitch,
+                        eqPresetName = eqName,
                         isRead = finalIsRead
                     )
                 )
@@ -279,6 +292,8 @@ class PlaybackService : MediaSessionService() {
             try {
                 val existing = database.progressDao().getProgress(currentMediaItem.mediaId)
                 val progressPercent = position.toFloat() / duration.toFloat()
+                val eqName = getSharedPreferences("eq_prefs", MODE_PRIVATE)
+                    .getString("eq_preset", "") ?: ""
                 database.progressDao().saveProgress(
                     AudiobookProgress(
                         mediaId = currentMediaItem.mediaId,
@@ -287,6 +302,7 @@ class PlaybackService : MediaSessionService() {
                         lastPauseTimestamp = System.currentTimeMillis(),
                         playbackSpeed = speed,
                         pitch = pitch,
+                        eqPresetName = eqName,
                         isRead = (existing?.isRead ?: false) || progressPercent >= 0.99f
                     )
                 )
