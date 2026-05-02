@@ -18,5 +18,6 @@ data class AudiobookProgress(
     val lastUpdated: Long = System.currentTimeMillis(),
     val lastPauseTimestamp: Long = 0L,
     val playbackSpeed: Float = 1.0f,
+    val pitch: Float = 1.0f,
     val isRead: Boolean = false
 )

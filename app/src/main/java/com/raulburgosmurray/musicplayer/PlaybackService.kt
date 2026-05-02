@@ -116,11 +116,17 @@ class PlaybackService : MediaSessionService() {
                         if (Math.abs(currentPlayer.currentPosition - progress.lastPosition) > 1000) {
                             currentPlayer.seekTo(progress.lastPosition)
                         }
-                        // Restaurar la velocidad guardada (mínimo 0.1 para evitar errores)
-                        currentPlayer.setPlaybackSpeed(progress.playbackSpeed.coerceAtLeast(0.1f))
+                        // Restaurar la velocidad y pitch guardados (mínimo 0.1 para evitar errores)
+                        val speed = progress.playbackSpeed.coerceAtLeast(0.1f)
+                        val pitch = progress.pitch.coerceAtLeast(0.1f)
+                        currentPlayer.setPlaybackParameters(
+                            androidx.media3.common.PlaybackParameters(speed, pitch)
+                        )
                     } else {
-                        // Libro nuevo: resetear velocidad a 1.0f por defecto
-                        currentPlayer.setPlaybackSpeed(1.0f)
+                        // Libro nuevo: resetear velocidad y pitch a 1.0f por defecto
+                        currentPlayer.setPlaybackParameters(
+                            androidx.media3.common.PlaybackParameters(1.0f, 1.0f)
+                        )
                     }
                 }
             } catch (e: Exception) {
@@ -214,6 +220,7 @@ class PlaybackService : MediaSessionService() {
         val position = p.currentPosition
         val duration = p.duration
         val speed = p.playbackParameters.speed
+        val pitch = p.playbackParameters.pitch
         
         if (duration <= 0 || position < 0) return
         
@@ -232,11 +239,12 @@ class PlaybackService : MediaSessionService() {
 
                 database.progressDao().saveProgress(
                     AudiobookProgress(
-                        mediaId = currentMediaItem.mediaId, 
-                        lastPosition = position, 
+                        mediaId = currentMediaItem.mediaId,
+                        lastPosition = position,
                         duration = duration,
                         lastPauseTimestamp = pauseToSave,
                         playbackSpeed = speed,
+                        pitch = pitch,
                         isRead = finalIsRead
                     )
                 )
@@ -264,6 +272,7 @@ class PlaybackService : MediaSessionService() {
         val position = p.currentPosition
         val duration = p.duration
         val speed = p.playbackParameters.speed
+        val pitch = p.playbackParameters.pitch
         if (duration <= 0 || position < 0) return
 
         runBlocking(Dispatchers.IO) {
@@ -277,6 +286,7 @@ class PlaybackService : MediaSessionService() {
                         duration = duration,
                         lastPauseTimestamp = System.currentTimeMillis(),
                         playbackSpeed = speed,
+                        pitch = pitch,
                         isRead = (existing?.isRead ?: false) || progressPercent >= 0.99f
                     )
                 )

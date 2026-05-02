@@ -72,6 +72,7 @@ data class PlaybackUiState(
     val playlist: List<MediaItem> = emptyList(),
     val currentIndex: Int = -1,
     val playbackSpeed: Float = 1.0f,
+    val pitch: Float = 1.0f,
     val isReady: Boolean = false,
     val isConnected: Boolean = false,
     val sleepTimerMinutes: Int = 0,
@@ -511,7 +512,7 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
             }
 
             override fun onPlaybackParametersChanged(playbackParameters: androidx.media3.common.PlaybackParameters) {
-                _uiState.value = _uiState.value.copy(playbackSpeed = playbackParameters.speed)
+                _uiState.value = _uiState.value.copy(playbackSpeed = playbackParameters.speed, pitch = playbackParameters.pitch)
             }
 
             override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
@@ -527,6 +528,7 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
             duration = player.duration,
             currentPosition = player.currentPosition,
             playbackSpeed = player.playbackParameters.speed,
+            pitch = player.playbackParameters.pitch,
             isReady = player.playbackState == Player.STATE_READY
         )
         updatePlaylistState()
@@ -628,6 +630,13 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
     fun setPlaybackSpeed(speed: Float) {
         controller?.setPlaybackSpeed(speed)
         _uiState.value = _uiState.value.copy(playbackSpeed = speed)
+    }
+
+    fun setPitch(pitch: Float) {
+        controller?.let {
+            it.setPlaybackParameters(androidx.media3.common.PlaybackParameters(it.playbackParameters.speed, pitch))
+        }
+        _uiState.value = _uiState.value.copy(pitch = pitch)
     }
 
     fun startSleepTimer(minutes: Int) {
