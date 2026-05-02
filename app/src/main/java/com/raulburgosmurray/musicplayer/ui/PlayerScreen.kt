@@ -385,7 +385,7 @@ fun currentMediaItemArtist(item: androidx.media3.common.MediaItem?): String {
 
 @Composable
 fun SpeedSelectorContent(currentSpeed: Float, currentPitch: Float, onSpeedSelected: (Float) -> Unit, onPitchSelected: (Float) -> Unit) {
-    val speeds = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f)
+    val speeds = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.25f)
     val pitches = listOf(0.8f, 0.9f, 1.0f, 1.1f, 1.2f)
     Column(modifier = Modifier.fillMaxWidth().padding(24.dp).padding(bottom = 32.dp)) {
         Text(stringResource(R.string.playback_speed_selector), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
