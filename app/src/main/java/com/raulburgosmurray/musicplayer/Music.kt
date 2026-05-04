@@ -27,7 +27,8 @@ data class Music(
     val fileSize: Long = 0,
     val fileName: String = "",
     val trackMore: String? = null,
-    val comment: String? = null
+    val comment: String? = null,
+    val description: String? = null
 ) {
     fun toMediaItem(): MediaItem {
         val metadata = MediaMetadata.Builder()

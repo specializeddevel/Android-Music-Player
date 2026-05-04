@@ -89,7 +89,8 @@ class MusicScanner(
                                 path = id,
                                 artUri = finalMetadata.artUri,
                                 fileSize = fileSize,
-                                fileName = finalMetadata.fileName
+                                fileName = finalMetadata.fileName,
+                                description = null
                             )
                             musicList[id] = music
                             metadataJsonHelper.saveMetadata(context, finalMetadata)
@@ -170,7 +171,8 @@ class MusicScanner(
                         path = id,
                         artUri = finalMetadata.artUri,
                         fileSize = fileSize,
-                        fileName = cursor.getString(6) ?: ""
+                        fileName = cursor.getString(6) ?: "",
+                        description = null
                     )
                     tempList.add(music)
                     metadataJsonHelper.saveMetadata(context, finalMetadata)

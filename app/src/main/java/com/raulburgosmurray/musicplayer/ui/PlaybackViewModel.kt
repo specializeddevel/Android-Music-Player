@@ -442,7 +442,7 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
                 MetadataJsonHelper.loadMetadata(getApplication(), mediaId)
             }
             _uiState.value = _uiState.value.copy(
-                currentMusicDetails = cachedBook?.let { Music(it.id, it.title, it.album, it.artist, it.duration, it.path, it.artUri, it.fileSize, it.fileName) }, 
+                currentMusicDetails = cachedBook?.let { Music(it.id, it.title, it.album, it.artist, it.duration, it.path, it.artUri, it.fileSize, it.fileName, description = it.description) }, 
                 currentMetadata = metadata
             )
         }
