@@ -265,4 +265,10 @@
     <string name="eq_preset_bass_cut">Bass Cut</string>
     <string name="eq_preset_clarity">Clarity</string>
     <string name="pitch_selector">Pitch</string>
+    <string name="go_to_time">Go to time</string>
+    <string name="go_to_time_desc">Enter a position to jump to</string>
+    <string name="hours_hint">HH</string>
+    <string name="minutes_hint">MM</string>
+    <string name="seconds_hint">SS</string>
+    <string name="invalid_time">Position exceeds duration</string>
 </resources>

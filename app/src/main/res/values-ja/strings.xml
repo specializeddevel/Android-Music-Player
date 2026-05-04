@@ -254,4 +254,10 @@
     <string name="eq_preset_bass_cut">バスカット</string>
     <string name="eq_preset_clarity">クラリティ</string>
     <string name="pitch_selector">ピッチ</string>
+    <string name="go_to_time">時間へ移動</string>
+    <string name="go_to_time_desc">ジャンプする位置を入力</string>
+    <string name="hours_hint">時</string>
+    <string name="minutes_hint">分</string>
+    <string name="seconds_hint">秒</string>
+    <string name="invalid_time">再生時間を超えています</string>
 </resources>

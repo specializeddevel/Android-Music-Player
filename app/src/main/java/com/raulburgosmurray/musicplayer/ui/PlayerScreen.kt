@@ -97,6 +97,7 @@ fun PlayerScreen(
     var showEqSheet by remember { mutableStateOf(false) }
 
     var showShareFileConfirmation by remember { mutableStateOf(false) }
+    var showSeekToTimeDialog by remember { mutableStateOf(false) }
     var isLocked by rememberSaveable { mutableStateOf(false) }
 
     Scaffold { padding ->
@@ -109,7 +110,7 @@ fun PlayerScreen(
                     onShowQueue = { showQueueSheet = true }, onShowDetails = { showDetailsSheet = true },
                     onShowShare = { showShareFileConfirmation = true }, onShowSpeed = { showSpeedSheet = true },
                     onShowTimer = { showTimerSheet = true }, onShowBookmark = { showBookmarkSheet = true },
-                    onShowEqualizer = { showEqSheet = true },
+                    onShowEqualizer = { showEqSheet = true }, onShowSeekToTime = { showSeekToTimeDialog = true },
                     onLock = { isLocked = true }
                 )
             } else {
@@ -120,7 +121,7 @@ fun PlayerScreen(
                     onShowQueue = { showQueueSheet = true }, onShowDetails = { showDetailsSheet = true },
                     onShowShare = { showShareFileConfirmation = true }, onShowSpeed = { showSpeedSheet = true },
                     onShowTimer = { showTimerSheet = true }, onShowBookmark = { showBookmarkSheet = true },
-                    onShowEqualizer = { showEqSheet = true },
+                    onShowEqualizer = { showEqSheet = true }, onShowSeekToTime = { showSeekToTimeDialog = true },
                     onLock = { isLocked = true }
                 )
             }
@@ -173,6 +174,7 @@ fun PlayerScreen(
     if (showBookmarkSheet) { ModalBottomSheet(onDismissRequest = { showBookmarkSheet = false }, sheetState = bookmarkSheetState) { BookmarkSelectorContent(bookmarks = state.bookmarks, onBookmarkSelected = { viewModel.seekTo(it.position); showBookmarkSheet = false }, onDeleteBookmark = { id -> viewModel.deleteBookmark(id) }, onAddBookmark = { bookmarkPositionAtCreation = state.currentPosition; showAddBookmarkDialog = true }) } }
     if (showEqSheet) { ModalBottomSheet(onDismissRequest = { showEqSheet = false }, sheetState = eqSheetState) { EqualizerSelectorContent(currentPreset = state.eqPreset, isAvailable = state.eqAvailable, onPresetSelected = { viewModel.setEqPreset(it); showEqSheet = false }) } }
     if (showAddBookmarkDialog) { AddBookmarkDialog(currentPosition = bookmarkPositionAtCreation, onDismiss = { showAddBookmarkDialog = false }, onConfirm = { note -> viewModel.addBookmark(note, bookmarkPositionAtCreation); showAddBookmarkDialog = false }) }
+    if (showSeekToTimeDialog) { SeekToTimeDialog(duration = state.duration, onDismiss = { showSeekToTimeDialog = false }, onConfirm = { pos -> viewModel.seekTo(pos); showSeekToTimeDialog = false }) }
     if (showShareFileConfirmation) {
         AlertDialog(onDismissRequest = { showShareFileConfirmation = false }, title = { Text(stringResource(R.string.share_file_warning_title)) }, text = { Text(stringResource(R.string.share_file_warning_message)) }, confirmButton = { Button(onClick = { showShareFileConfirmation = false; viewModel.shareFile(context) }) { Text(stringResource(R.string.confirm)) } }, dismissButton = { TextButton(onClick = { showShareFileConfirmation = false }) { Text(stringResource(R.string.cancel)) } })
     }
@@ -180,7 +182,7 @@ fun PlayerScreen(
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit, onShowBookmark: () -> Unit, onShowEqualizer: () -> Unit, onLock: () -> Unit) {
+fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit, onShowBookmark: () -> Unit, onShowEqualizer: () -> Unit, onShowSeekToTime: () -> Unit, onLock: () -> Unit) {
     val currentItem = state.currentMediaItem
     val context = LocalContext.current
     val mediaId = currentItem?.mediaId
@@ -207,6 +209,7 @@ fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, 
                     showMoreMenu = true
                 }) { Icon(Icons.Default.MoreVert, null) }
                 DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
+                    DropdownMenuItem(text = { Text(stringResource(R.string.go_to_time)) }, leadingIcon = { Icon(Icons.Default.AccessTime, null) }, onClick = { showMoreMenu = false; onShowSeekToTime() })
                     DropdownMenuItem(text = { Text(stringResource(R.string.book_details)) }, leadingIcon = { Icon(Icons.Default.Info, null) }, onClick = { showMoreMenu = false; onShowDetails() })
                     DropdownMenuItem(text = { Text(stringResource(R.string.share_btn)) }, leadingIcon = { Icon(Icons.Default.Share, null) }, onClick = { showMoreMenu = false; onShowShare() })
                     if (com.raulburgosmurray.musicplayer.FeatureFlags.P2P_TRANSFER) {
@@ -253,7 +256,7 @@ fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, 
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun LandscapePlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit, onShowBookmark: () -> Unit, onShowEqualizer: () -> Unit, onLock: () -> Unit) {
+fun LandscapePlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit, onShowBookmark: () -> Unit, onShowEqualizer: () -> Unit, onShowSeekToTime: () -> Unit, onLock: () -> Unit) {
     val currentItem = state.currentMediaItem
     val context = LocalContext.current
     val mediaId = currentItem?.mediaId
@@ -304,6 +307,7 @@ fun LandscapePlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel,
                 IconButton(onClick = onShowQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null) }
                 IconButton(onClick = onShowBookmark) { Icon(Icons.Default.Bookmark, null) }
                 IconButton(onClick = onShowEqualizer) { Icon(Icons.Default.Equalizer, null, tint = if (state.eqPreset != EqPreset.FLAT) Color.Red else LocalContentColor.current) }
+                IconButton(onClick = onShowSeekToTime) { Icon(Icons.Default.AccessTime, null) }
                 IconButton(onClick = onLock) { Icon(Icons.Default.Lock, null) }
                 IconButton(onClick = onShowDetails) { Icon(Icons.Default.Info, null) }
                 IconButton(onClick = onShowShare) { Icon(Icons.Default.Share, null) }
@@ -560,6 +564,92 @@ fun AddBookmarkDialog(currentPosition: Long, onDismiss: () -> Unit, onConfirm: (
         text = { Column { Text(stringResource(R.string.save_position_label, formatDuration(currentPosition))); Spacer(Modifier.height(8.dp)); OutlinedTextField(value = note, onValueChange = { note = it }, label = { Text(stringResource(R.string.note_label)) }, modifier = Modifier.fillMaxWidth()) } },
         confirmButton = { Button(onClick = { onConfirm(note) }) { Text(stringResource(R.string.save)) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } })
+}
+
+@Composable
+fun SeekToTimeDialog(duration: Long, onDismiss: () -> Unit, onConfirm: (Long) -> Unit) {
+    val maxHours = (duration / 3600000).toInt()
+    val maxMinutes = 59
+    val maxSeconds = 59
+
+    var hoursText by remember { mutableStateOf("") }
+    var minutesText by remember { mutableStateOf("") }
+    var secondsText by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf(false) }
+
+    val hours = hoursText.toIntOrNull() ?: 0
+    val minutes = minutesText.toIntOrNull() ?: 0
+    val seconds = secondsText.toIntOrNull() ?: 0
+    val inputMs = (hours * 3600L + minutes * 60L + seconds) * 1000L
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.go_to_time)) },
+        text = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(stringResource(R.string.go_to_time_desc), color = MaterialTheme.colorScheme.secondary)
+                Spacer(Modifier.height(16.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        OutlinedTextField(
+                            value = hoursText,
+                            onValueChange = { if (it.isEmpty() || it.toIntOrNull() != null) hoursText = it },
+                            label = { Text(stringResource(R.string.hours_hint)) },
+                            modifier = Modifier.width(72.dp),
+                            singleLine = true,
+                            isError = error,
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+                        )
+                    }
+                    Text(":", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        OutlinedTextField(
+                            value = minutesText,
+                            onValueChange = { v ->
+                                val n = v.toIntOrNull()
+                                if (v.isEmpty() || (n != null && n >= 0 && n <= maxMinutes)) minutesText = v
+                            },
+                            label = { Text(stringResource(R.string.minutes_hint)) },
+                            modifier = Modifier.width(72.dp),
+                            singleLine = true,
+                            isError = error,
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+                        )
+                    }
+                    Text(":", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        OutlinedTextField(
+                            value = secondsText,
+                            onValueChange = { v ->
+                                val n = v.toIntOrNull()
+                                if (v.isEmpty() || (n != null && n >= 0 && n <= maxSeconds)) secondsText = v
+                            },
+                            label = { Text(stringResource(R.string.seconds_hint)) },
+                            modifier = Modifier.width(72.dp),
+                            singleLine = true,
+                            isError = error,
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+                        )
+                    }
+                }
+                if (error) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(stringResource(R.string.invalid_time), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelMedium)
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                if (inputMs in 0..duration) {
+                    error = false
+                    onConfirm(inputMs)
+                } else {
+                    error = true
+                }
+            }) { Text(stringResource(R.string.go_to_time)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } }
+    )
 }
 
 enum class CoverTapArea { LEFT, CENTER, RIGHT }

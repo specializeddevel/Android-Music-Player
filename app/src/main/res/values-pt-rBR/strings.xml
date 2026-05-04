@@ -254,4 +254,10 @@
     <string name="eq_preset_bass_cut">Corte de Graves</string>
     <string name="eq_preset_clarity">Clareza</string>
     <string name="pitch_selector">Tom</string>
+    <string name="go_to_time">Ir para o tempo</string>
+    <string name="go_to_time_desc">Digite uma posição para pular</string>
+    <string name="hours_hint">HH</string>
+    <string name="minutes_hint">MM</string>
+    <string name="seconds_hint">SS</string>
+    <string name="invalid_time">Posição excede a duração</string>
 </resources>
