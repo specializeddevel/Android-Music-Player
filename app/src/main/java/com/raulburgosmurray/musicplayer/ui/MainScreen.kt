@@ -100,6 +100,7 @@ fun MainScreen(
     onFavoritesClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onReceiveClick: () -> Unit = {},
+    onSelectFolder: () -> Unit = {},
     navController: androidx.navigation.NavController
 ) {
     val books by mainViewModel.books.collectAsState()
@@ -236,7 +237,6 @@ fun MainScreen(
                         }
                     }
                 } else if (books.isEmpty()) {
-                    // Empty state when no books are found
                     Column(
                         modifier = Modifier.fillMaxSize().padding(32.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -257,26 +257,32 @@ fun MainScreen(
                         )
                         Spacer(Modifier.height(12.dp))
                         Text(
-                            text = if (scanAllMemory) stringResource(R.string.no_audiobooks_in_memory) else stringResource(R.string.no_audiobooks_in_folder),
+                            text = stringResource(R.string.no_audiobooks_in_folder),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.secondary,
                             textAlign = TextAlign.Center
                         )
-                        Spacer(Modifier.height(24.dp))
+                        Spacer(Modifier.height(32.dp))
                         Button(
-                            onClick = { 
-                                val uris = settingsViewModel.libraryRootUris.value
-                                val scanAll = settingsViewModel.scanAllMemory.value
-                                mainViewModel.loadBooks(if (scanAll) emptyList() else uris, scanAll)
-                            },
+                            onClick = { mainViewModel.loadBooks(emptyList(), true) },
+                            modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.primary,
                                 contentColor = MaterialTheme.colorScheme.onPrimary
                             )
                         ) {
-                            Icon(Icons.Default.Refresh, contentDescription = null)
+                            Icon(Icons.Default.Storage, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
-                            Text(if (scanAllMemory) stringResource(R.string.scan_memory_btn) else stringResource(R.string.scan_folders_btn))
+                            Text(stringResource(R.string.scan_memory_btn))
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        OutlinedButton(
+                            onClick = onSelectFolder,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.CreateNewFolder, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.select_folder))
                         }
                     }
                 } else {
