@@ -80,6 +80,10 @@ class MusicScanner(
                                 freshMetadata.copy(mediaId = id)
                             }
 
+                            val description = if (DescriptionExtractor.isSupported()) {
+                                DescriptionExtractor.extract(context, id)
+                            } else null
+
                             val music = Music(
                                 id = id,
                                 title = finalMetadata.title,
@@ -90,7 +94,7 @@ class MusicScanner(
                                 artUri = finalMetadata.artUri,
                                 fileSize = fileSize,
                                 fileName = finalMetadata.fileName,
-                                description = null
+                                description = description
                             )
                             musicList[id] = music
                             metadataJsonHelper.saveMetadata(context, finalMetadata)
@@ -162,6 +166,10 @@ class MusicScanner(
                         freshMetadata.copy(mediaId = id)
                     }
 
+                    val description = if (DescriptionExtractor.isSupported()) {
+                        DescriptionExtractor.extractFromLocalFile(filePath)
+                    } else null
+
                     val music = Music(
                         id = id,
                         title = finalMetadata.title,
@@ -172,7 +180,7 @@ class MusicScanner(
                         artUri = finalMetadata.artUri,
                         fileSize = fileSize,
                         fileName = cursor.getString(6) ?: "",
-                        description = null
+                        description = description
                     )
                     tempList.add(music)
                     metadataJsonHelper.saveMetadata(context, finalMetadata)

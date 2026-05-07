@@ -14,4 +14,6 @@ class BookRepository(private val cachedBookDao: CachedBookDao) {
     suspend fun saveBooks(books: List<CachedBook>) = cachedBookDao.upsertAll(books)
 
     suspend fun clearCache() = cachedBookDao.clearCache()
+
+    suspend fun updateDescription(id: String, description: String) = cachedBookDao.updateDescription(id, description)
 }

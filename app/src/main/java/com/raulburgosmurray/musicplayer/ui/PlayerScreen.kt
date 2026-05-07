@@ -5,6 +5,8 @@ import android.content.res.Configuration
 import android.util.Base64
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
@@ -35,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalConfiguration
@@ -180,6 +183,58 @@ fun PlayerScreen(
     }
 }
 
+@Composable
+fun SynopsisAccordion(description: String) {
+    var expanded by remember { mutableStateOf(false) }
+    val chevronRotation by animateFloatAsState(targetValue = if (expanded) 180f else 0f, label = "chevron")
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.animateContentSize()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded }
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    Icons.Default.Subject,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+                Text(
+                    text = stringResource(R.string.synopsis_label),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
+                Icon(
+                    Icons.Default.ExpandMore,
+                    contentDescription = if (expanded) stringResource(R.string.collapse) else stringResource(R.string.expand),
+                    modifier = Modifier
+                        .size(20.dp)
+                        .graphicsLayer { rotationZ = chevronRotation },
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            AnimatedVisibility(visible = expanded) {
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
+                )
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit, onShowBookmark: () -> Unit, onShowEqualizer: () -> Unit, onShowSeekToTime: () -> Unit, onLock: () -> Unit) {
@@ -250,6 +305,11 @@ fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, 
         }
         Spacer(Modifier.height(32.dp))
         PlayerControls(state, viewModel, onShowSpeed, onShowTimer)
+        val synopsis = state.currentMusicDetails?.description
+        if (!synopsis.isNullOrBlank()) {
+            Spacer(Modifier.height(16.dp))
+            SynopsisAccordion(description = synopsis)
+        }
         Spacer(Modifier.height(16.dp))
     }
 }
@@ -316,6 +376,11 @@ fun LandscapePlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel,
                 }
             }
             PlayerControls(state, viewModel, onShowSpeed, onShowTimer)
+            val synopsis = state.currentMusicDetails?.description
+            if (!synopsis.isNullOrBlank()) {
+                Spacer(Modifier.height(16.dp))
+                SynopsisAccordion(description = synopsis)
+            }
         }
     }
 }
