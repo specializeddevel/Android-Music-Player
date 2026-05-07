@@ -219,6 +219,8 @@
     <string name="history_undo_seek">Deshacer salto</string>
     <string name="history_bookmark_added">Marcador añadido</string>
     <string name="history_timer_finished">Temporizador finalizado</string>
+    <string name="history_accidental_seek">Salto accidental desde %1$s</string>
+    <string name="bookmark_accidental_seek">Posición antes del salto accidental</string>
     <!-- Transferencia -->
     <string name="ready">Listo</string>
     <string name="no_wifi">Sin Wi-Fi</string>
@@ -269,4 +271,8 @@
     <string name="minutes_hint">MM</string>
     <string name="seconds_hint">SS</string>
     <string name="invalid_time">Posición excede la duración</string>
+    <!-- Acordeón de sinopsis -->
+    <string name="synopsis_label">Sinopsis</string>
+    <string name="expand">Expandir</string>
+    <string name="collapse">Contraer</string>
 </resources>

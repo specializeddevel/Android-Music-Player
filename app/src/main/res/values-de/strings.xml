@@ -211,6 +211,8 @@
     <string name="history_undo_seek">Springen rückgängig</string>
     <string name="history_bookmark_added">Lesezeichen hinzugefügt</string>
     <string name="history_timer_finished">Schlaf-Timer beendet</string>
+    <string name="history_accidental_seek">Versehentlicher Sprung ab %1$s</string>
+    <string name="bookmark_accidental_seek">Position vor versehentlichem Sprung</string>
     <string name="ready">Bereit</string>
     <string name="no_wifi">Kein WLAN</string>
     <string name="detecting">Erkennen...</string>
@@ -260,4 +262,8 @@
     <string name="minutes_hint">MM</string>
     <string name="seconds_hint">SS</string>
     <string name="invalid_time">Position überschreitet Dauer</string>
+    <!-- Klappbox für Zusammenfassung -->
+    <string name="synopsis_label">Zusammenfassung</string>
+    <string name="expand">Erweitern</string>
+    <string name="collapse">Einklappen</string>
 </resources>

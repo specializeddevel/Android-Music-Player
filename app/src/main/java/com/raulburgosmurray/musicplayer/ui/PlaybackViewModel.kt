@@ -61,6 +61,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.withContext
 import com.raulburgosmurray.musicplayer.Constants
+import com.raulburgosmurray.musicplayer.data.DescriptionExtractor
 import com.raulburgosmurray.musicplayer.ui.formatDuration
 
 data class PlaybackUiState(
@@ -441,8 +442,26 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
             val metadata = withContext(Dispatchers.IO) {
                 MetadataJsonHelper.loadMetadata(getApplication(), mediaId)
             }
+
+            var description = cachedBook?.description
+            Log.d("PlaybackVM", "Book: ${cachedBook?.title}, path=${cachedBook?.path}, existing desc=${cachedBook?.description?.take(50)}")
+
+            if (description.isNullOrBlank() && DescriptionExtractor.isSupported() && !cachedBook?.path.isNullOrBlank()) {
+                Log.d("PlaybackVM", "Attempting lazy extraction for ${cachedBook!!.path}")
+                val extracted = withContext(Dispatchers.IO) {
+                    DescriptionExtractor.extract(getApplication(), cachedBook!!.path)
+                }
+                Log.d("PlaybackVM", "Lazy extraction result: ${extracted?.take(50)}")
+                if (!extracted.isNullOrBlank()) {
+                    description = extracted
+                    withContext(Dispatchers.IO) {
+                        bookRepository.updateDescription(mediaId, extracted)
+                    }
+                }
+            }
+
             _uiState.value = _uiState.value.copy(
-                currentMusicDetails = cachedBook?.let { Music(it.id, it.title, it.album, it.artist, it.duration, it.path, it.artUri, it.fileSize, it.fileName, description = it.description) }, 
+                currentMusicDetails = cachedBook?.let { Music(it.id, it.title, it.album, it.artist, it.duration, it.path, it.artUri, it.fileSize, it.fileName, description = description) }, 
                 currentMetadata = metadata
             )
         }
@@ -550,6 +569,16 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
             }
 
             override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
+                if (reason == Player.DISCONTINUITY_REASON_SEEK) {
+                    val backward = oldPosition.positionMs - newPosition.positionMs
+                    if (backward > Constants.SKIP_BACKWARD_MS * 2 && newPosition.positionMs < 5_000L) {
+                        _uiState.value = _uiState.value.copy(lastPositionBeforeSeek = oldPosition.positionMs)
+                        logAction(getApplication<Application>().getString(
+                            R.string.history_accidental_seek,
+                            formatDuration(oldPosition.positionMs)
+                        ))
+                    }
+                }
                 _uiState.value = _uiState.value.copy(currentPosition = newPosition.positionMs)
             }
         })

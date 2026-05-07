@@ -211,6 +211,8 @@
     <string name="history_undo_seek">シークを元に戻す</string>
     <string name="history_bookmark_added">ブックマークを追加</string>
     <string name="history_timer_finished">スリープタイマー終了</string>
+    <string name="history_accidental_seek">%1$sからの誤ったジャンプ</string>
+    <string name="bookmark_accidental_seek">誤ったジャンプ前の位置</string>
     <string name="ready">準備完了</string>
     <string name="no_wifi">Wi-Fiなし</string>
     <string name="detecting">検出中...</string>
@@ -260,4 +262,8 @@
     <string name="minutes_hint">分</string>
     <string name="seconds_hint">秒</string>
     <string name="invalid_time">再生時間を超えています</string>
+    <!-- あらすじアコーディオン -->
+    <string name="synopsis_label">あらすじ</string>
+    <string name="expand">展開</string>
+    <string name="collapse">折りたたむ</string>
 </resources>

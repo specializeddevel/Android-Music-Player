@@ -14,6 +14,7 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.raulburgosmurray.musicplayer.data.AppDatabase
 import com.raulburgosmurray.musicplayer.data.AudiobookProgress
+import com.raulburgosmurray.musicplayer.data.Bookmark
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -80,6 +81,32 @@ class PlaybackService : MediaSessionService() {
                     override fun onPlaybackStateChanged(playbackState: Int) {
                         if (playbackState == Player.STATE_ENDED || playbackState == Player.STATE_IDLE) {
                             saveCurrentProgress()
+                        }
+                    }
+
+                    override fun onPositionDiscontinuity(
+                        oldPosition: Player.PositionInfo,
+                        newPosition: Player.PositionInfo,
+                        reason: Int
+                    ) {
+                        if (reason != Player.DISCONTINUITY_REASON_SEEK) return
+                        val backward = oldPosition.positionMs - newPosition.positionMs
+                        if (backward > Constants.SKIP_BACKWARD_MS * 2 && newPosition.positionMs < 5_000L) {
+                            val savedPos = oldPosition.positionMs
+                            val mediaId = player?.currentMediaItem?.mediaId ?: return
+                            serviceScope.launch(Dispatchers.IO) {
+                                try {
+                                    database.bookmarkDao().insertBookmark(
+                                        Bookmark(
+                                            mediaId = mediaId,
+                                            position = savedPos,
+                                            note = getString(R.string.bookmark_accidental_seek)
+                                        )
+                                    )
+                                } catch (e: Exception) {
+                                    Log.e("PlaybackService", "Error guardando marcador de recuperación", e)
+                                }
+                            }
                         }
                     }
                 })

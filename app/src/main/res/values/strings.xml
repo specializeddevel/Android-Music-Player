@@ -218,6 +218,8 @@
     <string name="history_undo_seek">Undo seek</string>
     <string name="history_bookmark_added">Bookmark added</string>
     <string name="history_timer_finished">Sleep timer ended</string>
+    <string name="history_accidental_seek">Accidental jump from %1$s</string>
+    <string name="bookmark_accidental_seek">Position before accidental jump</string>
     <!-- Transfer -->
     <string name="ready">Ready</string>
     <string name="no_wifi">No Wi-Fi</string>
@@ -271,4 +273,8 @@
     <string name="minutes_hint">MM</string>
     <string name="seconds_hint">SS</string>
     <string name="invalid_time">Position exceeds duration</string>
+    <!-- Synopsis accordion -->
+    <string name="synopsis_label">Synopsis</string>
+    <string name="expand">Expand</string>
+    <string name="collapse">Collapse</string>
 </resources>
