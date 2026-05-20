@@ -10,6 +10,9 @@ interface CachedBookDao {
     @Query("SELECT * FROM cached_books")
     fun getAllBooks(): Flow<List<CachedBook>>
 
+    @Query("SELECT COUNT(*) FROM cached_books")
+    suspend fun getBookCount(): Int
+
     @Query("SELECT * FROM cached_books WHERE id = :id")
     suspend fun getBookById(id: String): CachedBook?
 

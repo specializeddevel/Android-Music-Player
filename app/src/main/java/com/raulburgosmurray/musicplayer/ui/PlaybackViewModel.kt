@@ -22,6 +22,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.PlaybackException
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import androidx.palette.graphics.Palette
@@ -31,14 +32,24 @@ import com.raulburgosmurray.musicplayer.PlaybackService
 import com.raulburgosmurray.musicplayer.R
 import com.raulburgosmurray.musicplayer.EqPreset
 import com.raulburgosmurray.musicplayer.EqualizerManager
+import com.raulburgosmurray.musicplayer.data.AudiobookProgress
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import android.os.CountDownTimer
 import android.content.Intent
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 import com.raulburgosmurray.musicplayer.data.AppDatabase
 import com.raulburgosmurray.musicplayer.data.BookRepository
@@ -87,17 +98,38 @@ data class PlaybackUiState(
     val currentMusicDetails: com.raulburgosmurray.musicplayer.Music? = null,
     val currentMetadata: AudioMetadata? = null,
     val eqPreset: EqPreset = EqPreset.FLAT,
-    val eqAvailable: Boolean = false
+    val eqAvailable: Boolean = false,
+    val timerStartPosition: Long? = null,
+    val canReturnToTimerStart: Boolean = false
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidViewModel(application) {
+
+    companion object {
+        internal const val MAX_REASONABLE_DURATION_MS = 315_360_000_000L // 10 years
+
+        fun sanitizeDuration(duration: Long): Long {
+            if (duration < 0) return 0L
+            if (duration > MAX_REASONABLE_DURATION_MS) return 0L
+            return duration
+        }
+
+        fun sanitizePosition(position: Long, duration: Long): Long {
+            if (position < 0) return 0L
+            if (duration in 1..MAX_REASONABLE_DURATION_MS && position > duration) return duration
+            if (position > MAX_REASONABLE_DURATION_MS) return 0L
+            return position
+        }
+    }
 
     var historyLimit: Int = 100 // Valor por defecto
 
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private var controller: MediaController? = null
     private var progressJob: Job? = null
+    private var pitchRecoveryJob: Job? = null
+    private var descriptionJob: Job? = null
     private var sleepTimer: CountDownTimer? = null
     private var originalTimerMinutes: Int = 0
     private var sensorManager: SensorManager? = null
@@ -121,15 +153,105 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
     private var isVibrationEnabled = true
     private var isSoundEnabled = false
 
+    // Time Announcement
+    private var isTimeAnnouncementEnabled = false
+    private var timeAnnouncementIntervalMinutes = 30
+    private var timeAnnouncementJob: Job? = null
+    private var tts: TextToSpeech? = null
+
+    private val prefs = application.getSharedPreferences("settings", Context.MODE_PRIVATE)
+    private val timerPrefs = application.getSharedPreferences("timer_prefs", Context.MODE_PRIVATE)
+
     init {
+        historyLimit = prefs.getInt("history_limit", 100)
+        val savedHistory = prefs.getString("history_json", null)
+        val initialHistory = if (savedHistory != null) {
+            try {
+                Json.decodeFromString<List<HistoryAction>>(savedHistory)
+            } catch (_: Exception) {
+                emptyList()
+            }
+        } else {
+            emptyList()
+        }
+        _uiState.value = _uiState.value.copy(history = initialHistory.take(historyLimit))
         observeFavoriteStatus()
         observeBookmarks()
+
+        isTimeAnnouncementEnabled = prefs.getBoolean("time_announcement_enabled", false)
+        timeAnnouncementIntervalMinutes = prefs.getInt("time_announcement_interval", 30)
+        initTts()
+    }
+
+    private fun initTts() {
+        tts = TextToSpeech(getApplication()) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                tts?.language = Locale.getDefault()
+            }
+        }
+    }
+
+    private fun checkTimerStartForMediaId(mediaId: String?) {
+        if (mediaId == null) {
+            _uiState.value = _uiState.value.copy(canReturnToTimerStart = false, timerStartPosition = null)
+            return
+        }
+        val savedMediaId = timerPrefs.getString("last_timer_media_id", null)
+        val savedPosition = timerPrefs.getLong("last_timer_position", -1L)
+        if (savedMediaId == mediaId && savedPosition >= 0) {
+            _uiState.value = _uiState.value.copy(canReturnToTimerStart = true, timerStartPosition = savedPosition)
+        } else {
+            _uiState.value = _uiState.value.copy(canReturnToTimerStart = false, timerStartPosition = null)
+        }
     }
 
     fun updateShakePreferences(enabled: Boolean, vibration: Boolean, sound: Boolean) {
         isShakeSettingEnabled = enabled
         isVibrationEnabled = vibration
         isSoundEnabled = sound
+    }
+
+    fun updateTimeAnnouncementPreferences(enabled: Boolean, intervalMinutes: Int) {
+        isTimeAnnouncementEnabled = enabled
+        timeAnnouncementIntervalMinutes = intervalMinutes
+        if (enabled && intervalMinutes > 0) {
+            startTimeAnnouncementLoop()
+        } else {
+            stopTimeAnnouncementLoop()
+        }
+    }
+
+    private fun startTimeAnnouncementLoop() {
+        stopTimeAnnouncementLoop()
+        if (!isTimeAnnouncementEnabled || timeAnnouncementIntervalMinutes <= 0) return
+        timeAnnouncementJob = viewModelScope.launch {
+            while (isActive) {
+                delay(timeAnnouncementIntervalMinutes * 60 * 1000L)
+                if (controller?.isPlaying == true) {
+                    announceTime()
+                }
+            }
+        }
+    }
+
+    private fun stopTimeAnnouncementLoop() {
+        timeAnnouncementJob?.cancel()
+        timeAnnouncementJob = null
+    }
+
+    private fun announceTime() {
+        val ttsInstance = tts ?: return
+        if (ttsInstance.isSpeaking) return
+        val now = SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date())
+        val message = getApplication<Application>().getString(R.string.time_announcement, now)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            ttsInstance.speak(message, TextToSpeech.QUEUE_FLUSH, null, "time_announcement")
+        } else {
+            @Suppress("DEPRECATION")
+            val params = java.util.HashMap<String, String>()
+            params[TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID] = "time_announcement"
+            ttsInstance.speak(message, TextToSpeech.QUEUE_FLUSH, params)
+        }
     }
 
     private fun playWarningSound() {
@@ -227,11 +349,19 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
     }
 
     private fun logAction(label: String) {
-        val currentPos = controller?.currentPosition ?: 0L
+        val rawPos = controller?.currentPosition ?: 0L
+        val duration = controller?.duration ?: 0L
+        val currentPos = sanitizePosition(rawPos, duration)
         val newAction = HistoryAction(label, currentPos)
         val newList = _uiState.value.history.toMutableList()
         newList.add(0, newAction)
-        _uiState.value = _uiState.value.copy(history = newList.take(historyLimit))
+        val limited = newList.take(historyLimit)
+        _uiState.value = _uiState.value.copy(history = limited)
+        try {
+            prefs.edit().putString("history_json", Json.encodeToString(limited)).apply()
+        } catch (_: Exception) {
+            // ignore serialization errors
+        }
     }
 
     fun toggleFavorite() {
@@ -385,6 +515,16 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
         }
     }
 
+    private fun persistLastPlayedMediaId(mediaId: String) {
+        val prefs = getApplication<Application>().getSharedPreferences("playback_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putString("last_played_media_id", mediaId).apply()
+    }
+
+    private fun getLastPlayedMediaId(): String? {
+        val prefs = getApplication<Application>().getSharedPreferences("playback_prefs", Context.MODE_PRIVATE)
+        return prefs.getString("last_played_media_id", null)
+    }
+
     fun loadPersistedQueue(allBooks: List<com.raulburgosmurray.musicplayer.Music>) {
         val player = controller
         if (player == null) {
@@ -422,7 +562,26 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
                 allBooks.find { it.id == savedItem.mediaId }?.toMediaItem()
             }
             if (itemsToLoad.isNotEmpty()) {
-                player.setMediaItems(itemsToLoad)
+                val lastMediaId = getLastPlayedMediaId()
+                val startIndex = if (lastMediaId != null) {
+                    itemsToLoad.indexOfFirst { it.mediaId == lastMediaId }.coerceAtLeast(0)
+                } else 0
+                val rawSaved = if (lastMediaId != null) {
+                    withContext(Dispatchers.IO) {
+                        progressRepository.getProgress(lastMediaId)?.lastPosition ?: 0L
+                    }
+                } else 0L
+                val savedDuration = if (lastMediaId != null) {
+                    withContext(Dispatchers.IO) {
+                        progressRepository.getProgress(lastMediaId)?.duration ?: 0L
+                    }
+                } else 0L
+                val savedPosition = sanitizePosition(rawSaved, sanitizeDuration(savedDuration))
+
+                // Optimistic UI update so slider doesn't flash at 0
+                _uiState.value = _uiState.value.copy(currentPosition = savedPosition)
+
+                player.setMediaItems(itemsToLoad, startIndex, savedPosition)
                 player.prepare()
                 updatePlaylistState()
             }
@@ -430,12 +589,13 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
         }
     }
 
-private fun updateCurrentMusicDetails(mediaId: String?) {
+    private fun updateCurrentMusicDetails(mediaId: String?) {
         if (mediaId == null) {
             _uiState.value = _uiState.value.copy(currentMusicDetails = null, currentMetadata = null)
             return
         }
-        viewModelScope.launch {
+        descriptionJob?.cancel()
+        descriptionJob = viewModelScope.launch {
             val cachedBook = withContext(Dispatchers.IO) {
                 bookRepository.getAllBooks().first().find { it.id == mediaId }
             }
@@ -475,7 +635,9 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
             
             Log.d("PlaybackViewModel", "restorePositionIfNeeded: mediaId=$mediaId, progress=$progress")
             
-            if (progress != null && progress.lastPosition > 0) {
+            val savedPos = progress?.lastPosition ?: 0L
+            val safeSavedPos = sanitizePosition(savedPos, sanitizeDuration(progress?.duration ?: 0L))
+            if (safeSavedPos > 0) {
                 // Wait for player to be ready (max 3 seconds)
                 val mediaController = controller
                 mediaController?.let { ctrl ->
@@ -488,9 +650,9 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
                     
                     if (ctrl.playbackState == androidx.media3.common.Player.STATE_READY) {
                         val currentPos = ctrl.currentPosition
-                        Log.d("PlaybackViewModel", "Restoring: currentPos=$currentPos, savedPos=${progress.lastPosition}")
-                        ctrl.seekTo(progress.lastPosition)
-                        Log.d("PlaybackViewModel", "Restored position to ${progress.lastPosition}ms")
+                        Log.d("PlaybackViewModel", "Restoring: currentPos=$currentPos, savedPos=$safeSavedPos")
+                        ctrl.seekTo(safeSavedPos)
+                        Log.d("PlaybackViewModel", "Restored position to ${safeSavedPos}ms")
                     } else {
                         Log.d("PlaybackViewModel", "Player never ready, state=${ctrl.playbackState}")
                     }
@@ -523,17 +685,24 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
                     }
                 }
 
+                val safeDuration = sanitizeDuration(player.duration)
+                val safePosition = sanitizePosition(player.currentPosition, safeDuration)
                 _uiState.value = _uiState.value.copy(
                     currentMediaItem = mediaItem,
                     currentIndex = player.currentMediaItemIndex,
-                    duration = player.duration,
+                    duration = safeDuration,
+                    currentPosition = safePosition,
                     chapters = emptyList(),
                     dominantColor = null
                 )
                 
                 updateCurrentMusicDetails(mediaItem?.mediaId)
                 updateDominantColor(mediaItem?.mediaMetadata?.artworkUri)
-                mediaItem?.mediaId?.let { restorePerBookSettings(it) }
+                mediaItem?.mediaId?.let { 
+                    restorePerBookSettings(it)
+                    persistLastPlayedMediaId(it)
+                }
+                checkTimerStartForMediaId(mediaItem?.mediaId)
                 mediaItem?.localConfiguration?.uri?.toString()?.let { uriString ->
                     if (uriString != lastScannedUri) {
                         extractChapters(uriString)
@@ -548,9 +717,12 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
+                val safeDuration = sanitizeDuration(player.duration)
+                val safePosition = sanitizePosition(player.currentPosition, safeDuration)
                 _uiState.value = _uiState.value.copy(
                     isReady = playbackState == Player.STATE_READY,
-                    duration = player.duration
+                    duration = safeDuration,
+                    currentPosition = safePosition
                 )
                 if (playbackState == Player.STATE_READY) {
                     attachEqualizer()
@@ -562,10 +734,27 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
                         }
                     }
                 }
+                // Defensive: some devices enter an unrecoverable idle state after changing pitch.
+                // Reset UI so the user can retry playback instead of staying stuck.
+                if (playbackState == Player.STATE_IDLE && player.playWhenReady) {
+                    Log.w("PlaybackVM", "Unexpected IDLE with playWhenReady=true; resetting UI state")
+                    _uiState.value = _uiState.value.copy(
+                        playWhenReady = false,
+                        isPlaying = false
+                    )
+                }
             }
 
             override fun onPlaybackParametersChanged(playbackParameters: androidx.media3.common.PlaybackParameters) {
                 _uiState.value = _uiState.value.copy(playbackSpeed = playbackParameters.speed, pitch = playbackParameters.pitch)
+            }
+
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                Log.e("PlaybackVM", "Player error received: ${error.errorCodeName}", error)
+                _uiState.value = _uiState.value.copy(
+                    isPlaying = false,
+                    playWhenReady = false
+                )
             }
 
             override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
@@ -579,17 +768,19 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
                         ))
                     }
                 }
-                _uiState.value = _uiState.value.copy(currentPosition = newPosition.positionMs)
+                val safeDuration = sanitizeDuration(player.duration)
+                _uiState.value = _uiState.value.copy(currentPosition = sanitizePosition(newPosition.positionMs, safeDuration))
             }
         })
 
+        val safeDuration = sanitizeDuration(player.duration)
         _uiState.value = _uiState.value.copy(
             isConnected = true,
             isPlaying = player.isPlaying,
             playWhenReady = player.playWhenReady,
             currentMediaItem = player.currentMediaItem,
-            duration = player.duration,
-            currentPosition = player.currentPosition,
+            duration = safeDuration,
+            currentPosition = sanitizePosition(player.currentPosition, safeDuration),
             playbackSpeed = player.playbackParameters.speed,
             pitch = player.playbackParameters.pitch,
             isReady = player.playbackState == Player.STATE_READY
@@ -638,7 +829,8 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
             while (true) {
                 controller?.let {
                     if (it.isPlaying) {
-                        _uiState.value = _uiState.value.copy(currentPosition = it.currentPosition)
+                        val safePos = sanitizePosition(it.currentPosition, sanitizeDuration(it.duration))
+                        _uiState.value = _uiState.value.copy(currentPosition = safePos)
                     }
                 }
                 delay(Constants.PROGRESS_UPDATE_INTERVAL_MS)
@@ -656,17 +848,31 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
             } else {
                 logAction(getApplication<Application>().getString(R.string.history_play))
                 it.play()
+                // Defensive: if player is stuck in idle/zombie state, force a rebuild
+                if (!it.isPlaying && it.playbackState == Player.STATE_IDLE) {
+                    val currentIndex = it.currentMediaItemIndex
+                    val currentPos = it.currentPosition
+                    it.stop()
+                    it.prepare()
+                    it.seekTo(currentIndex, currentPos)
+                    it.play()
+                }
             }
         }
     }
 
     private fun saveCurrentPositionAsUndo() {
-        controller?.let { _uiState.value = _uiState.value.copy(lastPositionBeforeSeek = it.currentPosition) }
+        controller?.let {
+            val safePos = sanitizePosition(it.currentPosition, sanitizeDuration(it.duration))
+            _uiState.value = _uiState.value.copy(lastPositionBeforeSeek = safePos)
+        }
     }
 
     fun undoSeek() {
         val prevPos = _uiState.value.lastPositionBeforeSeek ?: return
-        val currentPos = controller?.currentPosition ?: 0L
+        val rawCurrent = controller?.currentPosition ?: 0L
+        val duration = controller?.duration ?: 0L
+        val currentPos = sanitizePosition(rawCurrent, duration)
         logAction(getApplication<Application>().getString(R.string.history_undo_seek))
         controller?.seekTo(prevPos)
         _uiState.value = _uiState.value.copy(lastPositionBeforeSeek = currentPos)
@@ -675,7 +881,13 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
     fun seekTo(position: Long) {
         saveCurrentPositionAsUndo()
         logAction(getApplication<Application>().getString(R.string.history_manual_seek))
-        controller?.seekTo(position)
+        controller?.let {
+            // Defensive: if player is idle (e.g. after a pitch error), prepare first
+            if (it.playbackState == Player.STATE_IDLE) {
+                it.prepare()
+            }
+            it.seekTo(position)
+        }
     }
 
     fun skipForward(millis: Long) {
@@ -688,6 +900,20 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
         saveCurrentPositionAsUndo()
         logAction(getApplication<Application>().getString(R.string.history_skip_backward, millis/1000))
         controller?.let { it.seekTo(it.currentPosition - millis) }
+    }
+
+    fun skipByAmount(amountMs: Long, isForward: Boolean) {
+        val currentPos = controller?.currentPosition ?: 0L
+        val duration = controller?.duration ?: 0L
+        val targetPos = if (isForward) {
+            (currentPos + amountMs).coerceAtMost(duration)
+        } else {
+            (currentPos - amountMs).coerceAtLeast(0L)
+        }
+        saveCurrentPositionAsUndo()
+        val labelRes = if (isForward) R.string.history_skip_by_amount_forward else R.string.history_skip_by_amount_backward
+        logAction(getApplication<Application>().getString(labelRes, formatDuration(amountMs)))
+        controller?.seekTo(targetPos)
     }
 
     fun setPlaybackSpeed(speed: Float) {
@@ -705,8 +931,25 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
     }
 
     fun setPitch(pitch: Float) {
-        controller?.let {
-            it.setPlaybackParameters(androidx.media3.common.PlaybackParameters(it.playbackParameters.speed, pitch))
+        controller?.let { ctrl ->
+            val wasPlaying = ctrl.isPlaying
+            val currentPos = ctrl.currentPosition.coerceAtLeast(0L)
+
+            // Changing pitch while playing can corrupt the AudioTrack pipeline on some devices.
+            // Pause first, apply parameters, force a seek to rebuild the renderer, then resume.
+            if (wasPlaying) {
+                ctrl.pause()
+            }
+            ctrl.setPlaybackParameters(
+                androidx.media3.common.PlaybackParameters(ctrl.playbackParameters.speed, pitch)
+            )
+            // Force renderer rebuild to avoid a zombie audio sink
+            if (ctrl.playbackState != Player.STATE_IDLE) {
+                ctrl.seekTo(currentPos)
+            }
+            if (wasPlaying) {
+                ctrl.play()
+            }
         }
         _uiState.value = _uiState.value.copy(pitch = pitch)
         // Persist pitch per-book
@@ -724,6 +967,22 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
         cancelSleepTimer()
         originalTimerMinutes = minutes
         _uiState.value = _uiState.value.copy(sleepTimerMinutes = minutes, isShakeWaiting = false)
+
+        // Save current position as the new timer start point (works for initial timer and shake extensions)
+        val currentMediaId = controller?.currentMediaItem?.mediaId
+        val currentPos = controller?.currentPosition ?: 0L
+        val safePos = sanitizePosition(currentPos, controller?.duration ?: 0L)
+        if (currentMediaId != null) {
+            timerPrefs.edit()
+                .putString("last_timer_media_id", currentMediaId)
+                .putLong("last_timer_position", safePos)
+                .apply()
+            _uiState.value = _uiState.value.copy(
+                canReturnToTimerStart = true,
+                timerStartPosition = safePos
+            )
+            logAction(getApplication<Application>().getString(R.string.history_timer_started, formatDuration(safePos)))
+        }
         
         var hasWarned = false
 
@@ -737,6 +996,9 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
                 // Zona de advertencia: últimos 30 segundos
                 if (millisUntilFinished <= Constants.SLEEP_TIMER_WARNING_MS && !hasWarned) {
                     hasWarned = true
+                    if (isTimeAnnouncementEnabled) {
+                        announceTime()
+                    }
                     vibrate()
                     playWarningSound()
                     if (isShakeSettingEnabled) {
@@ -762,39 +1024,63 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
         _uiState.value = _uiState.value.copy(sleepTimerMinutes = 0, isShakeWaiting = false)
     }
 
+    fun returnToTimerStart() {
+        val pos = _uiState.value.timerStartPosition ?: return
+        seekTo(pos)
+        logAction(getApplication<Application>().getString(R.string.return_to_timer_start))
+    }
+
     private var pendingPlaylist: Pair<List<MediaItem>, Int>? = null
 
     fun playPlaylist(mediaItems: List<MediaItem>, startIndex: Int) {
-        val player = controller
-        if (player != null) {
-            val isSingleBook = mediaItems.size == 1
-            val alreadyHasQueue = player.mediaItemCount > 0
+        viewModelScope.launch {
+            val player = controller
+            if (player != null) {
+                val mediaId = mediaItems.getOrNull(startIndex)?.mediaId
+                val rawSaved = if (mediaId != null) {
+                    withContext(Dispatchers.IO) {
+                        progressRepository.getProgress(mediaId)?.lastPosition ?: 0L
+                    }
+                } else 0L
+                val savedDuration = if (mediaId != null) {
+                    withContext(Dispatchers.IO) {
+                        progressRepository.getProgress(mediaId)?.duration ?: 0L
+                    }
+                } else 0L
+                val savedPosition = sanitizePosition(rawSaved, sanitizeDuration(savedDuration))
 
-            if (isSingleBook && alreadyHasQueue) {
-                // Add single book to existing queue and play it without clearing
-                val newItem = mediaItems[startIndex]
-                val existingIndex = (0 until player.mediaItemCount).indexOfFirst {
-                    player.getMediaItemAt(it).mediaId == newItem.mediaId
-                }
-                if (existingIndex >= 0) {
-                    // Book already in queue: jump to it
-                    player.seekTo(existingIndex, 0)
-                    player.play()
+                // Optimistic UI update so slider doesn't flash at 0
+                _uiState.value = _uiState.value.copy(currentPosition = savedPosition)
+
+                val isSingleBook = mediaItems.size == 1
+                val alreadyHasQueue = player.mediaItemCount > 0
+
+                if (isSingleBook && alreadyHasQueue) {
+                    // Add single book to existing queue and play it without clearing
+                    val newItem = mediaItems[startIndex]
+                    val existingIndex = (0 until player.mediaItemCount).indexOfFirst {
+                        player.getMediaItemAt(it).mediaId == newItem.mediaId
+                    }
+                    if (existingIndex >= 0) {
+                        // Book already in queue: jump to it at saved position
+                        player.seekTo(existingIndex, savedPosition)
+                        player.play()
+                    } else {
+                        // New book: append and play it at saved position
+                        player.addMediaItem(newItem)
+                        player.seekTo(player.mediaItemCount - 1, savedPosition)
+                        player.play()
+                    }
                 } else {
-                    // New book: append and play it
-                    player.addMediaItem(newItem)
-                    player.seekTo(player.mediaItemCount - 1, 0)
+                    // Multi-book selection or empty player: replace queue
+                    player.stop()
+                    player.setMediaItems(mediaItems, startIndex, savedPosition)
+                    player.prepare()
                     player.play()
                 }
             } else {
-                // Multi-book selection or empty player: replace queue
-                player.stop()
-                player.setMediaItems(mediaItems, startIndex, 0)
-                player.prepare()
-                player.play()
+                pendingPlaylist = Pair(mediaItems, startIndex)
             }
-        } else {
-            pendingPlaylist = Pair(mediaItems, startIndex)
         }
     }
 
@@ -870,6 +1156,11 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
                 val existing = progressRepository.getProgress(mediaId)
                 if (existing != null) {
                     progressRepository.saveProgress(existing.copy(eqPresetName = preset.name))
+                } else {
+                    // Create a minimal record so the preset is preserved even for never-played books
+                    progressRepository.saveProgress(
+                        AudiobookProgress(mediaId = mediaId, lastPosition = 0L, duration = 0L, eqPresetName = preset.name)
+                    )
                 }
             }
         }
@@ -886,28 +1177,39 @@ private fun updateCurrentMusicDetails(mediaId: String?) {
 
     private fun restorePerBookSettings(mediaId: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            val progress = progressRepository.getProgress(mediaId) ?: return@launch
+            val progress = progressRepository.getProgress(mediaId)
             withContext(Dispatchers.Main) {
-                val speed = progress.playbackSpeed.coerceAtLeast(0.1f)
-                val pitch = progress.pitch.coerceAtLeast(0.1f)
-                controller?.setPlaybackParameters(
-                    androidx.media3.common.PlaybackParameters(speed, pitch)
-                )
-                _uiState.value = _uiState.value.copy(playbackSpeed = speed, pitch = pitch)
-                // Restore EQ preset
-                if (progress.eqPresetName.isNotEmpty()) {
-                    try {
-                        val preset = EqPreset.valueOf(progress.eqPresetName)
-                        equalizerManager.applyPreset(preset)
-                        _uiState.value = _uiState.value.copy(eqPreset = preset)
-                    } catch (_: IllegalArgumentException) {}
+                if (progress != null) {
+                    val speed = progress.playbackSpeed.coerceAtLeast(0.1f)
+                    val pitch = progress.pitch.coerceAtLeast(0.1f)
+                    controller?.setPlaybackParameters(
+                        androidx.media3.common.PlaybackParameters(speed, pitch)
+                    )
+                    _uiState.value = _uiState.value.copy(playbackSpeed = speed, pitch = pitch)
                 }
+                // Restore EQ preset: saved per-book or fallback to default
+                val presetToApply = when {
+                    progress?.eqPresetName?.isNotEmpty() == true -> {
+                        try { EqPreset.valueOf(progress.eqPresetName) } catch (_: IllegalArgumentException) { null }
+                    }
+                    else -> null
+                }
+                val finalPreset = presetToApply ?: run {
+                    val settingsPrefs = getApplication<Application>().getSharedPreferences("settings", Context.MODE_PRIVATE)
+                    val defaultName = settingsPrefs.getString("default_eq_preset", EqPreset.FLAT.name) ?: EqPreset.FLAT.name
+                    try { EqPreset.valueOf(defaultName) } catch (_: Exception) { EqPreset.FLAT }
+                }
+                equalizerManager.applyPreset(finalPreset)
+                _uiState.value = _uiState.value.copy(eqPreset = finalPreset)
             }
         }
     }
 
     override fun onCleared() {
         sleepTimer?.cancel()
+        stopTimeAnnouncementLoop()
+        tts?.shutdown()
+        tts = null
         equalizerManager.release()
         releaseController()
         super.onCleared()

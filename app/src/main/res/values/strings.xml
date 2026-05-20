@@ -91,6 +91,8 @@
     <string name="rescan_folders">Rescan Folders</string>
     <string name="audiobook_folder">Audiobook Folder</string>
     <string name="scanning_all_memory">Scanning all memory</string>
+    <string name="default_equalizer">Default Equalizer</string>
+    <string name="default_equalizer_desc">Preset applied to books without a custom equalizer setting.</string>
     <string name="about_app">About App</string>
     <string name="undo_seek">UNDO SEEK</string>
     <string name="manual_bookmarks">Manual Bookmarks</string>
@@ -163,6 +165,7 @@
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
     <!-- Screen lock -->
+    <string name="lock_screen">Lock screen</string>
     <string name="screen_locked">Screen locked</string>
     <string name="unlock">Unlock</string>
     <string name="undo">Undo</string>
@@ -218,6 +221,8 @@
     <string name="history_undo_seek">Undo seek</string>
     <string name="history_bookmark_added">Bookmark added</string>
     <string name="history_timer_finished">Sleep timer ended</string>
+    <string name="history_timer_started">Timer started at %1$s</string>
+    <string name="return_to_timer_start">Return to timer start</string>
     <string name="history_accidental_seek">Accidental jump from %1$s</string>
     <string name="bookmark_accidental_seek">Position before accidental jump</string>
     <!-- Transfer -->
@@ -273,6 +278,25 @@
     <string name="minutes_hint">MM</string>
     <string name="seconds_hint">SS</string>
     <string name="invalid_time">Position exceeds duration</string>
+    <string name="skip_by_amount">Skip by amount</string>
+    <string name="skip_by_amount_desc">Enter a time amount to skip</string>
+    <string name="amount_label">Amount</string>
+    <string name="unit_minutes">Minutes</string>
+    <string name="unit_hours">Hours</string>
+    <string name="direction_forward">Forward</string>
+    <string name="direction_backward">Backward</string>
+    <string name="invalid_skip_amount">Invalid amount or exceeds audio duration</string>
+    <string name="history_skip_by_amount_forward">Skip forward %1$s</string>
+    <string name="history_skip_by_amount_backward">Skip backward %1$s</string>
+    <!-- Time announcement -->
+    <string name="time_announcement_title">Time Announcements</string>
+    <string name="time_announcement_desc">Announce the current time over the audiobook.</string>
+    <string name="time_announcement_interval">Announcement Interval</string>
+    <string name="interval_15_min">15 min</string>
+    <string name="interval_30_min">30 min</string>
+    <string name="interval_60_min">1 hour</string>
+    <string name="interval_timer_only">Timer only</string>
+    <string name="time_announcement">It is %1$s</string>
     <!-- Synopsis accordion -->
     <string name="synopsis_label">Synopsis</string>
     <string name="expand">Expand</string>

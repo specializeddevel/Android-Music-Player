@@ -1,5 +1,6 @@
 package com.raulburgosmurray.musicplayer.ui
 
+import android.content.res.Configuration
 import android.net.Uri
 import android.util.Base64
 import androidx.compose.animation.AnimatedVisibilityScope
@@ -8,6 +9,9 @@ import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
@@ -16,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -44,6 +49,9 @@ fun FavoritesScreen(
     val playbackState by playbackViewModel.uiState.collectAsState()
     val context = LocalContext.current
     val readStatusSet = remember(bookReadStatus) { bookReadStatus.filter { it.value }.keys }
+
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     var selectedBookForDetails by remember { mutableStateOf<Music?>(null) }
     val detailsSheetState = rememberModalBottomSheetState()
@@ -94,6 +102,33 @@ fun FavoritesScreen(
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.secondary
                     )
+                }
+            }
+        } else if (isLandscape) {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                modifier = Modifier.fillMaxSize().padding(padding),
+                contentPadding = PaddingValues(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(items = favoriteBooks, key = { it.id }, contentType = { "book" }) { book ->
+                    with(sharedTransitionScope) {
+                        BookGridItem(
+                            book = book,
+                            isFavorite = true,
+                            isRead = readStatusSet.contains(book.id),
+                            progress = bookProgress[book.id] ?: 0f,
+                            keyPrefix = "fav",
+                            animatedVisibilityScope = animatedVisibilityScope,
+                            onAddToQueue = { playbackViewModel.addToQueue(book) },
+                            onLongClick = {
+                                selectedBookForDetails = book
+                                showDetailsSheet = true
+                            },
+                            onClick = { onBookClick(book) }
+                        )
+                    }
                 }
             }
         } else {

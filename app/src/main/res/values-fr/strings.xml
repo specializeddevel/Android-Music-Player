@@ -91,6 +91,8 @@
     <string name="rescan_folders">Rescanner les dossiers</string>
     <string name="audiobook_folder">Dossier de livres audio</string>
     <string name="scanning_all_memory">Analyse de toute la mémoire</string>
+    <string name="default_equalizer">Égaliseur par défaut</string>
+    <string name="default_equalizer_desc">Préréglage appliqué aux livres sans configuration d\'égaliseur personnalisée.</string>
     <string name="about_app">À propos de l\'app</string>
     <string name="undo_seek">ANNULER SAUT</string>
     <string name="manual_bookmarks">Signets manuels</string>
@@ -162,6 +164,7 @@
     <string name="theme_system">Système</string>
     <string name="theme_light">Clair</string>
     <string name="theme_dark">Sombre</string>
+    <string name="lock_screen">Verrouiller l\'écran</string>
     <string name="screen_locked">Écran verrouillé</string>
     <string name="unlock">Déverrouiller</string>
     <string name="undo">Annuler</string>
@@ -211,6 +214,8 @@
     <string name="history_undo_seek">Annuler le saut</string>
     <string name="history_bookmark_added">Signet ajouté</string>
     <string name="history_timer_finished">Minuterie terminée</string>
+    <string name="history_timer_started">Minuterie démarrée à %1$s</string>
+    <string name="return_to_timer_start">Retour au début de la minuterie</string>
     <string name="history_accidental_seek">Saut accidentel depuis %1$s</string>
     <string name="bookmark_accidental_seek">Position avant le saut accidentel</string>
     <string name="ready">Prêt</string>
@@ -262,6 +267,25 @@
     <string name="minutes_hint">MM</string>
     <string name="seconds_hint">SS</string>
     <string name="invalid_time">Position dépasse la durée</string>
+    <string name="skip_by_amount">Sauter d\'un montant</string>
+    <string name="skip_by_amount_desc">Entrez une durée pour sauter</string>
+    <string name="amount_label">Quantité</string>
+    <string name="unit_minutes">Minutes</string>
+    <string name="unit_hours">Heures</string>
+    <string name="direction_forward">Avancer</string>
+    <string name="direction_backward">Reculer</string>
+    <string name="invalid_skip_amount">Quantité invalide ou dépasse la durée</string>
+    <string name="history_skip_by_amount_forward">Avancer %1$s</string>
+    <string name="history_skip_by_amount_backward">Reculer %1$s</string>
+    <!-- Annonce de l\'heure -->
+    <string name="time_announcement_title">Annonce de l\'heure</string>
+    <string name="time_announcement_desc">Annonce l\'heure actuelle par-dessus le livre audio.</string>
+    <string name="time_announcement_interval">Intervalle d\'annonce</string>
+    <string name="interval_15_min">15 min</string>
+    <string name="interval_30_min">30 min</string>
+    <string name="interval_60_min">1 heure</string>
+    <string name="interval_timer_only">Timer uniquement</string>
+    <string name="time_announcement">Il est %1$s</string>
     <!-- Accordéon de synopsis -->
     <string name="synopsis_label">Synopsis</string>
     <string name="expand">Développer</string>

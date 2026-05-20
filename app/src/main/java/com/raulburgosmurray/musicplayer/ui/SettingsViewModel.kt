@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import com.raulburgosmurray.musicplayer.EqPreset
 import com.raulburgosmurray.musicplayer.ui.SortOrder
 
 enum class LayoutMode {
@@ -71,6 +72,19 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _isSoundEnabled = MutableStateFlow(prefs.getBoolean("sound_enabled", false))
     val isSoundEnabled: StateFlow<Boolean> = _isSoundEnabled.asStateFlow()
 
+    private val _isTimeAnnouncementEnabled = MutableStateFlow(prefs.getBoolean("time_announcement_enabled", false))
+    val isTimeAnnouncementEnabled: StateFlow<Boolean> = _isTimeAnnouncementEnabled.asStateFlow()
+
+    private val _timeAnnouncementInterval = MutableStateFlow(prefs.getInt("time_announcement_interval", 30))
+    val timeAnnouncementInterval: StateFlow<Int> = _timeAnnouncementInterval.asStateFlow()
+
+    private val _defaultEqPreset = MutableStateFlow(
+        prefs.getString("default_eq_preset", EqPreset.FLAT.name)?.let {
+            try { EqPreset.valueOf(it) } catch (_: Exception) { EqPreset.FLAT }
+        } ?: EqPreset.FLAT
+    )
+    val defaultEqPreset: StateFlow<EqPreset> = _defaultEqPreset.asStateFlow()
+
     fun setDynamicThemingEnabled(enabled: Boolean) {
         _isDynamicThemingEnabled.value = enabled
         prefs.edit().putBoolean("dynamic_theming", enabled).apply()
@@ -130,5 +144,20 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setSoundEnabled(enabled: Boolean) {
         _isSoundEnabled.value = enabled
         prefs.edit().putBoolean("sound_enabled", enabled).apply()
+    }
+
+    fun setTimeAnnouncementEnabled(enabled: Boolean) {
+        _isTimeAnnouncementEnabled.value = enabled
+        prefs.edit().putBoolean("time_announcement_enabled", enabled).apply()
+    }
+
+    fun setTimeAnnouncementInterval(minutes: Int) {
+        _timeAnnouncementInterval.value = minutes
+        prefs.edit().putInt("time_announcement_interval", minutes).apply()
+    }
+
+    fun setDefaultEqPreset(preset: EqPreset) {
+        _defaultEqPreset.value = preset
+        prefs.edit().putString("default_eq_preset", preset.name).apply()
     }
 }

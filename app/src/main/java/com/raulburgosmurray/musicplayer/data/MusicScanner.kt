@@ -220,4 +220,61 @@ class MusicScanner(
         }
         return files
     }
+
+    /**
+     * Quick check for MediaStore: returns a set of content-URI strings for all
+     * audio files that pass the duration/size/filename filters. Much faster than
+     * a full scan because it does NOT extract metadata.
+     */
+    suspend fun quickCheckMediaStore(context: Context): Set<String> = withContext(Dispatchers.IO) {
+        val ids = mutableSetOf<String>()
+        val collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+        } else {
+            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+        }
+
+        val proj = arrayOf(
+            MediaStore.Audio.Media._ID,
+            MediaStore.Audio.Media.SIZE,
+            MediaStore.Audio.Media.DATA
+        )
+
+        context.contentResolver.query(
+            collection,
+            proj,
+            "${MediaStore.Audio.Media.DURATION} > ${Constants.MIN_AUDIO_DURATION_MS}",
+            null,
+            null
+        )?.use { cursor ->
+            while (cursor.moveToNext()) {
+                val idLong = cursor.getLong(0)
+                val contentUri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, idLong)
+                val fileSize = cursor.getLong(1)
+                val filePath = cursor.getString(2) ?: ""
+                if (isExcludedPath(filePath)) continue
+                if (!isLikelyAudiobook(fileSize, 0)) continue
+                ids.add(contentUri.toString())
+            }
+        }
+        ids
+    }
+
+    /**
+     * Quick check for SAF directories: returns a set of URI strings for all
+     * audio files that pass the size/filename filters. Much faster than a full
+     * scan because it does NOT extract metadata.
+     */
+    suspend fun quickCheckDirectory(context: Context, directory: DocumentFile): Set<String> = withContext(Dispatchers.IO) {
+        val ids = mutableSetOf<String>()
+        val allFiles = collectAudioFiles(directory)
+        for (file in allFiles) {
+            val id = file.uri.toString()
+            val fileName = file.name ?: ""
+            if (isExcludedPath(fileName)) continue
+            if (!isLikelyAudiobook(file.length(), 0)) continue
+            ids.add(id)
+        }
+        ids
+    }
 }

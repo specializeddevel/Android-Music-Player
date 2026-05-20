@@ -205,10 +205,10 @@ class MainActivity : ComponentActivity() {
     private data class Quad<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
 
     private fun loadBooksAndStartUI() {
-        lifecycleScope.launch { 
+        lifecycleScope.launch {
             val uris = settingsViewModel.libraryRootUris.first()
             val scanAll = settingsViewModel.scanAllMemory.first()
-            mainViewModel.loadBooks(if (scanAll) emptyList() else uris, scanAll)
+            mainViewModel.smartLoadBooks(if (scanAll) emptyList() else uris, scanAll)
         }
         lifecycleScope.launch { mainViewModel.books.collect { if (it.isNotEmpty()) playbackViewModel.loadPersistedQueue(it) } }
         startUI()
@@ -280,7 +280,7 @@ class MainActivity : ComponentActivity() {
 
                             composable("main") { MainScreen(mainViewModel, settingsViewModel, playbackViewModel, this@SharedTransitionLayout, this@composable, onBookClick = { handleBookClick(it, playbackViewModel, navController, "list") }, onMiniPlayerClick = { navController.navigate("player/mini") }, onFavoritesClick = { navController.navigate("favorites") }, onSettingsClick = { navController.navigate("settings") }, onReceiveClick = { navController.navigate("transfer") }, onSelectFolder = { folderLauncher.launch(null) }, navController = navController) }
                             composable("favorites") { FavoritesScreen(mainViewModel, playbackViewModel, this@SharedTransitionLayout, this@composable, onBack = { navController.popBackStack() }, onBookClick = { handleBookClick(it, playbackViewModel, navController, "fav") }, onMiniPlayerClick = { navController.navigate("player/mini") }, navController = navController) }
-                            composable("settings") { SettingsScreen(settingsViewModel, mainViewModel, syncViewModel, onBack = { navController.popBackStack() }) }
+                            composable("settings") { SettingsScreen(settingsViewModel, mainViewModel, syncViewModel, playbackViewModel, onBack = { navController.popBackStack() }) }
                             composable(route = "transfer?bookId={bookId}", arguments = listOf(navArgument("bookId") { type = NavType.StringType; nullable = true; defaultValue = null })) { backStackEntry ->
                                 val bookId = backStackEntry.arguments?.getString("bookId")
                                 val state by transferViewModel.uiState.collectAsState()

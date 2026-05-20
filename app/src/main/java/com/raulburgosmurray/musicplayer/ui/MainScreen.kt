@@ -19,9 +19,11 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -132,7 +134,17 @@ fun MainScreen(
     
     var isChangingLayout by remember { mutableStateOf(false) }
     var displayedBooks by remember { mutableStateOf<List<Music>>(emptyList()) }
-    
+    val listState = rememberLazyListState()
+    val gridState = rememberLazyGridState()
+
+    // Scroll to top whenever the book list becomes non-empty (e.g. on first load or after scan)
+    LaunchedEffect(displayedBooks.isNotEmpty()) {
+        if (displayedBooks.isNotEmpty() && searchQuery.isEmpty()) {
+            listState.scrollToItem(0)
+            gridState.scrollToItem(0)
+        }
+    }
+
     // Debounce search: wait for the user to stop typing before filtering.
     // Books list and layout changes apply immediately; only searchQuery is debounced.
     LaunchedEffect(books, layoutMode) {
@@ -296,7 +308,7 @@ fun MainScreen(
                     }
                     
                     if (layoutMode == LayoutMode.LIST) {
-                        LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             items(
                                 items = displayedBooks,
                                 key = { it.id },
@@ -311,13 +323,45 @@ fun MainScreen(
                             isLandscape -> 3
                             else -> 2
                         }
-                        LazyVerticalGrid(columns = GridCells.Fixed(columns), modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        LazyVerticalGrid(state = gridState, columns = GridCells.Fixed(columns), modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                             items(
                                 items = displayedBooks,
                                 key = { it.id },
                                 contentType = { "book" }
                             ) { book -> with(sharedTransitionScope) { BookGridItem(book = book, isFavorite = favoriteIdsSet.contains(book.id), isRead = readStatusSet.contains(book.id), progress = bookProgress[book.id] ?: 0f, animatedVisibilityScope = animatedVisibilityScope, onAddToQueue = { onQueueClick(book) }, onLongClick = { onBookLongClick(book) }, onClick = { onBookClick(book) }) } }
                         }
+                    }
+                }
+                // Scrollbar indicator (visible only when there are enough items to scroll)
+                if (displayedBooks.size > 6 && !isChangingLayout) {
+                    val firstVisible = if (layoutMode == LayoutMode.LIST) listState.firstVisibleItemIndex else gridState.firstVisibleItemIndex
+                    val visibleCount = if (layoutMode == LayoutMode.LIST) listState.layoutInfo.visibleItemsInfo.size else gridState.layoutInfo.visibleItemsInfo.size
+                    val total = displayedBooks.size
+                    val progress = if (firstVisible + visibleCount >= total) {
+                        1f
+                    } else {
+                        (firstVisible.toFloat() / (total - visibleCount).coerceAtLeast(1).toFloat()).coerceIn(0f, 1f)
+                    }
+                    BoxWithConstraints(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(end = 2.dp, top = 8.dp, bottom = 8.dp)
+                            .width(3.dp)
+                            .fillMaxHeight()
+                    ) {
+                        val trackHeight = maxHeight
+                        val thumbHeight = trackHeight * 0.08f
+                        val thumbOffset = (trackHeight - thumbHeight) * progress
+                        // Track
+                        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f), RoundedCornerShape(1.5.dp)))
+                        // Thumb
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(thumbHeight)
+                                .offset(y = thumbOffset)
+                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f), RoundedCornerShape(1.5.dp))
+                        )
                     }
                 }
                 if (isChangingLayout) { 

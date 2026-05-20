@@ -7,8 +7,11 @@ import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -42,17 +45,34 @@ class PlaybackService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
         database = AppDatabase.getDatabase(this)
+        createPlayerAndSession()
+    }
 
+    @OptIn(UnstableApi::class)
+    private fun createPlayerAndSession() {
         // Configuración profesional para Audiolibros (Voz humana)
         val audioAttributes = AudioAttributes.Builder()
             .setUsage(C.USAGE_MEDIA)
             .setContentType(C.AUDIO_CONTENT_TYPE_SPEECH) // Optimizado para voz
             .build()
 
-        player = ExoPlayer.Builder(this)
+        val renderersFactory = DefaultRenderersFactory(this)
+            .setEnableAudioTrackPlaybackParams(false) // Force SonicAudioProcessor for stable pitch support
+
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                10_000,  // minBufferMs
+                20_000,  // maxBufferMs
+                1_500,   // bufferForPlaybackMs
+                3_000    // bufferForPlaybackAfterRebufferMs
+            )
+            .build()
+
+        player = ExoPlayer.Builder(this, renderersFactory)
             .setAudioAttributes(audioAttributes, true) // TRUE activa el manejo de Audio Focus automático
             .setHandleAudioBecomingNoisy(true)         // TRUE pausa automáticamente al desconectar audífonos
             .setWakeMode(C.WAKE_MODE_LOCAL)           // Optimizado para archivos locales
+            .setLoadControl(loadControl)
             .build().apply {
                 (application as ApplicationClass).audioSessionId = audioSessionId
                 addListener(object : Player.Listener {
@@ -81,6 +101,18 @@ class PlaybackService : MediaSessionService() {
                     override fun onPlaybackStateChanged(playbackState: Int) {
                         if (playbackState == Player.STATE_ENDED || playbackState == Player.STATE_IDLE) {
                             saveCurrentProgress()
+                        }
+                    }
+
+                    override fun onPlayerError(error: PlaybackException) {
+                        Log.e("PlaybackService", "Player error: ${error.errorCodeName}", error)
+                        // Save progress before any recovery attempt
+                        saveCurrentProgress()
+                        // Do NOT recreate the player/session: that disconnects all MediaControllers.
+                        // For local audiobooks, the player enters STATE_IDLE; the UI can re-prepare.
+                        val p = player ?: return
+                        if (p.playbackState == Player.STATE_IDLE && p.mediaItemCount > 0) {
+                            p.prepare()
                         }
                     }
 
@@ -114,7 +146,7 @@ class PlaybackService : MediaSessionService() {
 
         val intent = Intent(this, MainActivity::class.java)
         val pendingIntent = PendingIntent.getActivity(
-            this, 0, intent, 
+            this, 0, intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
@@ -259,7 +291,9 @@ class PlaybackService : MediaSessionService() {
         val speed = p.playbackParameters.speed
         val pitch = p.playbackParameters.pitch
         
-        if (duration <= 0 || position < 0) return
+        // Defensive: reject obviously corrupt values before they poison the DB
+        if (duration <= 0 || position < 0 || position > duration * 2) return
+        if (duration > com.raulburgosmurray.musicplayer.ui.PlaybackViewModel.MAX_REASONABLE_DURATION_MS) return
         
         val newPauseTimestamp = if (isPausing) System.currentTimeMillis() else 0L
         
@@ -274,8 +308,9 @@ class PlaybackService : MediaSessionService() {
                 val currentIsRead = currentProgress?.isRead ?: false
                 val finalIsRead = currentIsRead || shouldMarkAsRead
 
-                val eqName = getSharedPreferences("eq_prefs", MODE_PRIVATE)
-                    .getString("eq_preset", "") ?: ""
+                // Preserve per-book EQ preset if it exists; fall back to global prefs only when empty
+                val eqName = currentProgress?.eqPresetName?.takeIf { it.isNotEmpty() }
+                    ?: getSharedPreferences("eq_prefs", MODE_PRIVATE).getString("eq_preset", "") ?: ""
                 database.progressDao().saveProgress(
                     AudiobookProgress(
                         mediaId = currentMediaItem.mediaId,
@@ -313,14 +348,16 @@ class PlaybackService : MediaSessionService() {
         val duration = p.duration
         val speed = p.playbackParameters.speed
         val pitch = p.playbackParameters.pitch
-        if (duration <= 0 || position < 0) return
+        if (duration <= 0 || position < 0 || position > duration * 2) return
+        if (duration > com.raulburgosmurray.musicplayer.ui.PlaybackViewModel.MAX_REASONABLE_DURATION_MS) return
 
         runBlocking(Dispatchers.IO) {
             try {
                 val existing = database.progressDao().getProgress(currentMediaItem.mediaId)
                 val progressPercent = position.toFloat() / duration.toFloat()
-                val eqName = getSharedPreferences("eq_prefs", MODE_PRIVATE)
-                    .getString("eq_preset", "") ?: ""
+                // Preserve per-book EQ preset if it exists; fall back to global prefs only when empty
+                val eqName = existing?.eqPresetName?.takeIf { it.isNotEmpty() }
+                    ?: getSharedPreferences("eq_prefs", MODE_PRIVATE).getString("eq_preset", "") ?: ""
                 database.progressDao().saveProgress(
                     AudiobookProgress(
                         mediaId = currentMediaItem.mediaId,

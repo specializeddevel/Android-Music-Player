@@ -13,6 +13,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -74,10 +75,8 @@ fun PlayerScreen(
     val state by viewModel.uiState.collectAsState()
     val configuration = LocalConfiguration.current
     
-    // DETECCION DE TABLETA: Ancho mínimo de 600dp (~7 pulgadas)
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val isTablet = configuration.smallestScreenWidthDp >= 600
-    val shouldUseLandscapeLayout = isLandscape && isTablet
+    val shouldUseLandscapeLayout = isLandscape
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -101,6 +100,7 @@ fun PlayerScreen(
 
     var showShareFileConfirmation by remember { mutableStateOf(false) }
     var showSeekToTimeDialog by remember { mutableStateOf(false) }
+    var showSkipByAmountDialog by remember { mutableStateOf(false) }
     var isLocked by rememberSaveable { mutableStateOf(false) }
 
     Scaffold { padding ->
@@ -114,6 +114,7 @@ fun PlayerScreen(
                     onShowShare = { showShareFileConfirmation = true }, onShowSpeed = { showSpeedSheet = true },
                     onShowTimer = { showTimerSheet = true }, onShowBookmark = { showBookmarkSheet = true },
                     onShowEqualizer = { showEqSheet = true }, onShowSeekToTime = { showSeekToTimeDialog = true },
+                    onShowSkipByAmount = { showSkipByAmountDialog = true },
                     onLock = { isLocked = true }
                 )
             } else {
@@ -125,6 +126,7 @@ fun PlayerScreen(
                     onShowShare = { showShareFileConfirmation = true }, onShowSpeed = { showSpeedSheet = true },
                     onShowTimer = { showTimerSheet = true }, onShowBookmark = { showBookmarkSheet = true },
                     onShowEqualizer = { showEqSheet = true }, onShowSeekToTime = { showSeekToTimeDialog = true },
+                    onShowSkipByAmount = { showSkipByAmountDialog = true },
                     onLock = { isLocked = true }
                 )
             }
@@ -178,6 +180,7 @@ fun PlayerScreen(
     if (showEqSheet) { ModalBottomSheet(onDismissRequest = { showEqSheet = false }, sheetState = eqSheetState) { EqualizerSelectorContent(currentPreset = state.eqPreset, isAvailable = state.eqAvailable, onPresetSelected = { viewModel.setEqPreset(it); showEqSheet = false }) } }
     if (showAddBookmarkDialog) { AddBookmarkDialog(currentPosition = bookmarkPositionAtCreation, onDismiss = { showAddBookmarkDialog = false }, onConfirm = { note -> viewModel.addBookmark(note, bookmarkPositionAtCreation); showAddBookmarkDialog = false }) }
     if (showSeekToTimeDialog) { SeekToTimeDialog(duration = state.duration, onDismiss = { showSeekToTimeDialog = false }, onConfirm = { pos -> viewModel.seekTo(pos); showSeekToTimeDialog = false }) }
+    if (showSkipByAmountDialog) { SkipByAmountDialog(currentPosition = state.currentPosition, duration = state.duration, onDismiss = { showSkipByAmountDialog = false }, onConfirm = { amountMs, isForward -> viewModel.skipByAmount(amountMs, isForward); showSkipByAmountDialog = false }) }
     if (showShareFileConfirmation) {
         AlertDialog(onDismissRequest = { showShareFileConfirmation = false }, title = { Text(stringResource(R.string.share_file_warning_title)) }, text = { Text(stringResource(R.string.share_file_warning_message)) }, confirmButton = { Button(onClick = { showShareFileConfirmation = false; viewModel.shareFile(context) }) { Text(stringResource(R.string.confirm)) } }, dismissButton = { TextButton(onClick = { showShareFileConfirmation = false }) { Text(stringResource(R.string.cancel)) } })
     }
@@ -237,7 +240,7 @@ fun SynopsisAccordion(description: String) {
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit, onShowBookmark: () -> Unit, onShowEqualizer: () -> Unit, onShowSeekToTime: () -> Unit, onLock: () -> Unit) {
+fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit, onShowBookmark: () -> Unit, onShowEqualizer: () -> Unit, onShowSeekToTime: () -> Unit, onShowSkipByAmount: () -> Unit, onLock: () -> Unit) {
     val currentItem = state.currentMediaItem
     val context = LocalContext.current
     val mediaId = currentItem?.mediaId
@@ -260,11 +263,20 @@ fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, 
                 IconButton(onClick = onShowQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null) }
                 IconButton(onClick = onShowBookmark) { Icon(Icons.Default.Bookmark, null) }
                 IconButton(onClick = onShowEqualizer) { Icon(Icons.Default.Equalizer, null, tint = if (state.eqPreset != EqPreset.FLAT) Color.Red else LocalContentColor.current) }
+                IconButton(onClick = onLock) { Icon(Icons.Default.Lock, contentDescription = stringResource(R.string.lock_screen)) }
                 IconButton(onClick = {
                     showMoreMenu = true
                 }) { Icon(Icons.Default.MoreVert, null) }
                 DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
+                    if (state.canReturnToTimerStart) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.return_to_timer_start)) },
+                            leadingIcon = { Icon(Icons.Default.Restore, null) },
+                            onClick = { showMoreMenu = false; viewModel.returnToTimerStart() }
+                        )
+                    }
                     DropdownMenuItem(text = { Text(stringResource(R.string.go_to_time)) }, leadingIcon = { Icon(Icons.Default.AccessTime, null) }, onClick = { showMoreMenu = false; onShowSeekToTime() })
+                    DropdownMenuItem(text = { Text(stringResource(R.string.skip_by_amount)) }, leadingIcon = { Icon(Icons.Default.SkipNext, null) }, onClick = { showMoreMenu = false; onShowSkipByAmount() })
                     DropdownMenuItem(text = { Text(stringResource(R.string.book_details)) }, leadingIcon = { Icon(Icons.Default.Info, null) }, onClick = { showMoreMenu = false; onShowDetails() })
                     DropdownMenuItem(text = { Text(stringResource(R.string.share_btn)) }, leadingIcon = { Icon(Icons.Default.Share, null) }, onClick = { showMoreMenu = false; onShowShare() })
                     if (com.raulburgosmurray.musicplayer.FeatureFlags.P2P_TRANSFER) {
@@ -314,9 +326,9 @@ fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, 
     }
 }
 
-@OptIn(ExperimentalSharedTransitionApi::class)
+@OptIn(ExperimentalSharedTransitionApi::class, ExperimentalLayoutApi::class)
 @Composable
-fun LandscapePlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit, onShowBookmark: () -> Unit, onShowEqualizer: () -> Unit, onShowSeekToTime: () -> Unit, onLock: () -> Unit) {
+fun LandscapePlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit, onShowBookmark: () -> Unit, onShowEqualizer: () -> Unit, onShowSeekToTime: () -> Unit, onShowSkipByAmount: () -> Unit, onLock: () -> Unit) {
     val currentItem = state.currentMediaItem
     val context = LocalContext.current
     val mediaId = currentItem?.mediaId
@@ -361,13 +373,21 @@ fun LandscapePlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel,
         }
         Spacer(Modifier.width(24.dp))
         Column(modifier = Modifier.weight(1.2f).fillMaxHeight().verticalScroll(rememberScrollState())) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
                 IconButton(onClick = { viewModel.toggleFavorite() }) { Icon(if (state.isFavorite) Icons.Filled.Favorite else Icons.Default.Favorite, contentDescription = stringResource(R.string.favourites_btn), tint = if (state.isFavorite) Color.Red else LocalContentColor.current) }
                 IconButton(onClick = onShowHistory) { Icon(Icons.Default.History, null) }
                 IconButton(onClick = onShowQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null) }
                 IconButton(onClick = onShowBookmark) { Icon(Icons.Default.Bookmark, null) }
                 IconButton(onClick = onShowEqualizer) { Icon(Icons.Default.Equalizer, null, tint = if (state.eqPreset != EqPreset.FLAT) Color.Red else LocalContentColor.current) }
+                if (state.canReturnToTimerStart) {
+                    IconButton(onClick = { viewModel.returnToTimerStart() }) { Icon(Icons.Default.Restore, contentDescription = stringResource(R.string.return_to_timer_start)) }
+                }
                 IconButton(onClick = onShowSeekToTime) { Icon(Icons.Default.AccessTime, null) }
+                IconButton(onClick = onShowSkipByAmount) { Icon(Icons.Default.SkipNext, null) }
                 IconButton(onClick = onLock) { Icon(Icons.Default.Lock, null) }
                 IconButton(onClick = onShowDetails) { Icon(Icons.Default.Info, null) }
                 IconButton(onClick = onShowShare) { Icon(Icons.Default.Share, null) }
@@ -435,7 +455,9 @@ fun PlayerControls(state: PlaybackUiState, viewModel: PlaybackViewModel, onShowS
         Spacer(Modifier.height(32.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Surface(onClick = onShowSpeed, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.height(52.dp).weight(1f)) {
-                Box(contentAlignment = Alignment.Center) { Text("${state.playbackSpeed}x", fontWeight = FontWeight.Bold) }
+                Box(contentAlignment = Alignment.Center) {
+                    Text("${state.playbackSpeed}x · ${state.pitch}p", fontWeight = FontWeight.Bold)
+                }
             }
             Surface(onClick = onShowTimer, shape = RoundedCornerShape(16.dp), color = if (activeTimerMinutes > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.height(52.dp).weight(1f)) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
@@ -712,6 +734,138 @@ fun SeekToTimeDialog(duration: Long, onDismiss: () -> Unit, onConfirm: (Long) ->
                     error = true
                 }
             }) { Text(stringResource(R.string.go_to_time)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SkipByAmountDialog(
+    currentPosition: Long,
+    duration: Long,
+    onDismiss: () -> Unit,
+    onConfirm: (amountMs: Long, isForward: Boolean) -> Unit
+) {
+    val context = LocalContext.current
+    var amountText by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf("") }
+
+    val units = listOf(
+        stringResource(R.string.unit_minutes) to 60_000L,
+        stringResource(R.string.unit_hours) to 3_600_000L
+    )
+    var selectedUnitIndex by remember { mutableStateOf(0) }
+    var unitMenuExpanded by remember { mutableStateOf(false) }
+
+    var isForward by remember { mutableStateOf(true) }
+
+    val amount = amountText.toLongOrNull()
+    val unitMultiplier = units[selectedUnitIndex].second
+    val amountMs = (amount ?: 0L) * unitMultiplier
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.skip_by_amount)) },
+        text = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(stringResource(R.string.skip_by_amount_desc), color = MaterialTheme.colorScheme.secondary)
+                Spacer(Modifier.height(16.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = amountText,
+                        onValueChange = { v ->
+                            if (v.isEmpty() || (v.toLongOrNull() != null && v.toLongOrNull()!! >= 0)) {
+                                amountText = v
+                                error = false
+                            }
+                        },
+                        modifier = Modifier.width(100.dp),
+                        singleLine = true,
+                        isError = error,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                        )
+                    )
+                    ExposedDropdownMenuBox(
+                        expanded = unitMenuExpanded,
+                        onExpandedChange = { unitMenuExpanded = it }
+                    ) {
+                        OutlinedTextField(
+                            value = units[selectedUnitIndex].first,
+                            onValueChange = {},
+                            readOnly = true,
+                            modifier = Modifier
+                                .menuAnchor()
+                                .width(140.dp),
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = unitMenuExpanded)
+                            }
+                        )
+                        ExposedDropdownMenu(
+                            expanded = unitMenuExpanded,
+                            onDismissRequest = { unitMenuExpanded = false }
+                        ) {
+                            units.forEachIndexed { index, pair ->
+                                DropdownMenuItem(
+                                    text = { Text(pair.first) },
+                                    onClick = {
+                                        selectedUnitIndex = index
+                                        unitMenuExpanded = false
+                                        error = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = { isForward = false },
+                        modifier = Modifier.weight(1f),
+                        colors = if (!isForward) ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer) else ButtonDefaults.outlinedButtonColors()
+                    ) { Text(stringResource(R.string.direction_backward)) }
+                    OutlinedButton(
+                        onClick = { isForward = true },
+                        modifier = Modifier.weight(1f),
+                        colors = if (isForward) ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer) else ButtonDefaults.outlinedButtonColors()
+                    ) { Text(stringResource(R.string.direction_forward)) }
+                }
+                if (error) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        errorMessage,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                if (amount == null || amount <= 0) {
+                    error = true
+                    errorMessage = context.getString(R.string.invalid_skip_amount)
+                    return@Button
+                }
+                val targetPos = if (isForward) {
+                    currentPosition + amountMs
+                } else {
+                    currentPosition - amountMs
+                }
+                if (targetPos < 0 || targetPos > duration) {
+                    error = true
+                    errorMessage = context.getString(R.string.invalid_skip_amount)
+                    return@Button
+                }
+                error = false
+                onConfirm(amountMs, isForward)
+            }) { Text(stringResource(R.string.confirm)) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } }
     )

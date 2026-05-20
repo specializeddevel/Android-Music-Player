@@ -91,6 +91,8 @@
     <string name="rescan_folders">Ordner erneut scannen</string>
     <string name="audiobook_folder">Hörbuch-Ordner</string>
     <string name="scanning_all_memory">Scanne gesamten Speicher</string>
+    <string name="default_equalizer">Standard-Equalizer</string>
+    <string name="default_equalizer_desc">Voreinstellung für Bücher ohne benutzerdefinierte Equalizer-Einstellung.</string>
     <string name="about_app">Über die App</string>
     <string name="undo_seek">SUCHEN RÜCKGÄNGIG</string>
     <string name="manual_bookmarks">Lesezeichen</string>
@@ -162,6 +164,7 @@
     <string name="theme_system">System</string>
     <string name="theme_light">Hell</string>
     <string name="theme_dark">Dunkel</string>
+    <string name="lock_screen">Bildschirm sperren</string>
     <string name="screen_locked">Bildschirm gesperrt</string>
     <string name="unlock">Entsperren</string>
     <string name="undo">Rückgängig</string>
@@ -211,6 +214,8 @@
     <string name="history_undo_seek">Springen rückgängig</string>
     <string name="history_bookmark_added">Lesezeichen hinzugefügt</string>
     <string name="history_timer_finished">Schlaf-Timer beendet</string>
+    <string name="history_timer_started">Timer gestartet bei %1$s</string>
+    <string name="return_to_timer_start">Zum Timer-Start zurück</string>
     <string name="history_accidental_seek">Versehentlicher Sprung ab %1$s</string>
     <string name="bookmark_accidental_seek">Position vor versehentlichem Sprung</string>
     <string name="ready">Bereit</string>
@@ -262,6 +267,25 @@
     <string name="minutes_hint">MM</string>
     <string name="seconds_hint">SS</string>
     <string name="invalid_time">Position überschreitet Dauer</string>
+    <string name="skip_by_amount">Zeit überspringen</string>
+    <string name="skip_by_amount_desc">Gib eine Zeitmenge zum Überspringen ein</string>
+    <string name="amount_label">Menge</string>
+    <string name="unit_minutes">Minuten</string>
+    <string name="unit_hours">Stunden</string>
+    <string name="direction_forward">Vorwärts</string>
+    <string name="direction_backward">Rückwärts</string>
+    <string name="invalid_skip_amount">Ungültige Menge oder überschreitet Dauer</string>
+    <string name="history_skip_by_amount_forward">Vorwärts %1$s</string>
+    <string name="history_skip_by_amount_backward">Rückwärts %1$s</string>
+    <!-- Zeitansage -->
+    <string name="time_announcement_title">Zeitansage</string>
+    <string name="time_announcement_desc">Gibt die aktuelle Uhrzeit über dem Hörbuch aus.</string>
+    <string name="time_announcement_interval">Ansageintervall</string>
+    <string name="interval_15_min">15 Min</string>
+    <string name="interval_30_min">30 Min</string>
+    <string name="interval_60_min">1 Std</string>
+    <string name="interval_timer_only">Nur mit Timer</string>
+    <string name="time_announcement">Es ist %1$s</string>
     <!-- Klappbox für Zusammenfassung -->
     <string name="synopsis_label">Zusammenfassung</string>
     <string name="expand">Erweitern</string>

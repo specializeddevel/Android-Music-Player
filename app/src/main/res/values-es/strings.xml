@@ -86,6 +86,8 @@
     <string name="library">Biblioteca</string>
     <string name="audiobook_folder">Carpeta de Audiolibros</string>
     <string name="scanning_all_memory">Escaneando toda la memoria</string>
+    <string name="default_equalizer">Ecualizador Predeterminado</string>
+    <string name="default_equalizer_desc">Preset aplicado a los libros sin una configuración de ecualizador personalizada.</string>
     <string name="about_app">Sobre la App</string>
     <string name="undo_seek">DESHACER SALTO</string>
     <string name="manual_bookmarks">Marcadores Manuales</string>
@@ -164,6 +166,7 @@
     <string name="rescan_folders">Reescanear Carpetas</string>
     <string name="book_details">Detalles del libro</string>
     <!-- Bloqueo de pantalla -->
+    <string name="lock_screen">Bloquear pantalla</string>
     <string name="screen_locked">Pantalla bloqueada</string>
     <string name="unlock">Desbloquear</string>
     <string name="undo">Deshacer</string>
@@ -219,6 +222,8 @@
     <string name="history_undo_seek">Deshacer salto</string>
     <string name="history_bookmark_added">Marcador añadido</string>
     <string name="history_timer_finished">Temporizador finalizado</string>
+    <string name="history_timer_started">Temporizador iniciado en %1$s</string>
+    <string name="return_to_timer_start">Volver al inicio del temporizador</string>
     <string name="history_accidental_seek">Salto accidental desde %1$s</string>
     <string name="bookmark_accidental_seek">Posición antes del salto accidental</string>
     <!-- Transferencia -->
@@ -271,6 +276,25 @@
     <string name="minutes_hint">MM</string>
     <string name="seconds_hint">SS</string>
     <string name="invalid_time">Posición excede la duración</string>
+    <string name="skip_by_amount">Saltar cantidad</string>
+    <string name="skip_by_amount_desc">Introduce una cantidad de tiempo para saltar</string>
+    <string name="amount_label">Cantidad</string>
+    <string name="unit_minutes">Minutos</string>
+    <string name="unit_hours">Horas</string>
+    <string name="direction_forward">Adelantar</string>
+    <string name="direction_backward">Retroceder</string>
+    <string name="invalid_skip_amount">Cantidad inválida o excede la duración</string>
+    <string name="history_skip_by_amount_forward">Adelantar %1$s</string>
+    <string name="history_skip_by_amount_backward">Retroceder %1$s</string>
+    <!-- Anuncio de hora -->
+    <string name="time_announcement_title">Anuncio de hora</string>
+    <string name="time_announcement_desc">Anuncia la hora actual sobre el audiolibro.</string>
+    <string name="time_announcement_interval">Intervalo de anuncio</string>
+    <string name="interval_15_min">15 min</string>
+    <string name="interval_30_min">30 min</string>
+    <string name="interval_60_min">1 hora</string>
+    <string name="interval_timer_only">Solo con timer</string>
+    <string name="time_announcement">Son las %1$s</string>
     <!-- Acordeón de sinopsis -->
     <string name="synopsis_label">Sinopsis</string>
     <string name="expand">Expandir</string>

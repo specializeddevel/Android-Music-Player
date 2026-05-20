@@ -96,9 +96,7 @@ class MainViewModel(application: Application, settingsViewModel: SettingsViewMod
             combine(settingsViewModel.libraryRootUris, settingsViewModel.scanAllMemory) { uris, scanAll ->
                 Pair(uris, scanAll)
             }.collect { (uris, scanAll) ->
-                if (bookRepository.getAllBooks().first().isEmpty()) {
-                    loadBooks(if (scanAll) emptyList() else uris, scanAll)
-                }
+                smartLoadBooks(if (scanAll) emptyList() else uris, scanAll)
             }
         }
         observeFavorites(); observeProgress()
@@ -141,6 +139,55 @@ class MainViewModel(application: Application, settingsViewModel: SettingsViewMod
 
     private fun observeFavorites() {
         viewModelScope.launch { favoriteRepository.getAllFavoriteIds().collectLatest { _favoriteIds.value = it.toSet() } }
+    }
+
+    suspend fun hasCachedBooks(): Boolean = bookRepository.getBookCount() > 0
+
+    /**
+     * Smart scan that only performs a full metadata extraction when the set of
+     * audio files on disk differs from what is already cached in the database.
+     * Otherwise it skips scanning entirely, making startup instant.
+     */
+    fun smartLoadBooks(libraryRootUris: List<String> = emptyList(), scanAllMemory: Boolean = false) {
+        viewModelScope.launch {
+            val hasBooks = hasCachedBooks()
+            if (!hasBooks) {
+                // First time or empty cache -> full scan
+                loadBooks(libraryRootUris, scanAllMemory)
+                return@launch
+            }
+
+            // Quick check: enumerate files without extracting metadata
+            _isLoading.value = true
+            val currentIds = withContext(Dispatchers.IO) {
+                if (scanAllMemory) {
+                    musicScanner.quickCheckMediaStore(getApplication())
+                } else if (libraryRootUris.isNotEmpty()) {
+                    val ids = mutableSetOf<String>()
+                    for (uri in libraryRootUris) {
+                        val rootDoc = DocumentFile.fromTreeUri(getApplication(), Uri.parse(uri))
+                        if (rootDoc != null) {
+                            ids.addAll(musicScanner.quickCheckDirectory(getApplication(), rootDoc))
+                        }
+                    }
+                    ids
+                } else {
+                    emptySet()
+                }
+            }
+
+            val cachedIds = withContext(Dispatchers.IO) {
+                bookRepository.getAllBooks().first().map { it.id }.toSet()
+            }
+
+            if (currentIds != cachedIds) {
+                // Files added or removed -> full scan
+                loadBooks(libraryRootUris, scanAllMemory)
+            } else {
+                // No changes -> just stop the loading indicator
+                _isLoading.value = false
+            }
+        }
     }
 
     fun loadBooks(libraryRootUris: List<String> = emptyList(), scanAllMemory: Boolean = false) {

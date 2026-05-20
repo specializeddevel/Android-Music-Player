@@ -1,5 +1,6 @@
 package com.raulburgosmurray.musicplayer.ui
 
+import android.content.res.Configuration
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -20,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -37,6 +39,8 @@ fun MetadataEditorScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     val uiState by viewModel.uiState.collectAsState()
     
     var title by remember { mutableStateOf("") }
@@ -139,6 +143,97 @@ fun MetadataEditorScreen(
                     }
                 }
             }
+        } else if (isLandscape) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                CoverArtSection(
+                    currentArtUri = uiState.metadata?.artUri,
+                    newArtUri = uiState.newArtUri,
+                    bookTitle = title,
+                    onPickImage = { imagePickerLauncher.launch("image/*") },
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                )
+
+                Card(
+                    modifier = Modifier
+                        .weight(1.5f)
+                        .fillMaxHeight(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .padding(16.dp)
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        EditTextField(
+                            label = stringResource(R.string.field_title),
+                            value = title,
+                            onValueChange = { title = it },
+                            placeholder = stringResource(R.string.field_title_placeholder)
+                        )
+
+                        EditTextField(
+                            label = stringResource(R.string.field_author_label),
+                            value = artist,
+                            onValueChange = { artist = it },
+                            placeholder = stringResource(R.string.field_author_placeholder)
+                        )
+
+                        EditTextField(
+                            label = stringResource(R.string.detail_series),
+                            value = album,
+                            onValueChange = { album = it },
+                            placeholder = stringResource(R.string.field_series_placeholder)
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            EditTextField(
+                                label = stringResource(R.string.detail_year),
+                                value = year,
+                                onValueChange = { year = it },
+                                placeholder = "2024",
+                                modifier = Modifier.weight(1f)
+                            )
+
+                            EditTextField(
+                                label = stringResource(R.string.detail_volume),
+                                value = trackNumber,
+                                onValueChange = { trackNumber = it },
+                                placeholder = "1",
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+
+                        GenreDropdown(
+                            selectedGenre = genre,
+                            onGenreSelected = { genre = it },
+                            genres = viewModel.getPredefinedGenres()
+                        )
+
+                        EditTextField(
+                            label = stringResource(R.string.field_comment),
+                            value = comment,
+                            onValueChange = { comment = it },
+                            placeholder = stringResource(R.string.field_comment_placeholder),
+                            singleLine = false,
+                            minLines = 3
+                        )
+                    }
+                }
+            }
         } else {
             Column(
                 modifier = Modifier
@@ -154,7 +249,7 @@ fun MetadataEditorScreen(
                     bookTitle = title,
                     onPickImage = { imagePickerLauncher.launch("image/*") }
                 )
-                
+
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
@@ -185,7 +280,7 @@ fun MetadataEditorScreen(
                             onValueChange = { album = it },
                             placeholder = stringResource(R.string.field_series_placeholder)
                         )
-                        
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -206,13 +301,13 @@ fun MetadataEditorScreen(
                                 modifier = Modifier.weight(1f)
                             )
                         }
-                        
+
                         GenreDropdown(
                             selectedGenre = genre,
                             onGenreSelected = { genre = it },
                             genres = viewModel.getPredefinedGenres()
                         )
-                        
+
                         EditTextField(
                             label = stringResource(R.string.field_comment),
                             value = comment,
@@ -223,7 +318,7 @@ fun MetadataEditorScreen(
                         )
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
             }
         }
@@ -244,14 +339,15 @@ fun CoverArtSection(
     currentArtUri: String?,
     newArtUri: Uri?,
     bookTitle: String,
-    onPickImage: () -> Unit
+    onPickImage: () -> Unit,
+    modifier: Modifier = Modifier
+        .fillMaxWidth()
+        .aspectRatio(1f)
 ) {
     val displayUri = newArtUri?.toString() ?: currentArtUri
-    
+
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .aspectRatio(1f)
+        modifier = modifier
             .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .clickable(onClick = onPickImage),

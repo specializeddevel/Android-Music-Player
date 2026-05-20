@@ -91,6 +91,8 @@
     <string name="rescan_folders">フォルダを再スキャン</string>
     <string name="audiobook_folder">オーディオブックフォルダ</string>
     <string name="scanning_all_memory"> 전체メモリをスキャン中</string>
+    <string name="default_equalizer">デフォルトイコライザー</string>
+    <string name="default_equalizer_desc">カスタムイコライザー設定がない書籍に適用されるプリセット。</string>
     <string name="about_app">アプリについて</string>
     <string name="undo_seek">シークを元に戻す</string>
     <string name="manual_bookmarks">手動ブックマーク</string>
@@ -162,6 +164,7 @@
     <string name="theme_system">システム</string>
     <string name="theme_light">ライト</string>
     <string name="theme_dark">ダーク</string>
+    <string name="lock_screen">画面をロック</string>
     <string name="screen_locked">画面がロックされています</string>
     <string name="unlock">ロック解除</string>
     <string name="undo">元に戻す</string>
@@ -211,6 +214,8 @@
     <string name="history_undo_seek">シークを元に戻す</string>
     <string name="history_bookmark_added">ブックマークを追加</string>
     <string name="history_timer_finished">スリープタイマー終了</string>
+    <string name="history_timer_started">タイマー開始 %1$s</string>
+    <string name="return_to_timer_start">タイマー開始位置に戻る</string>
     <string name="history_accidental_seek">%1$sからの誤ったジャンプ</string>
     <string name="bookmark_accidental_seek">誤ったジャンプ前の位置</string>
     <string name="ready">準備完了</string>
@@ -262,6 +267,25 @@
     <string name="minutes_hint">分</string>
     <string name="seconds_hint">秒</string>
     <string name="invalid_time">再生時間を超えています</string>
+    <string name="skip_by_amount">時間をスキップ</string>
+    <string name="skip_by_amount_desc">スキップする時間を入力</string>
+    <string name="amount_label">量</string>
+    <string name="unit_minutes">分</string>
+    <string name="unit_hours">時間</string>
+    <string name="direction_forward">進む</string>
+    <string name="direction_backward">戻る</string>
+    <string name="invalid_skip_amount">無効な量または再生時間を超えています</string>
+    <string name="history_skip_by_amount_forward">進む %1$s</string>
+    <string name="history_skip_by_amount_backward">戻る %1$s</string>
+    <!-- 時刻アナウンス -->
+    <string name="time_announcement_title">時刻アナウンス</string>
+    <string name="time_announcement_desc">オーディオブックの上で現在時刻を読み上げます。</string>
+    <string name="time_announcement_interval">アナウンス間隔</string>
+    <string name="interval_15_min">15分</string>
+    <string name="interval_30_min">30分</string>
+    <string name="interval_60_min">1時間</string>
+    <string name="interval_timer_only">タイマーのみ</string>
+    <string name="time_announcement">%1$s です</string>
     <!-- あらすじアコーディオン -->
     <string name="synopsis_label">あらすじ</string>
     <string name="expand">展開</string>
