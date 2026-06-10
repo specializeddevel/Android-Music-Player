@@ -140,6 +140,8 @@
     <string name="welcome_desc">Pour commencer, nous avons besoin que vous sélectionniez le dossier où vous stockez vos livres audio.</string>
     <string name="select_folder">Sélectionner un dossier</string>
     <string name="onboarding_note">Vous pourrez changer cela plus tard dans les Paramètres.</string>
+    <string name="transfer_by_qr">Recevoir un livre audio via QR</string>
+    <string name="transfer_by_qr_desc">Pas de livres? Recevez-en un instantanément d\'un autre appareil.</string>
     <string name="book_detected">Livre détecté</string>
     <string name="existing_book_msg">%1$s détecté dans votre bibliothèque. Que voulez-vous faire?</string>
     <string name="sync_progress_only">Synchroniser uniquement la progression (Instantané)</string>
@@ -228,12 +230,17 @@
     <string name="delete_confirmation_message">Cela supprimera définitivement \"%1$s\" de votre appareil. Cette action ne peut pas être annulée.</string>
     <string name="delete_success">Livre audio supprimé</string>
     <string name="delete_error">Échec de la suppression du livre audio</string>
+    <string name="delete_book_in_use_title">Livre audio en cours d\'utilisation</string>
+    <string name="delete_book_in_use_message">Ce livre audio est en cours de lecture ou en pause. Vous devez le fermer avant de le supprimer, ou vous pouvez forcer la suppression.</string>
+    <string name="close_and_delete">Fermer le livre et supprimer</string>
+    <string name="delete_anyway">Supprimer quand même</string>
     <string name="mark_as_read">Marquer comme lu</string>
     <string name="mark_as_unread">Marquer comme non lu</string>
     <string name="filter_all">Tous</string>
     <string name="filter_completed">Terminés</string>
     <string name="filter_in_progress">En cours</string>
     <string name="filter">Filtrer</string>
+    <string name="scroll_down_hint">Faites défiler vers le bas pour plus de contrôles</string>
     <!-- Camera permission -->
     <string name="camera_permission_title">📷 Accès à la caméra</string>
     <string name="camera_permission_rationale">Nous avons besoin de l\'accès à la caméra pour:\n\n• Scanner les codes QR pour le transfert P2P\n• Connecter facilement les appareils à proximité\n\nAucune photo ou vidéo n\'est enregistrée.</string>
@@ -290,4 +297,20 @@
     <string name="synopsis_label">Synopsis</string>
     <string name="expand">Développer</string>
     <string name="collapse">Réduire</string>
+    <!-- Détection de sommeil -->
+    <string name="sleep_detection_title">Détection de sommeil</string>
+    <string name="sleep_detection_desc">Mettre en pause et remonter automatiquement quand votre Amazfit détecte que vous vous êtes endormi.</string>
+    <string name="sleep_detection_enabled">Activer la détection de sommeil</string>
+    <string name="sleep_detection_port">Port d\'écoute</string>
+    <string name="sleep_detection_port_desc">Numéro de port pour recevoir les événements de sommeil de la montre.</string>
+    <string name="sleep_detection_status">État : %1$s</string>
+    <string name="sleep_detection_connected">Connecté</string>
+    <string name="sleep_detection_disconnected">Déconnecté</string>
+    <string name="sleep_rewind_minutes">Temps de retour</string>
+    <string name="sleep_rewind_minutes_desc">Minutes à remonter quand le sommeil est détecté</string>
+    <string name="sleep_fallback_minutes">Retour de secours</string>
+    <string name="sleep_fallback_minutes_desc">Retour si aucune donnée de lecture disponible</string>
+    <string name="history_sleep_detected">Sommeil détecté — pause</string>
+    <string name="history_sleep_rewind">Remonté %1$s au point de sommeil</string>
+    <string name="interval_minutes">%1$d min</string>
 </resources>

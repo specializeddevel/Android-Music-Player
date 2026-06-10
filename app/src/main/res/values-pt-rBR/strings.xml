@@ -140,6 +140,8 @@
     <string name="welcome_desc">Para começar, precisamos que você selecione a pasta onde armazena seus audiolivros.</string>
     <string name="select_folder">Selecionar Pasta</string>
     <string name="onboarding_note">Você pode alterar isso mais tarde em Configurações.</string>
+    <string name="transfer_by_qr">Receber audiolivro por QR</string>
+    <string name="transfer_by_qr_desc">Sem livros? Receba um instantaneamente de outro dispositivo.</string>
     <string name="book_detected">Livro Detectado</string>
     <string name="existing_book_msg">%1$s detectado na sua biblioteca. O que deseja fazer?</string>
     <string name="sync_progress_only">Sincronizar Apenas Progresso (Instantâneo)</string>
@@ -228,12 +230,17 @@
     <string name="delete_confirmation_message">Isso excluirá permanentemente \"%1$s\" do seu dispositivo. Esta ação não pode ser desfeita.</string>
     <string name="delete_success">Audiolivro excluído</string>
     <string name="delete_error">Falha ao excluir audiolivro</string>
+    <string name="delete_book_in_use_title">Audiolivro em uso</string>
+    <string name="delete_book_in_use_message">Este audiolivro está sendo reproduzido ou está pausado. Você deve fechá-lo antes de excluir, ou pode forçar a exclusão.</string>
+    <string name="close_and_delete">Fechar livro e excluir</string>
+    <string name="delete_anyway">Excluir mesmo assim</string>
     <string name="mark_as_read">Marcar como lido</string>
     <string name="mark_as_unread">Marcar como não lido</string>
     <string name="filter_all">Todos</string>
     <string name="filter_completed">Concluídos</string>
     <string name="filter_in_progress">Em Progresso</string>
     <string name="filter">Filtrar</string>
+    <string name="scroll_down_hint">Deslize para baixo para mais controles</string>
     <!-- Camera permission -->
     <string name="camera_permission_title">📷 Acesso à Câmera</string>
     <string name="camera_permission_rationale">Precisamos do acesso à câmera para:\n\n• Escanear códigos QR para transferência P2P\n• Conectar com dispositivos próximos facilmente\n\nNenhuma foto ou vídeo é gravado.</string>
@@ -290,4 +297,20 @@
     <string name="synopsis_label">Sinopse</string>
     <string name="expand">Expandir</string>
     <string name="collapse">Recolher</string>
+    <!-- Detecção de sono -->
+    <string name="sleep_detection_title">Detecção de sono</string>
+    <string name="sleep_detection_desc">Pausar e retroceder automaticamente quando seu Amazfit detecta que você dormiu.</string>
+    <string name="sleep_detection_enabled">Ativar detecção de sono</string>
+    <string name="sleep_detection_port">Porta de escuta</string>
+    <string name="sleep_detection_port_desc">Número da porta para receber eventos de sono do relógio.</string>
+    <string name="sleep_detection_status">Status: %1$s</string>
+    <string name="sleep_detection_connected">Conectado</string>
+    <string name="sleep_detection_disconnected">Desconectado</string>
+    <string name="sleep_rewind_minutes">Tempo de retrocesso</string>
+    <string name="sleep_rewind_minutes_desc">Minutos para retroceder ao detectar sono</string>
+    <string name="sleep_fallback_minutes">Retrocesso de fallback</string>
+    <string name="sleep_fallback_minutes_desc">Retrocesso se não houver dados de reprodução</string>
+    <string name="history_sleep_detected">Sono detectado — pausado</string>
+    <string name="history_sleep_rewind">Retrocedido %1$s para o ponto de sono</string>
+    <string name="interval_minutes">%1$d min</string>
 </resources>

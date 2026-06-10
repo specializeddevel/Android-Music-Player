@@ -74,6 +74,8 @@ import kotlinx.coroutines.withContext
 import com.raulburgosmurray.musicplayer.Constants
 import com.raulburgosmurray.musicplayer.data.DescriptionExtractor
 import com.raulburgosmurray.musicplayer.ui.formatDuration
+import com.raulburgosmurray.musicplayer.sleep.SmartBookmarkManager
+import java.util.Calendar
 
 data class PlaybackUiState(
     val isPlaying: Boolean = false,
@@ -135,6 +137,7 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
     private var sensorManager: SensorManager? = null
     private var shakeDetector: com.raulburgosmurray.musicplayer.ShakeDetector? = null
     private val equalizerManager = EqualizerManager()
+    private val smartBookmarkManager = SmartBookmarkManager()
     
     private val bookRepository = BookRepository(AppDatabase.getDatabase(application).cachedBookDao())
     private val favoriteRepository = FavoriteRepository(AppDatabase.getDatabase(application).favoriteDao())
@@ -668,7 +671,13 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
         player.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 _uiState.value = _uiState.value.copy(isPlaying = isPlaying)
-                if (isPlaying) startProgressUpdate() else stopProgressUpdate()
+                if (isPlaying) {
+                    startProgressUpdate()
+                    smartBookmarkManager.startTracking(viewModelScope) { controller }
+                } else {
+                    stopProgressUpdate()
+                    smartBookmarkManager.stopTracking()
+                }
             }
 
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
@@ -1205,14 +1214,159 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
         }
     }
 
+    /**
+     * Maneja la detección de sueño desde el reloj Amazfit.
+     * Calcula el tiempo transcurrido desde que el usuario se durmió
+     * y retrocede la reproducción a ese punto.
+     */
+    fun handleSleepDetected(sleepOnsetMinutes: Int) {
+        val player = controller ?: return
+        if (!player.isPlaying) {
+            Log.d("PlaybackVM", "Sleep detected but player not playing, ignoring")
+            return
+        }
+
+        // Leer ajustes de SharedPreferences
+        val prefs = getApplication<Application>().getSharedPreferences("settings", Context.MODE_PRIVATE)
+        val rewindMinutes = prefs.getInt("sleep_rewind_minutes", 2)
+        val fallbackMinutes = prefs.getInt("sleep_fallback_minutes", 5)
+
+        // Convertir startTime (minutos desde medianoche) a timestamp
+        val sleepStartMillis = zeppStartTimeToMillis(sleepOnsetMinutes)
+        val nowMillis = System.currentTimeMillis()
+        
+        // Verificar que el tiempo de sueño sea razonable (no futuro)
+        if (sleepStartMillis > nowMillis) {
+            Log.w("PlaybackVM", "Sleep onset time is in the future, ignoring")
+            return
+        }
+
+        // Calcular bookmark exacto usando snapshots históricos
+        val bookmark = smartBookmarkManager.calculateSleepBookmark(sleepStartMillis)
+        
+        // Pausar inmediatamente
+        player.pause()
+        logAction(getApplication<Application>().getString(R.string.history_sleep_detected))
+        
+        val currentPos = player.currentPosition
+        
+        // Si tenemos un bookmark válido, retroceder al punto donde te dormiste + buffer
+        if (bookmark >= 0) {
+            val bufferMs = rewindMinutes * 60 * 1000L
+            val targetPos = (bookmark - bufferMs).coerceAtLeast(0L)
+            val rewindMs = (currentPos - targetPos).coerceAtLeast(0L)
+            
+            player.seekTo(targetPos)
+            Log.i("PlaybackVM", "Sleep rewind: current=$currentPos, bookmark=$bookmark, buffer=${bufferMs}ms, target=$targetPos, rewound=${rewindMs}ms")
+            
+            if (rewindMs > 0) {
+                logAction(getApplication<Application>().getString(
+                    R.string.history_sleep_rewind,
+                    formatDuration(rewindMs)
+                ))
+            }
+        } else {
+            // Fallback: retroceder según ajustes si no hay snapshots
+            val fallbackRewindMs = fallbackMinutes * 60 * 1000L
+            val rewindTo = (currentPos - fallbackRewindMs).coerceAtLeast(0L)
+            
+            player.seekTo(rewindTo)
+            Log.w("PlaybackVM", "No bookmark data, using fallback rewind: current=$currentPos, rewindTo=$rewindTo, fallbackMinutes=$fallbackMinutes")
+            
+            logAction(getApplication<Application>().getString(
+                R.string.history_sleep_rewind,
+                formatDuration(currentPos - rewindTo)
+            ))
+        }
+    }
+
+    /**
+     * Convierte startTime de Zepp OS (minutos desde medianoche) a timestamp UTC.
+     * Maneja correctamente el cruce de medianoche.
+     */
+    private fun zeppStartTimeToMillis(startTimeMinutes: Int): Long {
+        val cal = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        
+        val nowMinutes = Calendar.getInstance().let {
+            it.get(Calendar.HOUR_OF_DAY) * 60 + it.get(Calendar.MINUTE)
+        }
+        
+        // Si startTime > nowMinutes + 120, probablemente fue ayer (cruzó medianoche)
+        if (startTimeMinutes > nowMinutes + 120) {
+            cal.add(Calendar.DAY_OF_YEAR, -1)
+        }
+        
+        cal.add(Calendar.MINUTE, startTimeMinutes)
+        return cal.timeInMillis
+    }
+
     override fun onCleared() {
         sleepTimer?.cancel()
         stopTimeAnnouncementLoop()
+        smartBookmarkManager.stopTracking()
         tts?.shutdown()
         tts = null
         equalizerManager.release()
         releaseController()
         super.onCleared()
+    }
+
+    fun clearCurrentPlayback() {
+        controller?.let { player ->
+            player.stop()
+            player.clearMediaItems()
+        }
+        _uiState.value = _uiState.value.copy(
+            currentMediaItem = null,
+            currentMusicDetails = null,
+            currentMetadata = null,
+            isPlaying = false,
+            playWhenReady = false,
+            duration = 0L,
+            currentPosition = 0L,
+            chapters = emptyList(),
+            bookmarks = emptyList(),
+            dominantColor = null
+        )
+    }
+
+    fun cleanupAfterDeletion(mediaId: String) {
+        val player = controller
+        val isCurrent = _uiState.value.currentMediaItem?.mediaId == mediaId
+
+        if (isCurrent && player != null) {
+            clearCurrentPlayback()
+        } else if (player != null) {
+            // Remove from queue if present
+            val idx = (0 until player.mediaItemCount).indexOfFirst {
+                player.getMediaItemAt(it).mediaId == mediaId
+            }
+            if (idx >= 0) {
+                player.removeMediaItem(idx)
+                persistQueue()
+            }
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            progressRepository.deleteProgress(mediaId)
+            favoriteRepository.removeFavorite(mediaId)
+            bookmarkRepository.deleteBookmarksForMedia(mediaId)
+            MetadataJsonHelper.deleteMetadata(getApplication(), mediaId)
+
+            // Clean up SharedPreferences
+            val playbackPrefs = getApplication<Application>().getSharedPreferences("playback_prefs", Context.MODE_PRIVATE)
+            if (playbackPrefs.getString("last_played_media_id", null) == mediaId) {
+                playbackPrefs.edit().remove("last_played_media_id").apply()
+            }
+            if (timerPrefs.getString("last_timer_media_id", null) == mediaId) {
+                timerPrefs.edit().remove("last_timer_media_id").remove("last_timer_position").apply()
+            }
+        }
     }
 
     fun releaseController() {

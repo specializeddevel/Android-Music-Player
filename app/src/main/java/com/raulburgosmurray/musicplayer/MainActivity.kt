@@ -92,6 +92,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var settingsViewModel: SettingsViewModel
     private lateinit var syncViewModel: SyncViewModel
     private lateinit var transferViewModel: LiteraTransferViewModel
+    private var sleepDetectionReceiver: com.raulburgosmurray.musicplayer.sleep.SleepDetectionReceiver? = null
     private var backPressedTime = 0L
 
     private val syncReceiver = object : BroadcastReceiver() {
@@ -114,11 +115,33 @@ class MainActivity : ComponentActivity() {
         mainViewModel = ViewModelProvider(this, mainViewModelFactory)[MainViewModel::class.java]
         playbackViewModel = ViewModelProvider(this)[PlaybackViewModel::class.java]
         playbackViewModel.initController(this)
+        if (FeatureFlags.SLEEP_DETECTION) {
+            setupSleepDetection()
+        }
         checkPermissions()
+    }
+
+    private fun setupSleepDetection() {
+        val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
+        val enabled = prefs.getBoolean("sleep_detection_enabled", false)
+        val port = prefs.getInt("sleep_detection_port", 50002)
+        
+        if (enabled) {
+            sleepDetectionReceiver = com.raulburgosmurray.musicplayer.sleep.SleepDetectionReceiver(
+                context = this,
+                onSleepDetected = { sleepOnsetMinutes ->
+                    runOnUiThread {
+                        playbackViewModel.handleSleepDetected(sleepOnsetMinutes)
+                    }
+                }
+            )
+            sleepDetectionReceiver?.startListening(port)
+        }
     }
 
     override fun onDestroy() {
         try { unregisterReceiver(syncReceiver) } catch (e: Exception) {}
+        sleepDetectionReceiver?.stopListening()
         super.onDestroy()
     }
 
@@ -243,6 +266,30 @@ class MainActivity : ComponentActivity() {
                     val navBackStackEntry by navController.currentBackStackEntryAsState()
                     val currentRoute = navBackStackEntry?.destination?.route
                     
+                    var showCameraRationale by remember { mutableStateOf(false) }
+                    val cameraPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+                        if (granted) {
+                            navController.navigate("transfer?fromOnboarding=true")
+                        }
+                    }
+                    
+                    if (showCameraRationale) {
+                        AlertDialog(
+                            onDismissRequest = { showCameraRationale = false },
+                            title = { Text(stringResource(R.string.camera_permission_title)) },
+                            text = { Text(stringResource(R.string.camera_permission_rationale)) },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    showCameraRationale = false
+                                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                                }) { Text(stringResource(R.string.yes)) }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showCameraRationale = false }) { Text(stringResource(R.string.cancel)) }
+                            }
+                        )
+                    }
+                    
                     val folderLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
                         if (uri != null) {
                             contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
@@ -274,15 +321,25 @@ class MainActivity : ComponentActivity() {
                                         settingsViewModel.setScanAllMemory(true)
                                         mainViewModel.loadBooks(emptyList(), true)
                                         navController.navigate("main") { popUpTo("onboarding") { inclusive = true } }
-                                    }
+                                    },
+                                    onTransferByQr = if (FeatureFlags.P2P_TRANSFER) {
+                                        {
+                                            if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                                                navController.navigate("transfer?fromOnboarding=true")
+                                            } else {
+                                                showCameraRationale = true
+                                            }
+                                        }
+                                    } else null
                                 )
                             }
 
                             composable("main") { MainScreen(mainViewModel, settingsViewModel, playbackViewModel, this@SharedTransitionLayout, this@composable, onBookClick = { handleBookClick(it, playbackViewModel, navController, "list") }, onMiniPlayerClick = { navController.navigate("player/mini") }, onFavoritesClick = { navController.navigate("favorites") }, onSettingsClick = { navController.navigate("settings") }, onReceiveClick = { navController.navigate("transfer") }, onSelectFolder = { folderLauncher.launch(null) }, navController = navController) }
                             composable("favorites") { FavoritesScreen(mainViewModel, playbackViewModel, this@SharedTransitionLayout, this@composable, onBack = { navController.popBackStack() }, onBookClick = { handleBookClick(it, playbackViewModel, navController, "fav") }, onMiniPlayerClick = { navController.navigate("player/mini") }, navController = navController) }
                             composable("settings") { SettingsScreen(settingsViewModel, mainViewModel, syncViewModel, playbackViewModel, onBack = { navController.popBackStack() }) }
-                            composable(route = "transfer?bookId={bookId}", arguments = listOf(navArgument("bookId") { type = NavType.StringType; nullable = true; defaultValue = null })) { backStackEntry ->
+                            composable(route = "transfer?bookId={bookId}&fromOnboarding={fromOnboarding}", arguments = listOf(navArgument("bookId") { type = NavType.StringType; nullable = true; defaultValue = null }, navArgument("fromOnboarding") { type = NavType.BoolType; defaultValue = false })) { backStackEntry ->
                                 val bookId = backStackEntry.arguments?.getString("bookId")
+                                val fromOnboarding = backStackEntry.arguments?.getBoolean("fromOnboarding") ?: false
                                 val state by transferViewModel.uiState.collectAsState()
                                 val context = LocalContext.current
                                 var isManualEntry by remember { mutableStateOf(false) }
@@ -293,9 +350,14 @@ class MainActivity : ComponentActivity() {
                                 LaunchedEffect(state.receiveSuccess) {
                                     if (state.receiveSuccess) {
                                         transferViewModel.clearReceiveSuccess()
-                                        mainViewModel.loadBooks(if (scanAllMemory) emptyList() else libraryRootUris, scanAllMemory)
-                                        Toast.makeText(context, context.getString(R.string.book_received), Toast.LENGTH_LONG).show()
-                                        navController.navigate("main") { popUpTo("transfer?bookId={bookId}") { inclusive = true } }
+                                        if (fromOnboarding) {
+                                            navController.navigate("main") { popUpTo("onboarding") { inclusive = true } }
+                                            mainViewModel.scanTransferInbox()
+                                        } else {
+                                            mainViewModel.loadBooks(if (scanAllMemory) emptyList() else libraryRootUris, scanAllMemory)
+                                            Toast.makeText(context, context.getString(R.string.book_received), Toast.LENGTH_LONG).show()
+                                            navController.navigate("main") { popUpTo("transfer?bookId={bookId}") { inclusive = true } }
+                                        }
                                     }
                                 }
                                 LaunchedEffect(bookId) { if (bookId != null) transferViewModel.startServer(bookId) else { if (!hasCameraPermission) launcher.launch(Manifest.permission.CAMERA); transferViewModel.refreshLocalIp() } }
@@ -372,27 +434,53 @@ class MainActivity : ComponentActivity() {
                                             TextButton(onClick = { isManualEntry = false }) { Text(stringResource(R.string.camera)) }
                                         } else {
                                             if (hasCameraPermission) {
+                                                val lifecycleOwner = LocalLifecycleOwner.current
+                                                val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
+                                                var processCameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+                                                val executor = remember { java.util.concurrent.Executors.newSingleThreadExecutor() }
+
+                                                DisposableEffect(Unit) {
+                                                    onDispose {
+                                                        try { processCameraProvider?.unbindAll() } catch (e: Exception) {}
+                                                        try { executor.shutdown() } catch (e: Exception) {}
+                                                    }
+                                                }
+
+                                                LaunchedEffect(state.isDownloading) {
+                                                    if (state.isDownloading) {
+                                                        try { processCameraProvider?.unbindAll() } catch (e: Exception) {}
+                                                    }
+                                                }
+
                                                 Box(modifier = Modifier.size(320.dp).padding(8.dp)) {
-                                                    val lifecycleOwner = LocalLifecycleOwner.current
-                                                    val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
-                                                    AndroidView(factory = { ctx ->
-                                                        val previewView = PreviewView(ctx); cameraProviderFuture.addListener({
-                                                            try {
-                                                                val cameraProvider = cameraProviderFuture.get(); val preview = Preview.Builder().build().also { it.surfaceProvider = previewView.surfaceProvider }
-                                                                val scanner = BarcodeScanning.getClient(BarcodeScannerOptions.Builder().setBarcodeFormats(Barcode.FORMAT_QR_CODE).build())
-                                                                val imageAnalysis = ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build()
-                                                                imageAnalysis.setAnalyzer(Executors.newSingleThreadExecutor()) { imageProxy ->
-                                                                    val mediaImage = imageProxy.image
-                                                                    if (mediaImage != null) {
-                                                                        scanner.process(InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)).addOnSuccessListener { barcodes -> barcodes.forEach { it.rawValue?.let { transferViewModel.processScannedData(it, libraryRootUris.firstOrNull()) } } }.addOnCompleteListener { imageProxy.close() }
-                                                                    }
-                                                                }
-                                                                cameraProvider.unbindAll(); cameraProvider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageAnalysis)
-                                                            } catch (e: Exception) {
-                                                                Log.e("MainActivity", "Error al inicializar cámara QR", e)
+                                                    AndroidView(
+                                                        factory = { ctx ->
+                                                            val previewView = PreviewView(ctx).apply {
+                                                                implementationMode = PreviewView.ImplementationMode.COMPATIBLE
                                                             }
-                                                        }, ContextCompat.getMainExecutor(ctx)); previewView
-                                                    }, modifier = Modifier.fillMaxSize())
+                                                            cameraProviderFuture.addListener({
+                                                                try {
+                                                                    val provider = cameraProviderFuture.get()
+                                                                    processCameraProvider = provider
+                                                                    val preview = Preview.Builder().build().also { it.surfaceProvider = previewView.surfaceProvider }
+                                                                    val scanner = BarcodeScanning.getClient(BarcodeScannerOptions.Builder().setBarcodeFormats(Barcode.FORMAT_QR_CODE).build())
+                                                                    val imageAnalysis = ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build()
+                                                                    imageAnalysis.setAnalyzer(executor) { imageProxy ->
+                                                                        val mediaImage = imageProxy.image
+                                                                        if (mediaImage != null) {
+                                                                            scanner.process(InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)).addOnSuccessListener { barcodes -> barcodes.forEach { it.rawValue?.let { transferViewModel.processScannedData(it, libraryRootUris.firstOrNull()) } } }.addOnCompleteListener { imageProxy.close() }
+                                                                        } else { imageProxy.close() }
+                                                                    }
+                                                                    provider.unbindAll()
+                                                                    provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageAnalysis)
+                                                                } catch (e: Exception) {
+                                                                    Log.e("MainActivity", "Error al inicializar cámara QR", e)
+                                                                }
+                                                            }, ContextCompat.getMainExecutor(ctx))
+                                                            previewView
+                                                        },
+                                                        modifier = Modifier.fillMaxSize()
+                                                    )
                                                 }
                                                 Button(onClick = { isManualEntry = true }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.manual)) }
                                             } else { Button(onClick = { launcher.launch(Manifest.permission.CAMERA) }) { Text(stringResource(R.string.permission)) } }

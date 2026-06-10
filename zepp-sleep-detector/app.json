@@ -1,0 +1,66 @@
+{
+  "configVersion": "v3",
+  "app": {
+    "appId": 20001,
+    "appName": "Sleep Detector",
+    "appType": "app",
+    "version": {
+      "code": 5,
+      "name": "1.0.4"
+    },
+    "icon": "C:/Users/raulb/Develop/Android-Music-Player/zepp-sleep-detector/assets/active-max.r/icon.png",
+    "vender": "raulburgosmurray",
+    "description": "Detects sleep and notifies connected Android app"
+  },
+  "runtime": {
+    "apiVersion": {
+      "compatible": "4.0",
+      "target": "4.0",
+      "minVersion": "4.0"
+    },
+    "type": 0
+  },
+  "permissions": [
+    "device:os.bg_service",
+    "device:os.local_storage",
+    "data:user.hd.sleep"
+  ],
+  "targets": {
+    "active-max": {
+      "module": {
+        "page": {
+          "pages": [
+            "page/home/index.page"
+          ]
+        },
+        "app-service": {
+          "path": "app-service/index"
+        },
+        "app-side": {
+          "path": "app-side/index"
+        }
+      },
+      "platforms": [
+        {
+          "name": "active-max",
+          "deviceSource": 10813697,
+          "st": "r",
+          "sr": "w480"
+        },
+        {
+          "name": "active-max",
+          "deviceSource": 10813699,
+          "st": "r",
+          "sr": "w480"
+        }
+      ],
+      "designWidth": 480
+    }
+  },
+  "i18n": {
+    "en-US": {
+      "appName": "Sleep Detector"
+    }
+  },
+  "defaultLanguage": "en-US"
+}

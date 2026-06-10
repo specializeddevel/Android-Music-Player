@@ -52,6 +52,10 @@ fun SettingsScreen(
     val isTimeAnnouncementEnabled by viewModel.isTimeAnnouncementEnabled.collectAsState()
     val timeAnnouncementInterval by viewModel.timeAnnouncementInterval.collectAsState()
     val defaultEqPreset by viewModel.defaultEqPreset.collectAsState()
+    val isSleepDetectionEnabled by viewModel.isSleepDetectionEnabled.collectAsState()
+    val sleepDetectionPort by viewModel.sleepDetectionPort.collectAsState()
+    val sleepRewindMinutes by viewModel.sleepRewindMinutes.collectAsState()
+    val sleepFallbackMinutes by viewModel.sleepFallbackMinutes.collectAsState()
     
     val userAccount by syncViewModel.userAccount.collectAsState()
     val isSyncing by syncViewModel.isSyncing.collectAsState()
@@ -184,21 +188,23 @@ fun SettingsScreen(
     @Composable
     fun LibrarySection() {
         Text(stringResource(R.string.library), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 16.dp))
-        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.scan_all_memory), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
-                        Text(stringResource(R.string.scan_all_memory_desc), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (com.raulburgosmurray.musicplayer.FeatureFlags.SCAN_ALL_MEMORY) {
+            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.scan_all_memory), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.scan_all_memory_desc), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Switch(checked = scanAllMemory, onCheckedChange = {
+                            viewModel.setScanAllMemory(it)
+                            if (it) mainViewModel.loadBooks(emptyList(), true)
+                        })
                     }
-                    Switch(checked = scanAllMemory, onCheckedChange = { 
-                        viewModel.setScanAllMemory(it)
-                        if (it) mainViewModel.loadBooks(emptyList(), true)
-                    })
                 }
             }
+            Spacer(Modifier.height(12.dp))
         }
-        Spacer(Modifier.height(12.dp))
         Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
@@ -246,6 +252,78 @@ fun SettingsScreen(
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.rescan_folders))
                     }
+                }
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+    }
+
+    @Composable
+    fun SleepDetectionSection() {
+        Text(stringResource(R.string.sleep_detection_title), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 16.dp))
+        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(stringResource(R.string.sleep_detection_enabled), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.sleep_detection_desc), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(checked = isSleepDetectionEnabled, onCheckedChange = { viewModel.setSleepDetectionEnabled(it) })
+                }
+                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), thickness = 0.5.dp)
+                Row(modifier = Modifier.fillMaxWidth().alpha(if (isSleepDetectionEnabled) 1f else 0.5f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(stringResource(R.string.sleep_detection_port), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.sleep_detection_port_desc), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Text(
+                        text = sleepDetectionPort.toString(),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), thickness = 0.5.dp)
+                Column(modifier = Modifier.fillMaxWidth().alpha(if (isSleepDetectionEnabled) 1f else 0.5f)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(stringResource(R.string.sleep_rewind_minutes), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = stringResource(R.string.interval_minutes, sleepRewindMinutes),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Text(stringResource(R.string.sleep_rewind_minutes_desc), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Slider(
+                        value = sleepRewindMinutes.toFloat(),
+                        onValueChange = { viewModel.setSleepRewindMinutes(it.toInt()) },
+                        valueRange = 1f..10f,
+                        steps = 8,
+                        enabled = isSleepDetectionEnabled,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), thickness = 0.5.dp)
+                Column(modifier = Modifier.fillMaxWidth().alpha(if (isSleepDetectionEnabled) 1f else 0.5f)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(stringResource(R.string.sleep_fallback_minutes), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = stringResource(R.string.interval_minutes, sleepFallbackMinutes),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Text(stringResource(R.string.sleep_fallback_minutes_desc), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Slider(
+                        value = sleepFallbackMinutes.toFloat(),
+                        onValueChange = { viewModel.setSleepFallbackMinutes(it.toInt()) },
+                        valueRange = 1f..30f,
+                        steps = 28,
+                        enabled = isSleepDetectionEnabled,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
         }
@@ -428,6 +506,9 @@ fun SettingsScreen(
                         .weight(1f)
                         .verticalScroll(rememberScrollState())
                 ) {
+                    if (com.raulburgosmurray.musicplayer.FeatureFlags.SLEEP_DETECTION) {
+                        SleepDetectionSection()
+                    }
                     SleepTimerSection()
                     TimeAnnouncementSection()
                     DefaultEqualizerSection()
@@ -448,6 +529,9 @@ fun SettingsScreen(
                 }
                 AppearanceSection()
                 LibrarySection()
+                if (com.raulburgosmurray.musicplayer.FeatureFlags.SLEEP_DETECTION) {
+                    SleepDetectionSection()
+                }
                 SleepTimerSection()
                 TimeAnnouncementSection()
                 DefaultEqualizerSection()

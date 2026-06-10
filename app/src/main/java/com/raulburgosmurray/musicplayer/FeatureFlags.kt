@@ -3,6 +3,8 @@ package com.raulburgosmurray.musicplayer
 object FeatureFlags {
     val P2P_TRANSFER: Boolean = BuildConfig.FEATURE_P2P_TRANSFER
     val CLOUD_SYNC: Boolean   = BuildConfig.FEATURE_CLOUD_SYNC
+    val SCAN_ALL_MEMORY: Boolean = BuildConfig.FEATURE_SCAN_ALL_MEMORY
+    val SLEEP_DETECTION: Boolean = BuildConfig.FEATURE_SLEEP_DETECTION
 }
 
 object Constants {
@@ -17,6 +19,7 @@ object Constants {
     const val SOCKET_READ_TIMEOUT_MS = 60000
     const val SOCKET_ACCEPT_TIMEOUT_MS = 30000
     const val TRANSFER_SERVER_PORT = 50001
+    const val SLEEP_DETECTION_PORT = 50002
     const val STATEFLOW_STOP_TIMEOUT_MS = 5000L
     const val VIBRATION_DURATION_MS = 500L
     // Smart Rewind

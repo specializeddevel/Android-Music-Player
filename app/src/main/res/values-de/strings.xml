@@ -140,6 +140,8 @@
     <string name="welcome_desc">Um zu beginnen, müssen Sie den Ordner auswählen, in dem Sie Ihre Hörbücher speichern.</string>
     <string name="select_folder">Ordner auswählen</string>
     <string name="onboarding_note">Sie können dies später in den Einstellungen ändern.</string>
+    <string name="transfer_by_qr">Hörbuch per QR empfangen</string>
+    <string name="transfer_by_qr_desc">Keine Bücher? Empfangen Sie sofort eines von einem anderen Gerät.</string>
     <string name="book_detected">Buch erkannt</string>
     <string name="existing_book_msg">%1$s in Ihrer Bibliothek erkannt. Was möchten Sie tun?</string>
     <string name="sync_progress_only">Nur Fortschritt synchronisieren (Sofort)</string>
@@ -228,12 +230,17 @@
     <string name="delete_confirmation_message">Dies wird \"%1$s\" dauerhaft von Ihrem Gerät löschen. Diese Aktion kann nicht rückgängig gemacht werden.</string>
     <string name="delete_success">Hörbuch gelöscht</string>
     <string name="delete_error">Fehler beim Löschen des Hörbuchs</string>
+    <string name="delete_book_in_use_title">Hörbuch in Verwendung</string>
+    <string name="delete_book_in_use_message">Dieses Hörbuch wird gerade wiedergegeben oder ist pausiert. Sie müssen es schließen, bevor Sie es löschen, oder Sie können das Löschen erzwingen.</string>
+    <string name="close_and_delete">Buch schließen und löschen</string>
+    <string name="delete_anyway">Trotzdem löschen</string>
     <string name="mark_as_read">Als gelesen markieren</string>
     <string name="mark_as_unread">Als ungelesen markieren</string>
     <string name="filter_all">Alle</string>
     <string name="filter_completed">Abgeschlossen</string>
     <string name="filter_in_progress">In Bearbeitung</string>
     <string name="filter">Filtern</string>
+    <string name="scroll_down_hint">Nach unten scrollen für weitere Steuerungen</string>
     <!-- Camera permission -->
     <string name="camera_permission_title">📷 Kamerazugriff</string>
     <string name="camera_permission_rationale">Wir benötigen Kamerazugriff für:\n\n• QR-Codes für P2P-Hörbuch-Übertragung scannen\n• Einfache Verbindung mit Geräten in der Nähe\n\nEs werden keine Fotos oder Videos aufgenommen.</string>
@@ -290,4 +297,20 @@
     <string name="synopsis_label">Zusammenfassung</string>
     <string name="expand">Erweitern</string>
     <string name="collapse">Einklappen</string>
+    <!-- Schlaf-Erkennung -->
+    <string name="sleep_detection_title">Schlaf-Erkennung</string>
+    <string name="sleep_detection_desc">Automatisch pausieren und zurückspulen wenn Ihr Amazfit erkennt dass Sie eingeschlafen sind.</string>
+    <string name="sleep_detection_enabled">Schlaf-Erkennung aktivieren</string>
+    <string name="sleep_detection_port">Empfangsport</string>
+    <string name="sleep_detection_port_desc">Portnummer für den Empfang von Schlafereignissen von der Uhr.</string>
+    <string name="sleep_detection_status">Status: %1$s</string>
+    <string name="sleep_detection_connected">Verbunden</string>
+    <string name="sleep_detection_disconnected">Getrennt</string>
+    <string name="sleep_rewind_minutes">Rückspulzeit</string>
+    <string name="sleep_rewind_minutes_desc">Minuten zurückspulen wenn Schlaf erkannt wird</string>
+    <string name="sleep_fallback_minutes">Fallback-Rückspul</string>
+    <string name="sleep_fallback_minutes_desc">Zurückspulen wenn keine Wiedergabedaten verfügbar</string>
+    <string name="history_sleep_detected">Schlaf erkannt — pausiert</string>
+    <string name="history_sleep_rewind">%1$s zum Schlafpunkt zurückgespult</string>
+    <string name="interval_minutes">%1$d min</string>
 </resources>

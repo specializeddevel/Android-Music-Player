@@ -85,6 +85,19 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     )
     val defaultEqPreset: StateFlow<EqPreset> = _defaultEqPreset.asStateFlow()
 
+    // Sleep Detection (Amazfit Zepp OS)
+    private val _isSleepDetectionEnabled = MutableStateFlow(prefs.getBoolean("sleep_detection_enabled", false))
+    val isSleepDetectionEnabled: StateFlow<Boolean> = _isSleepDetectionEnabled.asStateFlow()
+
+    private val _sleepDetectionPort = MutableStateFlow(prefs.getInt("sleep_detection_port", 50002))
+    val sleepDetectionPort: StateFlow<Int> = _sleepDetectionPort.asStateFlow()
+
+    private val _sleepRewindMinutes = MutableStateFlow(prefs.getInt("sleep_rewind_minutes", 2))
+    val sleepRewindMinutes: StateFlow<Int> = _sleepRewindMinutes.asStateFlow()
+
+    private val _sleepFallbackMinutes = MutableStateFlow(prefs.getInt("sleep_fallback_minutes", 5))
+    val sleepFallbackMinutes: StateFlow<Int> = _sleepFallbackMinutes.asStateFlow()
+
     fun setDynamicThemingEnabled(enabled: Boolean) {
         _isDynamicThemingEnabled.value = enabled
         prefs.edit().putBoolean("dynamic_theming", enabled).apply()
@@ -159,5 +172,25 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setDefaultEqPreset(preset: EqPreset) {
         _defaultEqPreset.value = preset
         prefs.edit().putString("default_eq_preset", preset.name).apply()
+    }
+
+    fun setSleepDetectionEnabled(enabled: Boolean) {
+        _isSleepDetectionEnabled.value = enabled
+        prefs.edit().putBoolean("sleep_detection_enabled", enabled).apply()
+    }
+
+    fun setSleepDetectionPort(port: Int) {
+        _sleepDetectionPort.value = port
+        prefs.edit().putInt("sleep_detection_port", port).apply()
+    }
+
+    fun setSleepRewindMinutes(minutes: Int) {
+        _sleepRewindMinutes.value = minutes
+        prefs.edit().putInt("sleep_rewind_minutes", minutes).apply()
+    }
+
+    fun setSleepFallbackMinutes(minutes: Int) {
+        _sleepFallbackMinutes.value = minutes
+        prefs.edit().putInt("sleep_fallback_minutes", minutes).apply()
     }
 }

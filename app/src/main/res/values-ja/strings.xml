@@ -140,6 +140,8 @@
     <string name="welcome_desc">始めるには、オーディオブックを保存しているフォルダを選択してください。</string>
     <string name="select_folder">フォルダを選択</string>
     <string name="onboarding_note">これは後で設定で変更できます。</string>
+    <string name="transfer_by_qr">QRでオーディオブックを受信</string>
+    <string name="transfer_by_qr_desc">本がありませんか？他のデバイスから即座に受信できます。</string>
     <string name="book_detected">書籍が検出されました</string>
     <string name="existing_book_msg">ライブラリで%1$sが検出されました。どうしますか？</string>
     <string name="sync_progress_only">進捗のみ同期（即時）</string>
@@ -228,12 +230,17 @@
     <string name="delete_confirmation_message">これにより\"%1$s\"がデバイスから完全に削除されます。この操作は元に戻せません。</string>
     <string name="delete_success">オーディオブックを削除しました</string>
     <string name="delete_error">オーディオブックの削除に失敗しました</string>
+    <string name="delete_book_in_use_title">オーディオブック使用中</string>
+    <string name="delete_book_in_use_message">このオーディオブックは再生中または一時停止中です。削除する前に閉じるか、強制削除することができます。</string>
+    <string name="close_and_delete">閉じて削除</string>
+    <string name="delete_anyway">そのまま削除</string>
     <string name="mark_as_read">既読にする</string>
     <string name="mark_as_unread">未読にする</string>
     <string name="filter_all">すべて</string>
     <string name="filter_completed">完了</string>
     <string name="filter_in_progress">進行中</string>
     <string name="filter">フィルター</string>
+    <string name="scroll_down_hint">下にスクロールして詳細を表示</string>
     <!-- Camera permission -->
     <string name="camera_permission_title">📷 カメラへのアクセス</string>
     <string name="camera_permission_rationale">カメラへのアクセスが必要です：\n\n• P2Pオーディオブック転送のためにQRコードをスキャン\n• 近くのデバイスと簡単に接続\n\n写真またはビデオは記録されません。</string>
@@ -290,4 +297,20 @@
     <string name="synopsis_label">あらすじ</string>
     <string name="expand">展開</string>
     <string name="collapse">折りたたむ</string>
+    <!-- 睡眠検出 -->
+    <string name="sleep_detection_title">睡眠検出</string>
+    <string name="sleep_detection_desc">Amazfitが就寝を検出したら自動的に一時停止して巻き戻します。</string>
+    <string name="sleep_detection_enabled">睡眠検出を有効にする</string>
+    <string name="sleep_detection_port">リスナーポート</string>
+    <string name="sleep_detection_port_desc">時計から睡眠イベントを受信するポート番号。</string>
+    <string name="sleep_detection_status">ステータス: %1$s</string>
+    <string name="sleep_detection_connected">接続済み</string>
+    <string name="sleep_detection_disconnected">切断</string>
+    <string name="sleep_rewind_minutes">巻き戻し時間</string>
+    <string name="sleep_rewind_minutes_desc">睡眠検出時に巻き戻す分</string>
+    <string name="sleep_fallback_minutes">フォールバック巻き戻し</string>
+    <string name="sleep_fallback_minutes_desc">再生データがない場合に巻き戻し</string>
+    <string name="history_sleep_detected">睡眠検出 — 一時停止</string>
+    <string name="history_sleep_rewind">睡眠ポイントまで%1$s巻き戻し</string>
+    <string name="interval_minutes">%1$d分</string>
 </resources>

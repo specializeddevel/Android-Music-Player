@@ -140,6 +140,8 @@
     <string name="welcome_desc">To start, we need you to select the folder where you store your audiobooks.</string>
     <string name="select_folder">Select Folder</string>
     <string name="onboarding_note">You can change this later in Settings.</string>
+    <string name="transfer_by_qr">Receive audiobook via QR</string>
+    <string name="transfer_by_qr_desc">No books? Receive one instantly from another device.</string>
     <string name="book_detected">Book Detected</string>
     <string name="existing_book_msg">%1$s detected in your library. What do you want to do?</string>
     <string name="sync_progress_only">Sync Progress Only (Instant)</string>
@@ -225,6 +227,9 @@
     <string name="return_to_timer_start">Return to timer start</string>
     <string name="history_accidental_seek">Accidental jump from %1$s</string>
     <string name="bookmark_accidental_seek">Position before accidental jump</string>
+    <!-- Sleep Detection -->
+    <string name="history_sleep_detected">Sleep detected — paused</string>
+    <string name="history_sleep_rewind">Rewound %1$s to sleep point</string>
     <!-- Transfer -->
     <string name="ready">Ready</string>
     <string name="no_wifi">No Wi-Fi</string>
@@ -238,6 +243,10 @@
     <string name="delete_confirmation_message">This will permanently delete \"%1$s\" from your device. This action cannot be undone.</string>
     <string name="delete_success">Audiobook deleted</string>
     <string name="delete_error">Failed to delete audiobook</string>
+    <string name="delete_book_in_use_title">Audiobook in use</string>
+    <string name="delete_book_in_use_message">This audiobook is currently playing or paused. You must close it before deleting, or you can force deletion.</string>
+    <string name="close_and_delete">Close book and delete</string>
+    <string name="delete_anyway">Delete anyway</string>
     <!-- Read status -->
     <string name="mark_as_read">Mark as read</string>
     <string name="mark_as_unread">Mark as unread</string>
@@ -245,6 +254,7 @@
     <string name="filter_completed">Completed</string>
     <string name="filter_in_progress">In Progress</string>
     <string name="filter">Filter</string>
+    <string name="scroll_down_hint">Scroll down for more controls</string>
     <!-- Camera permission -->
     <string name="camera_permission_title">📷 Camera Access</string>
     <string name="camera_permission_rationale">We need camera access to:\n\n• Scan QR codes for P2P audiobook transfer\n• Connect with nearby devices easily\n\nNo photos or videos are recorded.</string>
@@ -288,6 +298,21 @@
     <string name="invalid_skip_amount">Invalid amount or exceeds audio duration</string>
     <string name="history_skip_by_amount_forward">Skip forward %1$s</string>
     <string name="history_skip_by_amount_backward">Skip backward %1$s</string>
+    <!-- Sleep Detection -->
+    <string name="sleep_detection_title">Sleep Detection</string>
+    <string name="sleep_detection_desc">Automatically pause and rewind when your Amazfit detects you fell asleep.</string>
+    <string name="sleep_detection_enabled">Enable Sleep Detection</string>
+    <string name="sleep_detection_port">Listener Port</string>
+    <string name="sleep_detection_port_desc">Port number for receiving sleep events from the watch.</string>
+    <string name="sleep_detection_status">Status: %1$s</string>
+    <string name="sleep_detection_connected">Connected</string>
+    <string name="sleep_detection_disconnected">Disconnected</string>
+    <string name="sleep_rewind_minutes">Rewind Time</string>
+    <string name="sleep_rewind_minutes_desc">Minutes to rewind when sleep is detected</string>
+    <string name="sleep_fallback_minutes">Fallback Rewind</string>
+    <string name="sleep_fallback_minutes_desc">Rewind if no playback data available</string>
+    <string name="interval_minutes">%1$d min</string>
+
     <!-- Time announcement -->
     <string name="time_announcement_title">Time Announcements</string>
     <string name="time_announcement_desc">Announce the current time over the audiobook.</string>

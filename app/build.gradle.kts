@@ -14,7 +14,7 @@ android {
     // Versionado manual - cambiar estos valores para actualizar la versión
     val versionMajor = 1
     val versionMinor = 0
-    val versionPatch = 220226001
+    val versionPatch = 260609001
     val versionCode = versionMajor * 10000 + versionMinor * 100 + versionPatch
     val versionName = "$versionMajor.$versionMinor.$versionPatch"
 
@@ -36,6 +36,8 @@ defaultConfig {
         debug {
             buildConfigField("boolean", "FEATURE_P2P_TRANSFER", "true")
             buildConfigField("boolean", "FEATURE_CLOUD_SYNC", "false")
+            buildConfigField("boolean", "FEATURE_SCAN_ALL_MEMORY", "true")
+            buildConfigField("boolean", "FEATURE_SLEEP_DETECTION", "true")
         }
         release {
             isMinifyEnabled = false
@@ -45,6 +47,8 @@ defaultConfig {
             )
             buildConfigField("boolean", "FEATURE_P2P_TRANSFER", "true")
             buildConfigField("boolean", "FEATURE_CLOUD_SYNC", "false")
+            buildConfigField("boolean", "FEATURE_SCAN_ALL_MEMORY", "true")
+            buildConfigField("boolean", "FEATURE_SLEEP_DETECTION", "true")
         }
     }
     compileOptions {
