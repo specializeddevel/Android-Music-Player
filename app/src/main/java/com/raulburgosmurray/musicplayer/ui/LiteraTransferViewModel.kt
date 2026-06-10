@@ -244,7 +244,7 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
             finalUri = newFile?.uri?.toString()
             context.contentResolver.openOutputStream(newFile!!.uri)!!
         } else {
-            val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), "Litera/Inbox")
+            val dir = File(context.getExternalFilesDir(Environment.DIRECTORY_MUSIC), "Litera/Inbox")
             if (!dir.exists()) dir.mkdirs()
             val f = File(dir, fileName); finalPath = f.absolutePath; FileOutputStream(f)
         }

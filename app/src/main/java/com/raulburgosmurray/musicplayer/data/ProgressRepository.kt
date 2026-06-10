@@ -42,4 +42,6 @@ class ProgressRepository(private val progressDao: ProgressDao) {
             )
         }
     }
+
+    suspend fun deleteProgress(mediaId: String) = progressDao.deleteProgress(mediaId)
 }

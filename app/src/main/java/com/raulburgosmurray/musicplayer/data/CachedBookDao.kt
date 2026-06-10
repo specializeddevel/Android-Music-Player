@@ -27,4 +27,7 @@ interface CachedBookDao {
 
     @Query("UPDATE cached_books SET description = :description WHERE id = :id")
     suspend fun updateDescription(id: String, description: String)
+
+    @Query("DELETE FROM cached_books WHERE id = :id")
+    suspend fun deleteBookById(id: String)
 }

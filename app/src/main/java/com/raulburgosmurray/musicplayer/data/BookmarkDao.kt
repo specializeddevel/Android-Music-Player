@@ -19,4 +19,7 @@ interface BookmarkDao {
 
     @Query("UPDATE bookmarks SET note = :newNote WHERE id = :bookmarkId")
     suspend fun updateBookmarkNote(bookmarkId: Int, newNote: String)
+
+    @Query("DELETE FROM bookmarks WHERE mediaId = :mediaId")
+    suspend fun deleteBookmarksForMedia(mediaId: String)
 }

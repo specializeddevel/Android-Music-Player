@@ -189,6 +189,7 @@ if (showDetailsSheet && selectedBookForDetails != null) {
                         }
                         showDetailsSheet = false
                         if (deleted) {
+                            playbackViewModel.cleanupAfterDeletion(bookToDelete.id)
                             snackbarHostState.showSnackbar(message = context.getString(R.string.delete_success), duration = SnackbarDuration.Short)
                             // Reload books to refresh the list
                             mainViewModel.loadBooks(emptyList(), true)
@@ -196,7 +197,8 @@ if (showDetailsSheet && selectedBookForDetails != null) {
                             snackbarHostState.showSnackbar(message = context.getString(R.string.delete_error), duration = SnackbarDuration.Short)
                         }
                     }
-                }
+                },
+                playbackViewModel = playbackViewModel
             )
         }
     }

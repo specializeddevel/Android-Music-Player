@@ -27,4 +27,7 @@ interface ProgressDao {
 
     @Query("UPDATE audiobook_progress SET isRead = :isRead, lastUpdated = :timestamp WHERE mediaId = :mediaId")
     suspend fun updateReadStatus(mediaId: String, isRead: Boolean, timestamp: Long = System.currentTimeMillis())
+
+    @Query("DELETE FROM audiobook_progress WHERE mediaId = :mediaId")
+    suspend fun deleteProgress(mediaId: String)
 }

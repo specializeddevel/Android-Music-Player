@@ -15,4 +15,7 @@ class BookmarkRepository(private val bookmarkDao: BookmarkDao) {
 
     suspend fun updateBookmarkNote(bookmarkId: Int, newNote: String) =
         bookmarkDao.updateBookmarkNote(bookmarkId, newNote)
+
+    suspend fun deleteBookmarksForMedia(mediaId: String) =
+        bookmarkDao.deleteBookmarksForMedia(mediaId)
 }

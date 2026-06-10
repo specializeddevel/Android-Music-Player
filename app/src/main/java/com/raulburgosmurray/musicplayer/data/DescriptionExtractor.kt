@@ -15,7 +15,9 @@ private const val TAG = "DescriptionExtractor"
 
 object DescriptionExtractor {
 
-    fun isSupported(): Boolean = Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM
+    fun isSupported(): Boolean =
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM
 
     fun extract(context: Context, uriString: String): String? {
         if (!isSupported()) return null

@@ -275,19 +275,21 @@ fun MainScreen(
                             textAlign = TextAlign.Center
                         )
                         Spacer(Modifier.height(32.dp))
-                        Button(
-                            onClick = { mainViewModel.loadBooks(emptyList(), true) },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary
-                            )
-                        ) {
-                            Icon(Icons.Default.Storage, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(stringResource(R.string.scan_memory_btn))
+                        if (com.raulburgosmurray.musicplayer.FeatureFlags.SCAN_ALL_MEMORY) {
+                            Button(
+                                onClick = { mainViewModel.loadBooks(emptyList(), true) },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                )
+                            ) {
+                                Icon(Icons.Default.Storage, contentDescription = null)
+                                Spacer(Modifier.width(8.dp))
+                                Text(stringResource(R.string.scan_memory_btn))
+                            }
+                            Spacer(Modifier.height(12.dp))
                         }
-                        Spacer(Modifier.height(12.dp))
                         OutlinedButton(
                             onClick = onSelectFolder,
                             modifier = Modifier.fillMaxWidth()
@@ -378,8 +380,8 @@ fun MainScreen(
         val isBookRead = readStatusSet.contains(currentBook.id)
         ModalBottomSheet(onDismissRequest = { showDetailsSheet = false }, sheetState = detailsSheetState) { 
             BookDetailsContent(
-                book = currentBook, 
-                allBooks = books, 
+                book = currentBook,
+                allBooks = books,
                 onEditMetadata = { bookId -> navController.navigate("metadata_editor?bookId=${encodeBookId(bookId)}") },
                 isRead = isBookRead,
                 onToggleRead = { mainViewModel.toggleReadStatus(currentBook.id) },
@@ -389,6 +391,7 @@ fun MainScreen(
                         val deleted = deleteAudioFile(context, bookToDelete.path)
                         showDetailsSheet = false
                         if (deleted) {
+                            playbackViewModel.cleanupAfterDeletion(bookToDelete.id)
                             snackbarHostState.showSnackbar(message = context.getString(R.string.delete_success), duration = SnackbarDuration.Short)
                             val uris = settingsViewModel.libraryRootUris.value
                             val scanAll = settingsViewModel.scanAllMemory.value
@@ -397,7 +400,8 @@ fun MainScreen(
                             snackbarHostState.showSnackbar(message = context.getString(R.string.delete_error), duration = SnackbarDuration.Short)
                         }
                     }
-                }
+                },
+                playbackViewModel = playbackViewModel
             ) 
         } 
     }
@@ -410,7 +414,8 @@ fun BookDetailsContent(
     onEditMetadata: (String) -> Unit = {},
     isRead: Boolean = false,
     onToggleRead: (() -> Unit)? = null,
-    onDelete: (() -> Unit)? = null
+    onDelete: (() -> Unit)? = null,
+    playbackViewModel: PlaybackViewModel? = null
 ) {
     val siblingCount = allBooks.count { it.album == book.album && it.id != book.id }
     val context = LocalContext.current
@@ -419,7 +424,50 @@ fun BookDetailsContent(
     val displayTitle = capitalizeWords(rawTitle)
     val displayArtist = capitalizeWords(book.artist)
     var showDeleteDialog by remember { mutableStateOf(false) }
-    
+    var showInUseDialog by remember { mutableStateOf(false) }
+
+    val isBookInUse = playbackViewModel?.uiState?.collectAsState()?.value?.currentMediaItem?.mediaId == book.id
+
+    if (showInUseDialog) {
+        AlertDialog(
+            onDismissRequest = { showInUseDialog = false },
+            title = { Text(stringResource(R.string.delete_book_in_use_title)) },
+            text = { Text(stringResource(R.string.delete_book_in_use_message)) },
+            confirmButton = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Button(
+                        onClick = {
+                            showInUseDialog = false
+                            playbackViewModel?.clearCurrentPlayback()
+                            onDelete?.invoke()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error, contentColor = MaterialTheme.colorScheme.onError)
+                    ) {
+                        Text(stringResource(R.string.close_and_delete))
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = {
+                            showInUseDialog = false
+                            onDelete?.invoke()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(stringResource(R.string.delete_anyway))
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    TextButton(
+                        onClick = { showInUseDialog = false },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                }
+            }
+        )
+    }
+
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
@@ -477,7 +525,13 @@ fun BookDetailsContent(
         if (onDelete != null) {
             Spacer(Modifier.height(8.dp))
             Button(
-                onClick = { showDeleteDialog = true },
+                onClick = {
+                    if (isBookInUse) {
+                        showInUseDialog = true
+                    } else {
+                        showDeleteDialog = true
+                    }
+                },
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.errorContainer,

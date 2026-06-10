@@ -2,6 +2,22 @@
 
 Instructions for automated agents working in this repository.
 
+## ⚠️ MANDATORY: Consult `ZEPP_OS_FINDINGS.md` before any Zepp OS work
+
+**Before creating, modifying, or debugging ANY Zepp OS Mini Program code** (anything in the `zepp-sleep-detector/` directory), you **MUST** read and follow:
+
+📄 **`ZEPP_OS_FINDINGS.md`** (in the project root)
+
+This document contains **critical, battle-tested findings** from real testing on an Amazfit Active Max (Zepp OS 5.0, API 4.2). It includes:
+
+- File extension requirements (`.page.js`, `.layout.js`)
+- Correct import patterns (`import * as hmUI from "@zos/ui"`)
+- Asset directory structure (`assets/<target>/icon.png`)
+- Common pitfalls that cause black screens and crashes
+- Verified working API surface for this device
+
+**This document must be kept up-to-date.** When you discover new issues or solutions, add them to `ZEPP_OS_FINDINGS.md`. Verify against the official docs at https://docs.zepp.com/ and samples at https://github.com/zepp-health/zeppos-samples periodically.
+
 ## Build & Verify
 
 ```bash
@@ -30,6 +46,7 @@ No ktlint, detekt, or ktfmt is configured — `./gradlew lint` is the only linte
 - **`PREVIUS`** (typo of "previous") is an intent action string used by `PlaybackService` — fixing the typo is a breaking API change.
 - **`viewBinding = true`** is enabled in build config but unused (Compose-only UI).
 - **ProGuard rules are stock boilerplate** — `isMinifyEnabled = false` for release, so no custom keep rules are needed today.
+- **Zepp OS Mini Program in `zepp-sleep-detector/`** — uses `*.page.js` and `*.layout.js` (NOT plain `.js`). Icons in `assets/<target>/icon.png`. Import `hmUI` with `import * as hmUI from "@zos/ui"`. Node **MUST** be v20 (not v22). For `zeus dev`, use target name with full name: `zeus dev -t "Amazfit Active Max"`. **There is a known bug with `zeus dev` causing an infinite rebuild loop** when assets change - use `zeus build` for one-shot compilation if needed. See **`ZEPP_OS_FINDINGS.md`** for full details.
 
 ## DI Pattern
 

@@ -21,6 +21,8 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.seconds
+import java.io.File
+import android.os.Environment
 
 enum class SortOrder { TITLE, ARTIST, PROGRESS, RECENT }
 enum class BookFilter { ALL, COMPLETED, IN_PROGRESS }
@@ -208,6 +210,26 @@ class MainViewModel(application: Application, settingsViewModel: SettingsViewMod
                         }
                     }
                     allMusic
+                } else {
+                    emptyList()
+                }
+            }
+            withContext(Dispatchers.IO) {
+                bookRepository.clearCache()
+                bookRepository.saveBooks(audioFiles.map { it.toCachedBook() })
+            }
+            _isLoading.value = false
+        }
+    }
+
+    fun scanTransferInbox() {
+        viewModelScope.launch {
+            _isLoading.value = true
+            val audioFiles = withContext(Dispatchers.IO) {
+                val dir = File(getApplication<Application>().getExternalFilesDir(Environment.DIRECTORY_MUSIC), "Litera/Inbox")
+                if (dir.exists() && dir.isDirectory) {
+                    val docFile = DocumentFile.fromFile(dir)
+                    musicScanner.scanDirectory(getApplication(), docFile) { _, _ -> }
                 } else {
                     emptyList()
                 }

@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
@@ -59,6 +60,7 @@ import com.raulburgosmurray.musicplayer.EqPreset
 import com.raulburgosmurray.musicplayer.encodeBookId
 import com.raulburgosmurray.musicplayer.ui.PlaybackUiState
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
@@ -252,77 +254,129 @@ fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, 
     val displayTitle = metadata?.title?.takeIf { it.isNotBlank() } ?: currentItem?.mediaMetadata?.title?.toString() ?: "A"
     var pressedArea by remember { mutableStateOf<CoverTapArea?>(null) }
     var showMoreMenu by remember { mutableStateOf(false) }
-    
-    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp).verticalScroll(rememberScrollState()).statusBarsPadding().navigationBarsPadding()) {
-        Spacer(Modifier.height(16.dp))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back_btn)) }
-            Row {
-                IconButton(onClick = { viewModel.toggleFavorite() }) { Icon(if (state.isFavorite) Icons.Filled.Favorite else Icons.Default.Favorite, contentDescription = stringResource(R.string.favourites_btn), tint = if (state.isFavorite) Color.Red else LocalContentColor.current) }
-                IconButton(onClick = onShowHistory) { Icon(Icons.Default.History, null) }
-                IconButton(onClick = onShowQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null) }
-                IconButton(onClick = onShowBookmark) { Icon(Icons.Default.Bookmark, null) }
-                IconButton(onClick = onShowEqualizer) { Icon(Icons.Default.Equalizer, null, tint = if (state.eqPreset != EqPreset.FLAT) Color.Red else LocalContentColor.current) }
-                IconButton(onClick = onLock) { Icon(Icons.Default.Lock, contentDescription = stringResource(R.string.lock_screen)) }
-                IconButton(onClick = {
-                    showMoreMenu = true
-                }) { Icon(Icons.Default.MoreVert, null) }
-                DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
-                    if (state.canReturnToTimerStart) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.return_to_timer_start)) },
-                            leadingIcon = { Icon(Icons.Default.Restore, null) },
-                            onClick = { showMoreMenu = false; viewModel.returnToTimerStart() }
+
+    BoxWithConstraints(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp).statusBarsPadding().navigationBarsPadding()
+    ) {
+        val maxCoverHeight = (maxHeight * 0.45f).coerceAtMost(maxWidth)
+        val scrollState = rememberScrollState()
+        val canScrollForward by remember { derivedStateOf { scrollState.canScrollForward } }
+        var showScrollHint by remember { mutableStateOf(true) }
+
+        LaunchedEffect(canScrollForward) {
+            if (canScrollForward) {
+                showScrollHint = true
+                delay(3000)
+                showScrollHint = false
+            }
+        }
+
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(modifier = Modifier.fillMaxSize().verticalScroll(scrollState)) {
+                Spacer(Modifier.height(16.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back_btn)) }
+                    Row {
+                        IconButton(onClick = { viewModel.toggleFavorite() }) { Icon(if (state.isFavorite) Icons.Filled.Favorite else Icons.Default.Favorite, contentDescription = stringResource(R.string.favourites_btn), tint = if (state.isFavorite) Color.Red else LocalContentColor.current) }
+                        IconButton(onClick = onShowHistory) { Icon(Icons.Default.History, null) }
+                        IconButton(onClick = onShowQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null) }
+                        IconButton(onClick = onShowBookmark) { Icon(Icons.Default.Bookmark, null) }
+                        IconButton(onClick = onShowEqualizer) { Icon(Icons.Default.Equalizer, null, tint = if (state.eqPreset != EqPreset.FLAT) Color.Red else LocalContentColor.current) }
+                        IconButton(onClick = onLock) { Icon(Icons.Default.Lock, contentDescription = stringResource(R.string.lock_screen)) }
+                        IconButton(onClick = {
+                            showMoreMenu = true
+                        }) { Icon(Icons.Default.MoreVert, null) }
+                        DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
+                            if (state.canReturnToTimerStart) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.return_to_timer_start)) },
+                                    leadingIcon = { Icon(Icons.Default.Restore, null) },
+                                    onClick = { showMoreMenu = false; viewModel.returnToTimerStart() }
+                                )
+                            }
+                            DropdownMenuItem(text = { Text(stringResource(R.string.go_to_time)) }, leadingIcon = { Icon(Icons.Default.AccessTime, null) }, onClick = { showMoreMenu = false; onShowSeekToTime() })
+                            DropdownMenuItem(text = { Text(stringResource(R.string.skip_by_amount)) }, leadingIcon = { Icon(Icons.Default.SkipNext, null) }, onClick = { showMoreMenu = false; onShowSkipByAmount() })
+                            DropdownMenuItem(text = { Text(stringResource(R.string.book_details)) }, leadingIcon = { Icon(Icons.Default.Info, null) }, onClick = { showMoreMenu = false; onShowDetails() })
+                            DropdownMenuItem(text = { Text(stringResource(R.string.share_btn)) }, leadingIcon = { Icon(Icons.Default.Share, null) }, onClick = { showMoreMenu = false; onShowShare() })
+                            if (com.raulburgosmurray.musicplayer.FeatureFlags.P2P_TRANSFER) {
+                                DropdownMenuItem(text = { Text(stringResource(R.string.send)) }, leadingIcon = { Icon(Icons.Default.Wifi, null) }, onClick = { showMoreMenu = false; currentItem?.mediaId?.let { onTransferClick(it) } })
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(24.dp))
+                Box(modifier = Modifier.fillMaxWidth().heightIn(max = maxCoverHeight)) {
+                    Box(modifier = Modifier.fillMaxHeight().aspectRatio(1f).align(Alignment.Center).clip(RoundedCornerShape(32.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
+                        with(sharedTransitionScope) {
+                            var imageLoadError by remember { mutableStateOf(false) }
+                            val artworkUri = currentItem?.mediaMetadata?.artworkUri?.toString()
+                            if (!artworkUri.isNullOrBlank() && !imageLoadError) {
+                                AsyncImage(
+                                    model = ImageRequest.Builder(LocalContext.current).data(artworkUri).crossfade(true).listener(onError = { _, _ -> imageLoadError = true }).build(),
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${from}_cover_${currentItem?.mediaId}"), animatedVisibilityScope = animatedVisibilityScope),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                            if (artworkUri.isNullOrBlank() || imageLoadError) {
+                                Box(modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${from}_cover_${currentItem?.mediaId}"), animatedVisibilityScope = animatedVisibilityScope)) {
+                                    BookPlaceholder(title = displayTitle, modifier = Modifier.fillMaxSize())
+                                }
+                            }
+                        }
+                        // Touch controls overlay
+                        CoverTouchControls(
+                            modifier = Modifier.fillMaxSize(),
+                            pressedArea = pressedArea,
+                            onAreaPressed = { pressedArea = it },
+                            onAreaReleased = { pressedArea = null },
+                            onLeftTap = { viewModel.skipBackward(Constants.SKIP_BACKWARD_MS) },
+                            onCenterTap = { viewModel.togglePlayPause() },
+                            onRightTap = { viewModel.skipForward(Constants.SKIP_FORWARD_MS) }
                         )
                     }
-                    DropdownMenuItem(text = { Text(stringResource(R.string.go_to_time)) }, leadingIcon = { Icon(Icons.Default.AccessTime, null) }, onClick = { showMoreMenu = false; onShowSeekToTime() })
-                    DropdownMenuItem(text = { Text(stringResource(R.string.skip_by_amount)) }, leadingIcon = { Icon(Icons.Default.SkipNext, null) }, onClick = { showMoreMenu = false; onShowSkipByAmount() })
-                    DropdownMenuItem(text = { Text(stringResource(R.string.book_details)) }, leadingIcon = { Icon(Icons.Default.Info, null) }, onClick = { showMoreMenu = false; onShowDetails() })
-                    DropdownMenuItem(text = { Text(stringResource(R.string.share_btn)) }, leadingIcon = { Icon(Icons.Default.Share, null) }, onClick = { showMoreMenu = false; onShowShare() })
-                    if (com.raulburgosmurray.musicplayer.FeatureFlags.P2P_TRANSFER) {
-                        DropdownMenuItem(text = { Text(stringResource(R.string.send)) }, leadingIcon = { Icon(Icons.Default.Wifi, null) }, onClick = { showMoreMenu = false; currentItem?.mediaId?.let { onTransferClick(it) } })
-                    }
                 }
+                Spacer(Modifier.height(32.dp))
+                PlayerControls(state, viewModel, onShowSpeed, onShowTimer)
+                val synopsis = state.currentMusicDetails?.description
+                if (!synopsis.isNullOrBlank()) {
+                    Spacer(Modifier.height(16.dp))
+                    SynopsisAccordion(description = synopsis)
+                }
+                Spacer(Modifier.height(16.dp))
             }
-        }
-        Spacer(Modifier.height(24.dp))
-        Box(modifier = Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(32.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
-            with(sharedTransitionScope) {
-                var imageLoadError by remember { mutableStateOf(false) }
-                val artworkUri = currentItem?.mediaMetadata?.artworkUri?.toString()
-                if (!artworkUri.isNullOrBlank() && !imageLoadError) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current).data(artworkUri).crossfade(true).listener(onError = { _, _ -> imageLoadError = true }).build(),
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${from}_cover_${currentItem?.mediaId}"), animatedVisibilityScope = animatedVisibilityScope),
-                        contentScale = ContentScale.Crop
+
+            // Scroll hint: gradient + arrow when content overflows
+            AnimatedVisibility(
+                visible = canScrollForward && showScrollHint,
+                modifier = Modifier.align(Alignment.BottomCenter),
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(64.dp)
+                        .background(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    MaterialTheme.colorScheme.background.copy(alpha = 0.7f),
+                                    MaterialTheme.colorScheme.background.copy(alpha = 0.95f)
+                                )
+                            )
+                        ),
+                    contentAlignment = Alignment.BottomCenter
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = stringResource(R.string.scroll_down_hint),
+                        modifier = Modifier.padding(bottom = 8.dp),
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
                 }
-                if (artworkUri.isNullOrBlank() || imageLoadError) {
-                    Box(modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${from}_cover_${currentItem?.mediaId}"), animatedVisibilityScope = animatedVisibilityScope)) {
-                        BookPlaceholder(title = displayTitle, modifier = Modifier.fillMaxSize())
-                    }
-                }
             }
-            // Touch controls overlay
-            CoverTouchControls(
-                modifier = Modifier.fillMaxSize(),
-                pressedArea = pressedArea,
-                onAreaPressed = { pressedArea = it },
-                onAreaReleased = { pressedArea = null },
-                onLeftTap = { viewModel.skipBackward(Constants.SKIP_BACKWARD_MS) },
-                onCenterTap = { viewModel.togglePlayPause() },
-                onRightTap = { viewModel.skipForward(Constants.SKIP_FORWARD_MS) }
-            )
         }
-        Spacer(Modifier.height(32.dp))
-        PlayerControls(state, viewModel, onShowSpeed, onShowTimer)
-        val synopsis = state.currentMusicDetails?.description
-        if (!synopsis.isNullOrBlank()) {
-            Spacer(Modifier.height(16.dp))
-            SynopsisAccordion(description = synopsis)
-        }
-        Spacer(Modifier.height(16.dp))
     }
 }
 
