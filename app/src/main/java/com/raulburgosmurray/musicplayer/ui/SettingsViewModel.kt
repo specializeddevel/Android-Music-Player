@@ -92,10 +92,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _sleepDetectionPort = MutableStateFlow(prefs.getInt("sleep_detection_port", 50002))
     val sleepDetectionPort: StateFlow<Int> = _sleepDetectionPort.asStateFlow()
 
-    private val _sleepRewindMinutes = MutableStateFlow(prefs.getInt("sleep_rewind_minutes", 2))
+    private val _sleepRewindMinutes = MutableStateFlow(prefs.getInt("sleep_rewind_minutes", 0))
     val sleepRewindMinutes: StateFlow<Int> = _sleepRewindMinutes.asStateFlow()
 
-    private val _sleepFallbackMinutes = MutableStateFlow(prefs.getInt("sleep_fallback_minutes", 5))
+    private val _sleepFallbackMinutes = MutableStateFlow(prefs.getInt("sleep_fallback_minutes", 0))
     val sleepFallbackMinutes: StateFlow<Int> = _sleepFallbackMinutes.asStateFlow()
 
     fun setDynamicThemingEnabled(enabled: Boolean) {

@@ -1228,8 +1228,8 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
 
         // Leer ajustes de SharedPreferences
         val prefs = getApplication<Application>().getSharedPreferences("settings", Context.MODE_PRIVATE)
-        val rewindMinutes = prefs.getInt("sleep_rewind_minutes", 2)
-        val fallbackMinutes = prefs.getInt("sleep_fallback_minutes", 5)
+        val rewindMinutes = prefs.getInt("sleep_rewind_minutes", 0)
+        val fallbackMinutes = prefs.getInt("sleep_fallback_minutes", 0)
 
         // Convertir startTime (minutos desde medianoche) a timestamp
         val sleepStartMillis = zeppStartTimeToMillis(sleepOnsetMinutes)

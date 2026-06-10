@@ -298,8 +298,8 @@ fun SettingsScreen(
                     Slider(
                         value = sleepRewindMinutes.toFloat(),
                         onValueChange = { viewModel.setSleepRewindMinutes(it.toInt()) },
-                        valueRange = 1f..10f,
-                        steps = 8,
+                        valueRange = 0f..5f,
+                        steps = 5,
                         enabled = isSleepDetectionEnabled,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -319,8 +319,8 @@ fun SettingsScreen(
                     Slider(
                         value = sleepFallbackMinutes.toFloat(),
                         onValueChange = { viewModel.setSleepFallbackMinutes(it.toInt()) },
-                        valueRange = 1f..30f,
-                        steps = 28,
+                        valueRange = 0f..5f,
+                        steps = 5,
                         enabled = isSleepDetectionEnabled,
                         modifier = Modifier.fillMaxWidth()
                     )
