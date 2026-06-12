@@ -4,7 +4,7 @@
 > 
 > Este documento contiene hallazgos críticos basados en pruebas reales con **Amazfit Active Max** (Zepp OS 5.0, API Level 4.2) y comparación con la documentación oficial.
 > 
-> **Última actualización**: 2026-06-09
+> **Última actualización**: 2026-06-12
 > **Fuentes verificadas**: https://docs.zepp.com/, https://github.com/zepp-health/zeppos-samples
 
 ---
@@ -654,6 +654,110 @@ AppSideService(BaseSideService({
 - `app.json` debe declarar `app-side` con `"path": "app-side/index"`
 - NO necesitas `app-service` para comunicación básica
 - `fetch` está disponible globalmente en el Side Service
+
+---
+
+## 🔴 Hallazgo #17: App Service requiere `requestPermission` dinámico (CRÍTICO)
+
+### El problema
+El App Service **NO se ejecuta** aunque:
+- `"permissions": ["device:os.bg_service"]` esté en `app.json`
+- `appService.start()` se llame desde la página
+- El servicio esté declarado correctamente en `app.json` con `"services": [...]`
+
+El síntoma es que el servicio parece arrancar pero **se detiene inmediatamente**. La página sigue funcionando, pero los callbacks del servicio nunca se ejecutan.
+
+### La solución correcta
+El permiso `device:os.bg_service` requiere **solicitud dinámica al usuario** antes de iniciar el servicio:
+
+```javascript
+import * as appService from "@zos/app-service"
+import { queryPermission, requestPermission } from "@zos/app"
+
+const SERVICE_FILE = "app-service/sleep_service"
+const BG_PERMISSIONS = ["device:os.bg_service"]
+
+function startServiceWithPermission(vm) {
+  const [permResult] = queryPermission({ permissions: BG_PERMISSIONS })
+
+  if (permResult === 2) {
+    // Permiso ya concedido
+    doStartService(vm)
+  } else if (permResult === 0) {
+    // Solicitar permiso al usuario (muestra diálogo)
+    requestPermission({
+      permissions: BG_PERMISSIONS,
+      callback: (results) => {
+        if (results[0] === 2) {
+          doStartService(vm)
+        } else {
+          // Permiso denegado
+        }
+      }
+    })
+  }
+}
+
+function doStartService(vm) {
+  const result = appService.start({
+    url: SERVICE_FILE,  // ⚠️ Usa "url", NO "file"
+    complete_func: (info) => {
+      if (info.result) {
+        // Servicio iniciado correctamente
+      }
+    }
+  })
+}
+```
+
+### Errores comunes que parecen funcionar pero fallan
+
+| Error | Causa |
+|-------|-------|
+| `appService.start({ file: ... })` | El parámetro correcto es **`url`**, no `file` |
+| No llamar `requestPermission` | El servicio se inicia pero se detiene inmediatamente |
+| No verificar `queryPermission` primero | Puede causar errores innecesarios |
+| Usar `start()` sin `complete_func` | No hay forma de saber si falló |
+
+### Parámetros correctos de `appService.start()`
+```javascript
+appService.start({
+  url: "app-service/sleep_service",  // ← CORRECTO (no "file")
+  param: "optional=params",          // ← Opcional
+  reload: true,                      // ← Persistir tras reinicio (API 4.0)
+  complete_func: (info) => {         // ← OBLIGATORIO
+    console.log(info.result)         // true/false
+  }
+})
+```
+
+### Verificar si el servicio está corriendo
+```javascript
+const services = appService.getAllAppServices()
+// services es un array de strings con los paths de servicios activos
+const isRunning = services.includes("app-service/sleep_service")
+```
+
+### APIs disponibles en App Service
+| API | Disponible |
+|-----|-----------|
+| `@zos/sensor` (Sleep, Time, HeartRate) | ✅ |
+| `@zos/storage` (localStorage) | ✅ |
+| `@zos/notification` (notify) | ✅ |
+| `@zos/app-service` (start, stop, exit) | ✅ |
+| `@zos/app` (getPackageInfo, getProfile) | ✅ |
+| `@zos/ble` (except mst*) | ✅ |
+| `@zos/fs` (solo pantalla off/AOD) | ✅ |
+| `@zos/ui` | ❌ No UI |
+| `@zos/timer` (setTimeout, setInterval) | ❌ No timers |
+| `@zos/sensor` (Accelerometer, Gyroscope) | ❌ Alta potencia |
+
+### Verificación confirmada
+- ✅ Amazfit Active Max (Zepp OS 5.0, API 4.2): `Sleep.getSleepingStatus()` funciona en App Service
+- ✅ `Time.onPerMinute()` dispara callbacks cada minuto en background
+- ✅ `localStorage` persiste entre instancias (App Service ↔ Page ↔ Side Service)
+- ✅ El servicio sigue corriendo tras apagar la pantalla
+- ✅ El servicio se reinicia automáticamente tras reinicio del sistema (con `reload: true`)
 
 ---
 

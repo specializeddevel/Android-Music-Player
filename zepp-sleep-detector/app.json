@@ -34,7 +34,7 @@
           ]
         },
         "app-service": {
-          "path": "app-service/index"
+          "services": ["app-service/sleep_service"]
         },
         "app-side": {
           "path": "app-side/index"

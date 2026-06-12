@@ -3,9 +3,13 @@ import { log as Logger } from "@zos/utils"
 import { localStorage } from "@zos/storage"
 import { createSysTimer, stopTimer } from "@zos/timer"
 import { BasePage } from "@zeppos/zml/base-page"
+import * as appService from "@zos/app-service"
+import { queryPermission, requestPermission } from "@zos/app"
 
 const logger = Logger.getLogger("sleep-detector")
 const STORAGE_KEY = "sleep_detection_enabled"
+const SERVICE_FILE = "app-service/sleep_service"
+const BG_PERMISSIONS = ["device:os.bg_service"]
 
 function formatTime(ts) {
   if (!ts) return "--:--:--"
@@ -16,13 +20,74 @@ function formatTime(ts) {
   return h + ":" + m + ":" + s
 }
 
+function isServiceRunning() {
+  try {
+    const services = appService.getAllAppServices()
+    logger.log("Running services:", JSON.stringify(services))
+    return services && services.includes(SERVICE_FILE)
+  } catch (e) {
+    logger.log("getAllAppServices error:", String(e))
+    return false
+  }
+}
+
+function doStartService(vm) {
+  logger.log("Starting service:", SERVICE_FILE)
+  const result = appService.start({
+    url: SERVICE_FILE,
+    complete_func: (info) => {
+      logger.log("start complete, result:", JSON.stringify(info))
+      if (info.result) {
+        vm.enabled = true
+        localStorage.setItem(STORAGE_KEY, "true")
+        vm.statusWidget.setProperty(hmUI.prop.TEXT, "ON")
+        vm.statusWidget.setProperty(hmUI.prop.COLOR, 0x00FF00)
+        vm.btnBg.setProperty(hmUI.prop.COLOR, 0xCC3333)
+        vm.btnText.setProperty(hmUI.prop.TEXT, "DISABLE")
+        hmUI.showToast({ text: "Service started!" })
+      } else {
+        hmUI.showToast({ text: "Service FAILED to start" })
+        logger.log("Service start FAILED")
+      }
+    }
+  })
+  logger.log("start() returned:", result)
+}
+
+function startServiceWithPermission(vm) {
+  const [permResult] = queryPermission({ permissions: BG_PERMISSIONS })
+  logger.log("queryPermission result:", permResult)
+
+  if (permResult === 2) {
+    doStartService(vm)
+  } else if (permResult === 0) {
+    requestPermission({
+      permissions: BG_PERMISSIONS,
+      callback: (results) => {
+        logger.log("requestPermission callback:", JSON.stringify(results))
+        if (results[0] === 2) {
+          doStartService(vm)
+        } else {
+          hmUI.showToast({ text: "Permission denied" })
+          logger.log("Permission denied by user")
+        }
+      }
+    })
+  } else {
+    logger.log("Permission error:", permResult)
+    hmUI.showToast({ text: "Permission error: " + permResult })
+  }
+}
+
 Page(
   BasePage({
     state: {},
 
     onInit() {
       logger.log("onInit")
-      this.enabled = localStorage.getItem(STORAGE_KEY) === "true"
+      const running = isServiceRunning()
+      this.enabled = running || localStorage.getItem(STORAGE_KEY) === "true"
+      logger.log("Service running:", running, "enabled:", this.enabled)
     },
 
     build() {
@@ -80,13 +145,25 @@ Page(
         normal_src: "btn_transparent.png",
         press_src: "btn_transparent.png",
         click_func: () => {
-          this.enabled = !this.enabled
-          localStorage.setItem(STORAGE_KEY, this.enabled ? "true" : "false")
-          this.statusWidget.setProperty(hmUI.prop.TEXT, this.enabled ? "ON" : "OFF")
-          this.statusWidget.setProperty(hmUI.prop.COLOR, this.enabled ? 0x00FF00 : 0xFF3333)
-          this.btnBg.setProperty(hmUI.prop.COLOR, this.enabled ? 0xCC3333 : 0x33AA33)
-          this.btnText.setProperty(hmUI.prop.TEXT, this.enabled ? "DISABLE" : "ENABLE")
-          logger.log("Toggled:", this.enabled ? "ON" : "OFF")
+          if (this.enabled) {
+            logger.log("Stopping service...")
+            appService.stop({
+              url: SERVICE_FILE,
+              complete_func: (info) => {
+                logger.log("stop result:", JSON.stringify(info))
+                this.enabled = false
+                localStorage.setItem(STORAGE_KEY, "false")
+                this.statusWidget.setProperty(hmUI.prop.TEXT, "OFF")
+                this.statusWidget.setProperty(hmUI.prop.COLOR, 0xFF3333)
+                this.btnBg.setProperty(hmUI.prop.COLOR, 0x33AA33)
+                this.btnText.setProperty(hmUI.prop.TEXT, "ENABLE")
+                hmUI.showToast({ text: "Service stopped" })
+              }
+            })
+          } else {
+            logger.log("Starting service with permission...")
+            startServiceWithPermission(this)
+          }
         }
       })
 
@@ -113,7 +190,7 @@ Page(
           this.testBtnBg.setProperty(hmUI.prop.COLOR, 0x1A4D80)
 
           const now = Date.now()
-          const d = new Date(now - 1 * 60000)  // 1 minuto atrás (simula que te dormiste hace 1 min)
+          const d = new Date(now - 1 * 60000)
           const sleepOnsetMinutes = d.getHours() * 60 + d.getMinutes()
           logger.log("Sending SLEEP_DETECTED via ZML, onset:", sleepOnsetMinutes)
 
