@@ -278,28 +278,28 @@ fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, 
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back_btn)) }
                     Row {
                         IconButton(onClick = { viewModel.toggleFavorite() }) { Icon(if (state.isFavorite) Icons.Filled.Favorite else Icons.Default.Favorite, contentDescription = stringResource(R.string.favourites_btn), tint = if (state.isFavorite) Color.Red else LocalContentColor.current) }
-                        IconButton(onClick = onShowHistory) { Icon(Icons.Default.History, null) }
-                        IconButton(onClick = onShowQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null) }
-                        IconButton(onClick = onShowBookmark) { Icon(Icons.Default.Bookmark, null) }
-                        IconButton(onClick = onShowEqualizer) { Icon(Icons.Default.Equalizer, null, tint = if (state.eqPreset != EqPreset.FLAT) Color.Red else LocalContentColor.current) }
+                        IconButton(onClick = onShowQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, contentDescription = stringResource(R.string.playback_queue_title)) }
+                        IconButton(onClick = onShowEqualizer) { Icon(Icons.Default.Equalizer, contentDescription = stringResource(R.string.equalizer_title), tint = if (state.eqPreset != EqPreset.FLAT) Color.Red else LocalContentColor.current) }
                         IconButton(onClick = onLock) { Icon(Icons.Default.Lock, contentDescription = stringResource(R.string.lock_screen)) }
-                        IconButton(onClick = {
-                            showMoreMenu = true
-                        }) { Icon(Icons.Default.MoreVert, null) }
-                        DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
-                            if (state.canReturnToTimerStart) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.return_to_timer_start)) },
-                                    leadingIcon = { Icon(Icons.Default.Restore, null) },
-                                    onClick = { showMoreMenu = false; viewModel.returnToTimerStart() }
-                                )
-                            }
-                            DropdownMenuItem(text = { Text(stringResource(R.string.go_to_time)) }, leadingIcon = { Icon(Icons.Default.AccessTime, null) }, onClick = { showMoreMenu = false; onShowSeekToTime() })
-                            DropdownMenuItem(text = { Text(stringResource(R.string.skip_by_amount)) }, leadingIcon = { Icon(Icons.Default.SkipNext, null) }, onClick = { showMoreMenu = false; onShowSkipByAmount() })
-                            DropdownMenuItem(text = { Text(stringResource(R.string.book_details)) }, leadingIcon = { Icon(Icons.Default.Info, null) }, onClick = { showMoreMenu = false; onShowDetails() })
-                            DropdownMenuItem(text = { Text(stringResource(R.string.share_btn)) }, leadingIcon = { Icon(Icons.Default.Share, null) }, onClick = { showMoreMenu = false; onShowShare() })
-                            if (com.raulburgosmurray.musicplayer.FeatureFlags.P2P_TRANSFER) {
-                                DropdownMenuItem(text = { Text(stringResource(R.string.send)) }, leadingIcon = { Icon(Icons.Default.Wifi, null) }, onClick = { showMoreMenu = false; currentItem?.mediaId?.let { onTransferClick(it) } })
+                        Box {
+                            IconButton(onClick = { showMoreMenu = true }) { Icon(Icons.Default.MoreVert, null) }
+                            DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
+                                DropdownMenuItem(text = { Text(stringResource(R.string.manual_bookmarks)) }, leadingIcon = { Icon(Icons.Default.Bookmark, null) }, onClick = { showMoreMenu = false; onShowBookmark() })
+                                DropdownMenuItem(text = { Text(stringResource(R.string.activity_history_title)) }, leadingIcon = { Icon(Icons.Default.History, null) }, onClick = { showMoreMenu = false; onShowHistory() })
+                                if (state.canReturnToTimerStart) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.return_to_timer_start)) },
+                                        leadingIcon = { Icon(Icons.Default.Restore, null) },
+                                        onClick = { showMoreMenu = false; viewModel.returnToTimerStart() }
+                                    )
+                                }
+                                DropdownMenuItem(text = { Text(stringResource(R.string.go_to_time)) }, leadingIcon = { Icon(Icons.Default.AccessTime, null) }, onClick = { showMoreMenu = false; onShowSeekToTime() })
+                                DropdownMenuItem(text = { Text(stringResource(R.string.skip_by_amount)) }, leadingIcon = { Icon(Icons.Default.SkipNext, null) }, onClick = { showMoreMenu = false; onShowSkipByAmount() })
+                                DropdownMenuItem(text = { Text(stringResource(R.string.book_details)) }, leadingIcon = { Icon(Icons.Default.Info, null) }, onClick = { showMoreMenu = false; onShowDetails() })
+                                DropdownMenuItem(text = { Text(stringResource(R.string.share_btn)) }, leadingIcon = { Icon(Icons.Default.Share, null) }, onClick = { showMoreMenu = false; onShowShare() })
+                                if (com.raulburgosmurray.musicplayer.FeatureFlags.P2P_TRANSFER) {
+                                    DropdownMenuItem(text = { Text(stringResource(R.string.send)) }, leadingIcon = { Icon(Icons.Default.Wifi, null) }, onClick = { showMoreMenu = false; currentItem?.mediaId?.let { onTransferClick(it) } })
+                                }
                             }
                         }
                     }
@@ -427,26 +427,36 @@ fun LandscapePlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel,
         }
         Spacer(Modifier.width(24.dp))
         Column(modifier = Modifier.weight(1.2f).fillMaxHeight().verticalScroll(rememberScrollState())) {
-            FlowRow(
+            Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = { viewModel.toggleFavorite() }) { Icon(if (state.isFavorite) Icons.Filled.Favorite else Icons.Default.Favorite, contentDescription = stringResource(R.string.favourites_btn), tint = if (state.isFavorite) Color.Red else LocalContentColor.current) }
-                IconButton(onClick = onShowHistory) { Icon(Icons.Default.History, null) }
-                IconButton(onClick = onShowQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null) }
-                IconButton(onClick = onShowBookmark) { Icon(Icons.Default.Bookmark, null) }
-                IconButton(onClick = onShowEqualizer) { Icon(Icons.Default.Equalizer, null, tint = if (state.eqPreset != EqPreset.FLAT) Color.Red else LocalContentColor.current) }
-                if (state.canReturnToTimerStart) {
-                    IconButton(onClick = { viewModel.returnToTimerStart() }) { Icon(Icons.Default.Restore, contentDescription = stringResource(R.string.return_to_timer_start)) }
-                }
-                IconButton(onClick = onShowSeekToTime) { Icon(Icons.Default.AccessTime, null) }
-                IconButton(onClick = onShowSkipByAmount) { Icon(Icons.Default.SkipNext, null) }
-                IconButton(onClick = onLock) { Icon(Icons.Default.Lock, null) }
-                IconButton(onClick = onShowDetails) { Icon(Icons.Default.Info, null) }
-                IconButton(onClick = onShowShare) { Icon(Icons.Default.Share, null) }
-                if (com.raulburgosmurray.musicplayer.FeatureFlags.P2P_TRANSFER) {
-                    IconButton(onClick = { currentItem?.mediaId?.let { onTransferClick(it) } }) { Icon(Icons.Default.Wifi, null) }
+                IconButton(onClick = onShowQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, contentDescription = stringResource(R.string.playback_queue_title)) }
+                IconButton(onClick = onShowEqualizer) { Icon(Icons.Default.Equalizer, contentDescription = stringResource(R.string.equalizer_title), tint = if (state.eqPreset != EqPreset.FLAT) Color.Red else LocalContentColor.current) }
+                IconButton(onClick = onLock) { Icon(Icons.Default.Lock, contentDescription = stringResource(R.string.lock_screen)) }
+                Box {
+                    var showMoreMenuLandscape by remember { mutableStateOf(false) }
+                    IconButton(onClick = { showMoreMenuLandscape = true }) { Icon(Icons.Default.MoreVert, contentDescription = null) }
+                    DropdownMenu(expanded = showMoreMenuLandscape, onDismissRequest = { showMoreMenuLandscape = false }) {
+                        DropdownMenuItem(text = { Text(stringResource(R.string.manual_bookmarks)) }, leadingIcon = { Icon(Icons.Default.Bookmark, null) }, onClick = { showMoreMenuLandscape = false; onShowBookmark() })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.activity_history_title)) }, leadingIcon = { Icon(Icons.Default.History, null) }, onClick = { showMoreMenuLandscape = false; onShowHistory() })
+                        if (state.canReturnToTimerStart) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.return_to_timer_start)) },
+                                leadingIcon = { Icon(Icons.Default.Restore, null) },
+                                onClick = { showMoreMenuLandscape = false; viewModel.returnToTimerStart() }
+                            )
+                        }
+                        DropdownMenuItem(text = { Text(stringResource(R.string.go_to_time)) }, leadingIcon = { Icon(Icons.Default.AccessTime, null) }, onClick = { showMoreMenuLandscape = false; onShowSeekToTime() })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.skip_by_amount)) }, leadingIcon = { Icon(Icons.Default.SkipNext, null) }, onClick = { showMoreMenuLandscape = false; onShowSkipByAmount() })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.book_details)) }, leadingIcon = { Icon(Icons.Default.Info, null) }, onClick = { showMoreMenuLandscape = false; onShowDetails() })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.share_btn)) }, leadingIcon = { Icon(Icons.Default.Share, null) }, onClick = { showMoreMenuLandscape = false; onShowShare() })
+                        if (com.raulburgosmurray.musicplayer.FeatureFlags.P2P_TRANSFER) {
+                            DropdownMenuItem(text = { Text(stringResource(R.string.send)) }, leadingIcon = { Icon(Icons.Default.Wifi, null) }, onClick = { showMoreMenuLandscape = false; currentItem?.mediaId?.let { onTransferClick(it) } })
+                        }
+                    }
                 }
             }
             PlayerControls(state, viewModel, onShowSpeed, onShowTimer)

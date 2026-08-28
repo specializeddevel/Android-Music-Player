@@ -178,15 +178,13 @@ fun MainScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) },
                 actions = {
-                    if (com.raulburgosmurray.musicplayer.FeatureFlags.P2P_TRANSFER) {
-                        IconButton(onClick = onReceiveClick) { Icon(Icons.Default.Wifi, contentDescription = stringResource(R.string.receive)) }
+                    IconButton(onClick = { showSearchBar = !showSearchBar }) { 
+                        Icon(
+                            Icons.Default.Search, 
+                            contentDescription = stringResource(R.string.search_placeholder), 
+                            tint = if (showSearchBar || searchQuery.isNotEmpty()) MaterialTheme.colorScheme.primary else LocalContentColor.current
+                        ) 
                     }
-                    IconButton(onClick = { 
-                        val uris = settingsViewModel.libraryRootUris.value
-                        val scanAll = settingsViewModel.scanAllMemory.value
-                        mainViewModel.loadBooks(if (scanAll) emptyList() else uris, scanAll)
-                    }) { Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.open)) }
-                    IconButton(onClick = { settingsViewModel.setLayoutMode(if (layoutMode == LayoutMode.LIST) LayoutMode.GRID else LayoutMode.LIST) }) { Icon(if (layoutMode == LayoutMode.LIST) Icons.Default.GridView else Icons.AutoMirrored.Filled.ViewList, contentDescription = stringResource(R.string.layout_toggle)) }
                     Box {
                         val currentFilter = mainViewModel.bookFilter.collectAsState().value
                         val hasActiveFilter = currentFilter != com.raulburgosmurray.musicplayer.ui.BookFilter.ALL
@@ -222,9 +220,40 @@ fun MainScreen(
                             DropdownMenuItem(text = { Text(stringResource(R.string.filter_in_progress)) }, leadingIcon = { if (currentFilter == com.raulburgosmurray.musicplayer.ui.BookFilter.IN_PROGRESS) Icon(Icons.Default.Check, null) }, onClick = { mainViewModel.setFilter(com.raulburgosmurray.musicplayer.ui.BookFilter.IN_PROGRESS); showSortMenu = false })
                         }
                     }
-                    IconButton(onClick = { showSearchBar = !showSearchBar }) { Icon(Icons.Default.Search, contentDescription = stringResource(R.string.search_placeholder), tint = if (showSearchBar || searchQuery.isNotEmpty()) MaterialTheme.colorScheme.primary else LocalContentColor.current) }
-                    IconButton(onClick = onFavoritesClick) { Icon(Icons.Default.Favorite, contentDescription = stringResource(R.string.favourites_btn), tint = if (favoriteIds.isNotEmpty()) androidx.compose.ui.graphics.Color.Red else LocalContentColor.current) }
-                    IconButton(onClick = onSettingsClick) { Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings)) }
+                    IconButton(onClick = { settingsViewModel.setLayoutMode(if (layoutMode == LayoutMode.LIST) LayoutMode.GRID else LayoutMode.LIST) }) { Icon(if (layoutMode == LayoutMode.LIST) Icons.Default.GridView else Icons.AutoMirrored.Filled.ViewList, contentDescription = stringResource(R.string.layout_toggle)) }
+                    Box {
+                        var showMainMenuMore by remember { mutableStateOf(false) }
+                        IconButton(onClick = { showMainMenuMore = true }) { Icon(Icons.Default.MoreVert, contentDescription = null) }
+                        DropdownMenu(expanded = showMainMenuMore, onDismissRequest = { showMainMenuMore = false }) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.favourites_btn)) },
+                                leadingIcon = { Icon(Icons.Default.Favorite, null, tint = if (favoriteIds.isNotEmpty()) androidx.compose.ui.graphics.Color.Red else LocalContentColor.current) },
+                                onClick = { showMainMenuMore = false; onFavoritesClick() }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.open)) },
+                                leadingIcon = { Icon(Icons.Default.Refresh, null) },
+                                onClick = {
+                                    showMainMenuMore = false
+                                    val uris = settingsViewModel.libraryRootUris.value
+                                    val scanAll = settingsViewModel.scanAllMemory.value
+                                    mainViewModel.loadBooks(if (scanAll) emptyList() else uris, scanAll)
+                                }
+                            )
+                            if (com.raulburgosmurray.musicplayer.FeatureFlags.P2P_TRANSFER) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.receive)) },
+                                    leadingIcon = { Icon(Icons.Default.Wifi, null) },
+                                    onClick = { showMainMenuMore = false; onReceiveClick() }
+                                )
+                            }
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.settings)) },
+                                leadingIcon = { Icon(Icons.Default.Settings, null) },
+                                onClick = { showMainMenuMore = false; onSettingsClick() }
+                            )
+                        }
+                    }
                 }
             )
         },
