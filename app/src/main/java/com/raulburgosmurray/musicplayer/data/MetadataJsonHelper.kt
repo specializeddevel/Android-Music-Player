@@ -7,14 +7,17 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
 import java.io.File
+import android.util.LruCache
 
 private const val TAG = "MetadataJsonHelper"
+private const val CACHE_SIZE = 500
 
 object MetadataJsonHelper {
     private val json = Json {
         ignoreUnknownKeys = true
         prettyPrint = true
     }
+    private val metadataCache = LruCache<String, AudioMetadata>(CACHE_SIZE)
 
     fun saveMetadata(context: Context, metadata: AudioMetadata) {
         try {
@@ -25,6 +28,7 @@ object MetadataJsonHelper {
             val fileName = "${metadata.mediaId.hashCode()}.json"
             val file = File(metadataDir, fileName)
             file.writeText(json.encodeToString(metadata))
+            metadataCache.put(metadata.mediaId, metadata)
             Log.d(TAG, "Saved metadata for ${metadata.mediaId} to $fileName")
         } catch (e: Exception) {
             Log.e(TAG, "Error saving metadata for ${metadata.mediaId}", e)
@@ -32,12 +36,14 @@ object MetadataJsonHelper {
     }
 
     fun loadMetadata(context: Context, mediaId: String): AudioMetadata? {
+        metadataCache.get(mediaId)?.let { return it }
         return try {
             val metadataDir = File(context.filesDir, "metadata")
             val fileName = "${mediaId.hashCode()}.json"
             val file = File(metadataDir, fileName)
             if (file.exists()) {
                 val metadata = json.decodeFromString<AudioMetadata>(file.readText())
+                metadataCache.put(mediaId, metadata)
                 Log.d(TAG, "Loaded metadata for $mediaId from $fileName")
                 metadata
             } else {
@@ -75,6 +81,7 @@ object MetadataJsonHelper {
             val file = File(metadataDir, fileName)
             if (file.exists()) {
                 file.delete()
+                metadataCache.remove(mediaId)
                 Log.d(TAG, "Deleted metadata for $mediaId")
             }
         } catch (e: Exception) {

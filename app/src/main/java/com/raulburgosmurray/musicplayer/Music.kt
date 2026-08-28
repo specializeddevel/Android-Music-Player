@@ -2,6 +2,7 @@ package com.raulburgosmurray.musicplayer
 
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import kotlinx.serialization.Serializable
 import java.io.File
 
 data class Chapter(
@@ -10,6 +11,7 @@ data class Chapter(
     val durationMs: Long = 0
 )
 
+@Serializable
 data class HistoryAction(
     val label: String,
     val audioPositionMs: Long,
@@ -27,7 +29,8 @@ data class Music(
     val fileSize: Long = 0,
     val fileName: String = "",
     val trackMore: String? = null,
-    val comment: String? = null
+    val comment: String? = null,
+    val description: String? = null
 ) {
     fun toMediaItem(): MediaItem {
         val metadata = MediaMetadata.Builder()

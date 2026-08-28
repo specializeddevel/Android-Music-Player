@@ -13,12 +13,16 @@ import com.raulburgosmurray.musicplayer.data.BookRepository
 import com.raulburgosmurray.musicplayer.data.FavoriteRepository
 import com.raulburgosmurray.musicplayer.data.ProgressRepository
 import com.raulburgosmurray.musicplayer.data.MusicScanner
+import com.raulburgosmurray.musicplayer.data.MetadataJsonHelper
 import com.raulburgosmurray.musicplayer.data.toMusic
 import com.raulburgosmurray.musicplayer.data.toCachedBook
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration.Companion.seconds
+import java.io.File
+import android.os.Environment
 
 enum class SortOrder { TITLE, ARTIST, PROGRESS, RECENT }
 enum class BookFilter { ALL, COMPLETED, IN_PROGRESS }
@@ -38,7 +42,16 @@ class MainViewModel(application: Application, settingsViewModel: SettingsViewMod
     val scanProgress = _scanProgress.asStateFlow()
     
     private val _books = bookRepository.getAllBooks()
-        .map { list -> list.map { it.toMusic() } }
+        .map { list ->
+            val context = getApplication<Application>()
+            list.map { cached ->
+                val editedTitle = MetadataJsonHelper.loadMetadata(context, cached.id)
+                    ?.title?.takeIf { it.isNotBlank() }
+                val music = cached.toMusic()
+                if (editedTitle != null) music.copy(title = editedTitle) else music
+            }
+        }
+        .flowOn(Dispatchers.IO)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(Constants.STATEFLOW_STOP_TIMEOUT_MS), emptyList())
     
     val sortOrder = settingsViewModel.sortOrder
@@ -72,9 +85,12 @@ class MainViewModel(application: Application, settingsViewModel: SettingsViewMod
             SortOrder.RECENT -> filtered.sortedByDescending { timestamps[it.id] ?: 0L }
         }
         sorted
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(Constants.STATEFLOW_STOP_TIMEOUT_MS), emptyList())
+    }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(Constants.STATEFLOW_STOP_TIMEOUT_MS), emptyList())
 
     val favoriteBooks = combine(books, _favoriteIds) { b, f -> b.filter { f.contains(it.id) } }
+        .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(Constants.STATEFLOW_STOP_TIMEOUT_MS), emptyList())
 
     init {
@@ -82,9 +98,7 @@ class MainViewModel(application: Application, settingsViewModel: SettingsViewMod
             combine(settingsViewModel.libraryRootUris, settingsViewModel.scanAllMemory) { uris, scanAll ->
                 Pair(uris, scanAll)
             }.collect { (uris, scanAll) ->
-                if (bookRepository.getAllBooks().first().isEmpty()) {
-                    loadBooks(if (scanAll) emptyList() else uris, scanAll)
-                }
+                smartLoadBooks(if (scanAll) emptyList() else uris, scanAll)
             }
         }
         observeFavorites(); observeProgress()
@@ -92,11 +106,13 @@ class MainViewModel(application: Application, settingsViewModel: SettingsViewMod
 
     private fun observeProgress() {
         viewModelScope.launch {
-            progressRepository.getAllProgressFlow().collect { list ->
-                _bookProgress.value = list.associate { it.mediaId to if (it.duration > 0) it.lastPosition.toFloat() / it.duration.toFloat() else 0f }
-                _bookActivityTimestamps.value = list.associate { it.mediaId to it.lastPauseTimestamp }
-                _bookReadStatus.value = list.associate { it.mediaId to it.isRead }
-            }
+            progressRepository.getAllProgressFlow()
+                .debounce(2.seconds)
+                .collect { list ->
+                    _bookProgress.value = list.associate { it.mediaId to if (it.duration > 0) it.lastPosition.toFloat() / it.duration.toFloat() else 0f }
+                    _bookActivityTimestamps.value = list.associate { it.mediaId to it.lastPauseTimestamp }
+                    _bookReadStatus.value = list.associate { it.mediaId to it.isRead }
+                }
         }
     }
 
@@ -127,6 +143,55 @@ class MainViewModel(application: Application, settingsViewModel: SettingsViewMod
         viewModelScope.launch { favoriteRepository.getAllFavoriteIds().collectLatest { _favoriteIds.value = it.toSet() } }
     }
 
+    suspend fun hasCachedBooks(): Boolean = bookRepository.getBookCount() > 0
+
+    /**
+     * Smart scan that only performs a full metadata extraction when the set of
+     * audio files on disk differs from what is already cached in the database.
+     * Otherwise it skips scanning entirely, making startup instant.
+     */
+    fun smartLoadBooks(libraryRootUris: List<String> = emptyList(), scanAllMemory: Boolean = false) {
+        viewModelScope.launch {
+            val hasBooks = hasCachedBooks()
+            if (!hasBooks) {
+                // First time or empty cache -> full scan
+                loadBooks(libraryRootUris, scanAllMemory)
+                return@launch
+            }
+
+            // Quick check: enumerate files without extracting metadata
+            _isLoading.value = true
+            val currentIds = withContext(Dispatchers.IO) {
+                if (scanAllMemory) {
+                    musicScanner.quickCheckMediaStore(getApplication())
+                } else if (libraryRootUris.isNotEmpty()) {
+                    val ids = mutableSetOf<String>()
+                    for (uri in libraryRootUris) {
+                        val rootDoc = DocumentFile.fromTreeUri(getApplication(), Uri.parse(uri))
+                        if (rootDoc != null) {
+                            ids.addAll(musicScanner.quickCheckDirectory(getApplication(), rootDoc))
+                        }
+                    }
+                    ids
+                } else {
+                    emptySet()
+                }
+            }
+
+            val cachedIds = withContext(Dispatchers.IO) {
+                bookRepository.getAllBooks().first().map { it.id }.toSet()
+            }
+
+            if (currentIds != cachedIds) {
+                // Files added or removed -> full scan
+                loadBooks(libraryRootUris, scanAllMemory)
+            } else {
+                // No changes -> just stop the loading indicator
+                _isLoading.value = false
+            }
+        }
+    }
+
     fun loadBooks(libraryRootUris: List<String> = emptyList(), scanAllMemory: Boolean = false) {
         viewModelScope.launch {
             _isLoading.value = true
@@ -145,6 +210,26 @@ class MainViewModel(application: Application, settingsViewModel: SettingsViewMod
                         }
                     }
                     allMusic
+                } else {
+                    emptyList()
+                }
+            }
+            withContext(Dispatchers.IO) {
+                bookRepository.clearCache()
+                bookRepository.saveBooks(audioFiles.map { it.toCachedBook() })
+            }
+            _isLoading.value = false
+        }
+    }
+
+    fun scanTransferInbox() {
+        viewModelScope.launch {
+            _isLoading.value = true
+            val audioFiles = withContext(Dispatchers.IO) {
+                val dir = File(getApplication<Application>().getExternalFilesDir(Environment.DIRECTORY_MUSIC), "Litera/Inbox")
+                if (dir.exists() && dir.isDirectory) {
+                    val docFile = DocumentFile.fromFile(dir)
+                    musicScanner.scanDirectory(getApplication(), docFile) { _, _ -> }
                 } else {
                     emptyList()
                 }

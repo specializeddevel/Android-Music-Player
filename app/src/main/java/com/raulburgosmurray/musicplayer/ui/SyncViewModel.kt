@@ -17,9 +17,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+import android.util.Log
 import androidx.annotation.VisibleForTesting
 
 class SyncViewModel(application: Application) : AndroidViewModel(application) {
+    companion object { private const val TAG = "SyncViewModel" }
     private val progressRepository = ProgressRepository(AppDatabase.getDatabase(application).progressDao())
     private val prefs = application.getSharedPreferences("sync_prefs", Context.MODE_PRIVATE)
 
@@ -52,7 +54,8 @@ class SyncViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _isSyncing.value = true
             try {
-                val driveService = GoogleDriveService(context, account.email!!)
+                val email = account.email ?: return@launch
+                val driveService = GoogleDriveService(context, email)
                 
                 // 1. Descargar de la nube
                 val cloudProgress = driveService.downloadProgress()
@@ -79,7 +82,7 @@ class SyncViewModel(application: Application) : AndroidViewModel(application) {
                     prefs.edit().putLong("last_sync_time", now).apply()
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                Log.e(TAG, "Error during sync", e)
             } finally {
                 _isSyncing.value = false
             }
@@ -92,13 +95,14 @@ class SyncViewModel(application: Application) : AndroidViewModel(application) {
         
         viewModelScope.launch {
             try {
-                val driveService = GoogleDriveService(context, account.email!!)
+                val email = account.email ?: return@launch
+                val driveService = GoogleDriveService(context, email)
                 val localProgress = withContext(Dispatchers.IO) {
                     progressRepository.getAllProgress()
                 }
                 driveService.uploadProgress(localProgress)
             } catch (e: Exception) {
-                e.printStackTrace()
+                Log.e(TAG, "Error during sync", e)
             }
         }
     }
@@ -120,9 +124,10 @@ class SyncViewModel(application: Application) : AndroidViewModel(application) {
             when {
                 l != null && c != null -> {
                     // Quedarnos con el más reciente
-                    if (c.lastUpdated > l.lastUpdated) merged.add(c)
+                    merged.add(if (c.lastUpdated > l.lastUpdated) c else l)
                 }
                 l == null && c != null -> merged.add(c) // Nuevo desde la nube
+                l != null && c == null -> merged.add(l) // Solo en local, conservar
             }
         }
 

@@ -7,13 +7,17 @@ import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.raulburgosmurray.musicplayer.data.AppDatabase
 import com.raulburgosmurray.musicplayer.data.AudiobookProgress
+import com.raulburgosmurray.musicplayer.data.Bookmark
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -21,6 +25,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 
 class PlaybackService : MediaSessionService() {
 
@@ -32,24 +38,43 @@ class PlaybackService : MediaSessionService() {
     private var player: ExoPlayer? = null
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var saveProgressJob: Job? = null
+    private var smartRewindJob: Job? = null
     private lateinit var database: AppDatabase
 
     @OptIn(UnstableApi::class)
     override fun onCreate() {
         super.onCreate()
         database = AppDatabase.getDatabase(this)
+        createPlayerAndSession()
+    }
 
+    @OptIn(UnstableApi::class)
+    private fun createPlayerAndSession() {
         // Configuración profesional para Audiolibros (Voz humana)
         val audioAttributes = AudioAttributes.Builder()
             .setUsage(C.USAGE_MEDIA)
             .setContentType(C.AUDIO_CONTENT_TYPE_SPEECH) // Optimizado para voz
             .build()
 
-        player = ExoPlayer.Builder(this)
+        val renderersFactory = DefaultRenderersFactory(this)
+            .setEnableAudioTrackPlaybackParams(false) // Force SonicAudioProcessor for stable pitch support
+
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                10_000,  // minBufferMs
+                20_000,  // maxBufferMs
+                1_500,   // bufferForPlaybackMs
+                3_000    // bufferForPlaybackAfterRebufferMs
+            )
+            .build()
+
+        player = ExoPlayer.Builder(this, renderersFactory)
             .setAudioAttributes(audioAttributes, true) // TRUE activa el manejo de Audio Focus automático
             .setHandleAudioBecomingNoisy(true)         // TRUE pausa automáticamente al desconectar audífonos
             .setWakeMode(C.WAKE_MODE_LOCAL)           // Optimizado para archivos locales
+            .setLoadControl(loadControl)
             .build().apply {
+                (application as ApplicationClass).audioSessionId = audioSessionId
                 addListener(object : Player.Listener {
                     override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                         mediaItem?.let { item ->
@@ -78,12 +103,50 @@ class PlaybackService : MediaSessionService() {
                             saveCurrentProgress()
                         }
                     }
+
+                    override fun onPlayerError(error: PlaybackException) {
+                        Log.e("PlaybackService", "Player error: ${error.errorCodeName}", error)
+                        // Save progress before any recovery attempt
+                        saveCurrentProgress()
+                        // Do NOT recreate the player/session: that disconnects all MediaControllers.
+                        // For local audiobooks, the player enters STATE_IDLE; the UI can re-prepare.
+                        val p = player ?: return
+                        if (p.playbackState == Player.STATE_IDLE && p.mediaItemCount > 0) {
+                            p.prepare()
+                        }
+                    }
+
+                    override fun onPositionDiscontinuity(
+                        oldPosition: Player.PositionInfo,
+                        newPosition: Player.PositionInfo,
+                        reason: Int
+                    ) {
+                        if (reason != Player.DISCONTINUITY_REASON_SEEK) return
+                        val backward = oldPosition.positionMs - newPosition.positionMs
+                        if (backward > Constants.SKIP_BACKWARD_MS * 2 && newPosition.positionMs < 5_000L) {
+                            val savedPos = oldPosition.positionMs
+                            val mediaId = player?.currentMediaItem?.mediaId ?: return
+                            serviceScope.launch(Dispatchers.IO) {
+                                try {
+                                    database.bookmarkDao().insertBookmark(
+                                        Bookmark(
+                                            mediaId = mediaId,
+                                            position = savedPos,
+                                            note = getString(R.string.bookmark_accidental_seek)
+                                        )
+                                    )
+                                } catch (e: Exception) {
+                                    Log.e("PlaybackService", "Error guardando marcador de recuperación", e)
+                                }
+                            }
+                        }
+                    }
                 })
             }
 
         val intent = Intent(this, MainActivity::class.java)
         val pendingIntent = PendingIntent.getActivity(
-            this, 0, intent, 
+            this, 0, intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
@@ -94,30 +157,45 @@ class PlaybackService : MediaSessionService() {
 
     private fun calculateRewindMs(elapsed: Long): Long {
         return when {
-            elapsed < 10_000 -> 2_000L
-            elapsed < 300_000 -> 3_000L
-            elapsed < 1_800_000 -> 5_000L
-            elapsed < 7_200_000 -> 10_000L
-            else -> 20_000L
+            elapsed < Constants.SMART_REWIND_VERY_SHORT_PAUSE_MS -> Constants.SMART_REWIND_VERY_SHORT_AMOUNT_MS
+            elapsed < Constants.SMART_REWIND_SHORT_PAUSE_MS -> Constants.SMART_REWIND_SHORT_AMOUNT_MS
+            elapsed < Constants.SMART_REWIND_MEDIUM_PAUSE_MS -> Constants.SMART_REWIND_MEDIUM_AMOUNT_MS
+            elapsed < Constants.SMART_REWIND_LONG_PAUSE_MS -> Constants.SMART_REWIND_LONG_AMOUNT_MS
+            else -> Constants.SMART_REWIND_VERY_LONG_AMOUNT_MS
         }
     }
 
     private fun restorePositionOnTransition(mediaId: String) {
-        val p = player ?: return
         serviceScope.launch(Dispatchers.IO) {
             try {
                 val progress = database.progressDao().getProgress(mediaId)
-                launch(Dispatchers.Main) {
-                    val currentPlayer = player ?: return@launch
+                withContext(Dispatchers.Main) {
+                    val currentPlayer = player ?: return@withContext
                     if (progress != null) {
                         if (Math.abs(currentPlayer.currentPosition - progress.lastPosition) > 1000) {
                             currentPlayer.seekTo(progress.lastPosition)
                         }
-                        // Restaurar la velocidad guardada (mínimo 0.1 para evitar errores)
-                        currentPlayer.setPlaybackSpeed(progress.playbackSpeed.coerceAtLeast(0.1f))
+                        // Restaurar la velocidad y pitch guardados (mínimo 0.1 para evitar errores)
+                        val speed = progress.playbackSpeed.coerceAtLeast(0.1f)
+                        val pitch = progress.pitch.coerceAtLeast(0.1f)
+                        currentPlayer.setPlaybackParameters(
+                            androidx.media3.common.PlaybackParameters(speed, pitch)
+                        )
+                        // Restaurar equalizer preset si existe
+                        if (progress.eqPresetName.isNotEmpty()) {
+                            try {
+                                val preset = EqPreset.valueOf(progress.eqPresetName)
+                                // El equalizer se restaurará via PlaybackViewModel.attachEqualizer
+                                // Guardamos en prefs para que el ViewModel lo lea
+                                getSharedPreferences("eq_prefs", MODE_PRIVATE).edit()
+                                    .putString("eq_preset", preset.name).apply()
+                            } catch (_: IllegalArgumentException) {}
+                        }
                     } else {
-                        // Libro nuevo: resetear velocidad a 1.0f por defecto
-                        currentPlayer.setPlaybackSpeed(1.0f)
+                        // Libro nuevo: resetear velocidad y pitch a 1.0f por defecto
+                        currentPlayer.setPlaybackParameters(
+                            androidx.media3.common.PlaybackParameters(1.0f, 1.0f)
+                        )
                     }
                 }
             } catch (e: Exception) {
@@ -127,26 +205,29 @@ class PlaybackService : MediaSessionService() {
     }
 
     private fun applySmartRewindOnPlay() {
+        // Cancel any in-flight rewind from a previous rapid play/pause to avoid
+        // multiple concurrent seeks, which can crash ExoPlayer with BT headphones.
+        smartRewindJob?.cancel()
         val p = player ?: return
         val currentItem = p.currentMediaItem ?: return
         val mediaId = currentItem.mediaId
-        
-        serviceScope.launch(Dispatchers.IO) {
+
+        smartRewindJob = serviceScope.launch(Dispatchers.IO) {
             try {
                 val progress = database.progressDao().getProgress(mediaId)
                 val lastPause = progress?.lastPauseTimestamp ?: 0L
-                
+
                 if (lastPause > 0) {
                     val elapsed = System.currentTimeMillis() - lastPause
                     val rewindMs = calculateRewindMs(elapsed)
-                    
+
                     progress?.let {
                         database.progressDao().saveProgress(it.copy(lastPauseTimestamp = 0L))
                     }
 
-                    if (rewindMs > 0) {
-                        launch(Dispatchers.Main) {
-                            val currentPlayer = player ?: return@launch
+                    if (rewindMs > 0 && isActive) {
+                        withContext(Dispatchers.Main) {
+                            val currentPlayer = player ?: return@withContext
                             val newPos = (currentPlayer.currentPosition - rewindMs).coerceAtLeast(0L)
                             currentPlayer.seekTo(newPos)
                         }
@@ -180,7 +261,7 @@ class PlaybackService : MediaSessionService() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ApplicationClass.EXIT) {
             stopPeriodicSave()
-            saveCurrentProgress(isPausing = true)
+            saveCurrentProgressBlocking()
             releaseResources()
             stopSelf()
         }
@@ -208,8 +289,11 @@ class PlaybackService : MediaSessionService() {
         val position = p.currentPosition
         val duration = p.duration
         val speed = p.playbackParameters.speed
+        val pitch = p.playbackParameters.pitch
         
-        if (duration <= 0 || position < 0) return
+        // Defensive: reject obviously corrupt values before they poison the DB
+        if (duration <= 0 || position < 0 || position > duration * 2) return
+        if (duration > com.raulburgosmurray.musicplayer.ui.PlaybackViewModel.MAX_REASONABLE_DURATION_MS) return
         
         val newPauseTimestamp = if (isPausing) System.currentTimeMillis() else 0L
         
@@ -224,13 +308,18 @@ class PlaybackService : MediaSessionService() {
                 val currentIsRead = currentProgress?.isRead ?: false
                 val finalIsRead = currentIsRead || shouldMarkAsRead
 
+                // Preserve per-book EQ preset if it exists; fall back to global prefs only when empty
+                val eqName = currentProgress?.eqPresetName?.takeIf { it.isNotEmpty() }
+                    ?: getSharedPreferences("eq_prefs", MODE_PRIVATE).getString("eq_preset", "") ?: ""
                 database.progressDao().saveProgress(
                     AudiobookProgress(
-                        mediaId = currentMediaItem.mediaId, 
-                        lastPosition = position, 
+                        mediaId = currentMediaItem.mediaId,
+                        lastPosition = position,
                         duration = duration,
                         lastPauseTimestamp = pauseToSave,
                         playbackSpeed = speed,
+                        pitch = pitch,
+                        eqPresetName = eqName,
                         isRead = finalIsRead
                     )
                 )
@@ -246,8 +335,50 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
+    /**
+     * Saves progress synchronously using runBlocking to guarantee completion before the
+     * service process is killed. Only called during shutdown paths (EXIT, onTaskRemoved,
+     * onDestroy). Normal playback saves use the async saveCurrentProgress().
+     */
+    private fun saveCurrentProgressBlocking() {
+        val p = player ?: return
+        if (p.playbackState == Player.STATE_IDLE) return
+        val currentMediaItem = p.currentMediaItem ?: return
+        val position = p.currentPosition
+        val duration = p.duration
+        val speed = p.playbackParameters.speed
+        val pitch = p.playbackParameters.pitch
+        if (duration <= 0 || position < 0 || position > duration * 2) return
+        if (duration > com.raulburgosmurray.musicplayer.ui.PlaybackViewModel.MAX_REASONABLE_DURATION_MS) return
+
+        runBlocking(Dispatchers.IO) {
+            try {
+                val existing = database.progressDao().getProgress(currentMediaItem.mediaId)
+                val progressPercent = position.toFloat() / duration.toFloat()
+                // Preserve per-book EQ preset if it exists; fall back to global prefs only when empty
+                val eqName = existing?.eqPresetName?.takeIf { it.isNotEmpty() }
+                    ?: getSharedPreferences("eq_prefs", MODE_PRIVATE).getString("eq_preset", "") ?: ""
+                database.progressDao().saveProgress(
+                    AudiobookProgress(
+                        mediaId = currentMediaItem.mediaId,
+                        lastPosition = position,
+                        duration = duration,
+                        lastPauseTimestamp = System.currentTimeMillis(),
+                        playbackSpeed = speed,
+                        pitch = pitch,
+                        eqPresetName = eqName,
+                        isRead = (existing?.isRead ?: false) || progressPercent >= 0.99f
+                    )
+                )
+            } catch (e: Exception) {
+                Log.e("PlaybackService", "Error guardando progreso al cerrar", e)
+            }
+        }
+    }
+
     override fun onTaskRemoved(rootIntent: Intent?) {
-        saveCurrentProgress(isPausing = true)
+        stopPeriodicSave()
+        saveCurrentProgressBlocking()
         releaseResources()
         stopSelf()
         super.onTaskRemoved(rootIntent)
@@ -255,7 +386,7 @@ class PlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         stopPeriodicSave()
-        saveCurrentProgress(isPausing = true)
+        saveCurrentProgressBlocking()
         releaseResources()
         super.onDestroy()
     }

@@ -4,7 +4,9 @@ import android.content.res.Configuration
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -20,7 +22,8 @@ import com.raulburgosmurray.musicplayer.R
 @Composable
 fun OnboardingScreen(
     onSelectFolder: () -> Unit,
-    onScanAllMemory: () -> Unit
+    onScanAllMemory: () -> Unit,
+    onTransferByQr: (() -> Unit)? = null
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -51,16 +54,18 @@ fun OnboardingScreen(
                     color = MaterialTheme.colorScheme.secondary
                 )
                 Spacer(Modifier.height(32.dp))
-                Button(
-                    onClick = onScanAllMemory,
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    shape = MaterialTheme.shapes.medium
-                ) {
-                    Icon(Icons.Default.Storage, null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.scan_all_memory), fontSize = 18.sp)
+                if (com.raulburgosmurray.musicplayer.FeatureFlags.SCAN_ALL_MEMORY) {
+                    Button(
+                        onClick = onScanAllMemory,
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        shape = MaterialTheme.shapes.medium
+                    ) {
+                        Icon(Icons.Default.Storage, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.scan_all_memory), fontSize = 18.sp)
+                    }
+                    Spacer(Modifier.height(12.dp))
                 }
-                Spacer(Modifier.height(12.dp))
                 OutlinedButton(
                     onClick = onSelectFolder,
                     modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -69,6 +74,24 @@ fun OnboardingScreen(
                     Icon(Icons.Default.FolderOpen, null)
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.select_folder), fontSize = 18.sp)
+                }
+                if (onTransferByQr != null) {
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedButton(
+                        onClick = onTransferByQr,
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        shape = MaterialTheme.shapes.medium
+                    ) {
+                        Icon(Icons.Default.Wifi, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.transfer_by_qr), fontSize = 18.sp)
+                    }
+                    Text(
+                        text = stringResource(R.string.transfer_by_qr_desc),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
                 }
             }
         }
@@ -99,16 +122,18 @@ fun OnboardingScreen(
                 color = MaterialTheme.colorScheme.secondary
             )
             Spacer(Modifier.height(48.dp))
-            Button(
-                onClick = onScanAllMemory,
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                shape = MaterialTheme.shapes.medium
-            ) {
-                Icon(Icons.Default.Storage, null)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.scan_all_memory), fontSize = 18.sp)
+            if (com.raulburgosmurray.musicplayer.FeatureFlags.SCAN_ALL_MEMORY) {
+                Button(
+                    onClick = onScanAllMemory,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = MaterialTheme.shapes.medium
+                ) {
+                    Icon(Icons.Default.Storage, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.scan_all_memory), fontSize = 18.sp)
+                }
+                Spacer(Modifier.height(12.dp))
             }
-            Spacer(Modifier.height(12.dp))
             OutlinedButton(
                 onClick = onSelectFolder,
                 modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -117,6 +142,24 @@ fun OnboardingScreen(
                 Icon(Icons.Default.FolderOpen, null)
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.select_folder), fontSize = 18.sp)
+            }
+            if (onTransferByQr != null) {
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = onTransferByQr,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = MaterialTheme.shapes.medium
+                ) {
+                    Icon(Icons.Default.Wifi, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.transfer_by_qr), fontSize = 18.sp)
+                }
+                Text(
+                    text = stringResource(R.string.transfer_by_qr_desc),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
             }
             Spacer(Modifier.height(16.dp))
             Text(

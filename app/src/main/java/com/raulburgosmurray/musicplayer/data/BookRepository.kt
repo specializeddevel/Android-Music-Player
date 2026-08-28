@@ -7,6 +7,8 @@ class BookRepository(private val cachedBookDao: CachedBookDao) {
 
     fun getAllBooks(): Flow<List<CachedBook>> = cachedBookDao.getAllBooks()
 
+    suspend fun getBookCount(): Int = cachedBookDao.getBookCount()
+
     suspend fun getBookById(id: String): CachedBook? = cachedBookDao.getBookById(id)
 
     suspend fun getSampleBooks(): List<SampleBook> = cachedBookDao.getSampleBooks()
@@ -14,4 +16,8 @@ class BookRepository(private val cachedBookDao: CachedBookDao) {
     suspend fun saveBooks(books: List<CachedBook>) = cachedBookDao.upsertAll(books)
 
     suspend fun clearCache() = cachedBookDao.clearCache()
+
+    suspend fun updateDescription(id: String, description: String) = cachedBookDao.updateDescription(id, description)
+
+    suspend fun deleteBookById(id: String) = cachedBookDao.deleteBookById(id)
 }

@@ -20,6 +20,11 @@ class MusicScanner(
 ) {
     private val extensions = setOf("mp3", "m4a", "m4b", "aac", "wav", "ogg", "flac")
 
+    companion object {
+        private const val TAG = "MusicScanner"
+        private const val MAX_SCAN_DEPTH = 20
+    }
+
     /**
      * Check if the file path belongs to a messaging/voice recording app that should be excluded
      */
@@ -75,6 +80,10 @@ class MusicScanner(
                                 freshMetadata.copy(mediaId = id)
                             }
 
+                            val description = if (DescriptionExtractor.isSupported()) {
+                                DescriptionExtractor.extract(context, id)
+                            } else null
+
                             val music = Music(
                                 id = id,
                                 title = finalMetadata.title,
@@ -84,7 +93,8 @@ class MusicScanner(
                                 path = id,
                                 artUri = finalMetadata.artUri,
                                 fileSize = fileSize,
-                                fileName = finalMetadata.fileName
+                                fileName = finalMetadata.fileName,
+                                description = description
                             )
                             musicList[id] = music
                             metadataJsonHelper.saveMetadata(context, finalMetadata)
@@ -156,6 +166,10 @@ class MusicScanner(
                         freshMetadata.copy(mediaId = id)
                     }
 
+                    val description = if (DescriptionExtractor.isSupported()) {
+                        DescriptionExtractor.extractFromLocalFile(filePath)
+                    } else null
+
                     val music = Music(
                         id = id,
                         title = finalMetadata.title,
@@ -165,7 +179,8 @@ class MusicScanner(
                         path = id,
                         artUri = finalMetadata.artUri,
                         fileSize = fileSize,
-                        fileName = cursor.getString(6) ?: ""
+                        fileName = cursor.getString(6) ?: "",
+                        description = description
                     )
                     tempList.add(music)
                     metadataJsonHelper.saveMetadata(context, finalMetadata)
@@ -175,18 +190,91 @@ class MusicScanner(
         tempList
     }
 
+    // Iterative traversal with an explicit stack to avoid stack overflow on deep directory trees.
+    // MAX_SCAN_DEPTH prevents runaway traversal in pathological symlink/mount structures.
     private fun collectAudioFiles(directory: DocumentFile): List<DocumentFile> {
         val files = mutableListOf<DocumentFile>()
-        directory.listFiles()?.forEach { file ->
-            if (file.isDirectory) {
-                files.addAll(collectAudioFiles(file))
-            } else {
-                val name = file.name?.lowercase() ?: ""
-                if (extensions.any { name.endsWith(".$it") }) {
-                    files.add(file)
+        val stack = ArrayDeque<Pair<DocumentFile, Int>>()
+        stack.addLast(directory to 0)
+
+        while (stack.isNotEmpty()) {
+            val (current, depth) = stack.removeLast()
+            if (depth > MAX_SCAN_DEPTH) continue
+
+            val children = current.listFiles()
+            if (children == null) {
+                Log.w(TAG, "listFiles() returned null for '${current.name}'")
+                continue
+            }
+
+            for (file in children) {
+                if (file.isDirectory) {
+                    stack.addLast(file to depth + 1)
+                } else {
+                    val name = file.name?.lowercase() ?: ""
+                    if (extensions.any { name.endsWith(".$it") }) {
+                        files.add(file)
+                    }
                 }
             }
         }
         return files
+    }
+
+    /**
+     * Quick check for MediaStore: returns a set of content-URI strings for all
+     * audio files that pass the duration/size/filename filters. Much faster than
+     * a full scan because it does NOT extract metadata.
+     */
+    suspend fun quickCheckMediaStore(context: Context): Set<String> = withContext(Dispatchers.IO) {
+        val ids = mutableSetOf<String>()
+        val collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+        } else {
+            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+        }
+
+        val proj = arrayOf(
+            MediaStore.Audio.Media._ID,
+            MediaStore.Audio.Media.SIZE,
+            MediaStore.Audio.Media.DATA
+        )
+
+        context.contentResolver.query(
+            collection,
+            proj,
+            "${MediaStore.Audio.Media.DURATION} > ${Constants.MIN_AUDIO_DURATION_MS}",
+            null,
+            null
+        )?.use { cursor ->
+            while (cursor.moveToNext()) {
+                val idLong = cursor.getLong(0)
+                val contentUri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, idLong)
+                val fileSize = cursor.getLong(1)
+                val filePath = cursor.getString(2) ?: ""
+                if (isExcludedPath(filePath)) continue
+                if (!isLikelyAudiobook(fileSize, 0)) continue
+                ids.add(contentUri.toString())
+            }
+        }
+        ids
+    }
+
+    /**
+     * Quick check for SAF directories: returns a set of URI strings for all
+     * audio files that pass the size/filename filters. Much faster than a full
+     * scan because it does NOT extract metadata.
+     */
+    suspend fun quickCheckDirectory(context: Context, directory: DocumentFile): Set<String> = withContext(Dispatchers.IO) {
+        val ids = mutableSetOf<String>()
+        val allFiles = collectAudioFiles(directory)
+        for (file in allFiles) {
+            val id = file.uri.toString()
+            val fileName = file.name ?: ""
+            if (isExcludedPath(fileName)) continue
+            if (!isLikelyAudiobook(file.length(), 0)) continue
+            ids.add(id)
+        }
+        ids
     }
 }

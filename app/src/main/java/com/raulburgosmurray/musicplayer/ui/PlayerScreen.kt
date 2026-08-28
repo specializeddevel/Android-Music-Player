@@ -5,12 +5,15 @@ import android.content.res.Configuration
 import android.util.Base64
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -25,6 +28,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
@@ -35,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalConfiguration
@@ -51,19 +56,12 @@ import coil.request.ImageRequest
 import com.raulburgosmurray.musicplayer.Music
 import com.raulburgosmurray.musicplayer.R
 import com.raulburgosmurray.musicplayer.Constants
+import com.raulburgosmurray.musicplayer.EqPreset
 import com.raulburgosmurray.musicplayer.encodeBookId
 import com.raulburgosmurray.musicplayer.ui.PlaybackUiState
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
-private fun capitalizeWords(text: String): String {
-    return text
-        .replace(Regex("\\.[a-zA-Z0-9]{2,4}$"), "")
-        .replace("_", " ")
-        .replace("-", " ")
-        .split(" ")
-        .filter { it.isNotEmpty() }
-        .joinToString(" ") { word -> word.lowercase().replaceFirstChar { it.titlecase() } }
-}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
@@ -79,10 +77,8 @@ fun PlayerScreen(
     val state by viewModel.uiState.collectAsState()
     val configuration = LocalConfiguration.current
     
-    // DETECCION DE TABLETA: Ancho mínimo de 600dp (~7 pulgadas)
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val isTablet = configuration.smallestScreenWidthDp >= 600
-    val shouldUseLandscapeLayout = isLandscape && isTablet
+    val shouldUseLandscapeLayout = isLandscape
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -101,8 +97,12 @@ fun PlayerScreen(
     var showBookmarkSheet by remember { mutableStateOf(false) }
     var showAddBookmarkDialog by remember { mutableStateOf(false) }
     var bookmarkPositionAtCreation by remember { mutableStateOf(0L) }
+    val eqSheetState = rememberModalBottomSheetState()
+    var showEqSheet by remember { mutableStateOf(false) }
 
     var showShareFileConfirmation by remember { mutableStateOf(false) }
+    var showSeekToTimeDialog by remember { mutableStateOf(false) }
+    var showSkipByAmountDialog by remember { mutableStateOf(false) }
     var isLocked by rememberSaveable { mutableStateOf(false) }
 
     Scaffold { padding ->
@@ -115,6 +115,8 @@ fun PlayerScreen(
                     onShowQueue = { showQueueSheet = true }, onShowDetails = { showDetailsSheet = true },
                     onShowShare = { showShareFileConfirmation = true }, onShowSpeed = { showSpeedSheet = true },
                     onShowTimer = { showTimerSheet = true }, onShowBookmark = { showBookmarkSheet = true },
+                    onShowEqualizer = { showEqSheet = true }, onShowSeekToTime = { showSeekToTimeDialog = true },
+                    onShowSkipByAmount = { showSkipByAmountDialog = true },
                     onLock = { isLocked = true }
                 )
             } else {
@@ -125,6 +127,8 @@ fun PlayerScreen(
                     onShowQueue = { showQueueSheet = true }, onShowDetails = { showDetailsSheet = true },
                     onShowShare = { showShareFileConfirmation = true }, onShowSpeed = { showSpeedSheet = true },
                     onShowTimer = { showTimerSheet = true }, onShowBookmark = { showBookmarkSheet = true },
+                    onShowEqualizer = { showEqSheet = true }, onShowSeekToTime = { showSeekToTimeDialog = true },
+                    onShowSkipByAmount = { showSkipByAmountDialog = true },
                     onLock = { isLocked = true }
                 )
             }
@@ -169,93 +173,224 @@ fun PlayerScreen(
         }
     }
 
-    if (showSpeedSheet) { ModalBottomSheet(onDismissRequest = { showSpeedSheet = false }, sheetState = speedSheetState) { SpeedSelectorContent(currentSpeed = state.playbackSpeed, onSpeedSelected = { viewModel.setPlaybackSpeed(it); showSpeedSheet = false }) } }
+    if (showSpeedSheet) { ModalBottomSheet(onDismissRequest = { showSpeedSheet = false }, sheetState = speedSheetState) { SpeedSelectorContent(currentSpeed = state.playbackSpeed, currentPitch = state.pitch, onSpeedSelected = { viewModel.setPlaybackSpeed(it); showSpeedSheet = false }, onPitchSelected = { viewModel.setPitch(it) }) } }
     if (showTimerSheet) { ModalBottomSheet(onDismissRequest = { showTimerSheet = false }, sheetState = timerSheetState) { TimerSelectorContent(activeTimerMinutes = state.sleepTimerMinutes, onTimerSelected = { viewModel.startSleepTimer(it); showTimerSheet = false }, onCancelTimer = { viewModel.cancelSleepTimer(); showTimerSheet = false }) } }
     if (showHistorySheet) { ModalBottomSheet(onDismissRequest = { showHistorySheet = false }, sheetState = historySheetState) { HistorySelectorContent(history = state.history, onActionSelected = { viewModel.seekTo(it.audioPositionMs); showHistorySheet = false }) } }
     if (showQueueSheet) { ModalBottomSheet(onDismissRequest = { showQueueSheet = false }, sheetState = queueSheetState) { QueueSelectorContent(playlist = state.playlist, currentIndex = state.currentIndex, onItemClicked = { index -> viewModel.skipToQueueItem(index); showQueueSheet = false }, onRemoveItem = { viewModel.removeItemFromQueue(it) }, onShowDetails = { showDetailsSheet = true }) } }
     if (showDetailsSheet && state.currentMusicDetails != null) { ModalBottomSheet(onDismissRequest = { showDetailsSheet = false }, sheetState = detailsSheetState) { BookDetailsContent(book = state.currentMusicDetails!!, allBooks = emptyList(), onEditMetadata = { bookId -> navController.navigate("metadata_editor?bookId=${encodeBookId(bookId)}") }) } }
     if (showBookmarkSheet) { ModalBottomSheet(onDismissRequest = { showBookmarkSheet = false }, sheetState = bookmarkSheetState) { BookmarkSelectorContent(bookmarks = state.bookmarks, onBookmarkSelected = { viewModel.seekTo(it.position); showBookmarkSheet = false }, onDeleteBookmark = { id -> viewModel.deleteBookmark(id) }, onAddBookmark = { bookmarkPositionAtCreation = state.currentPosition; showAddBookmarkDialog = true }) } }
+    if (showEqSheet) { ModalBottomSheet(onDismissRequest = { showEqSheet = false }, sheetState = eqSheetState) { EqualizerSelectorContent(currentPreset = state.eqPreset, isAvailable = state.eqAvailable, onPresetSelected = { viewModel.setEqPreset(it); showEqSheet = false }) } }
     if (showAddBookmarkDialog) { AddBookmarkDialog(currentPosition = bookmarkPositionAtCreation, onDismiss = { showAddBookmarkDialog = false }, onConfirm = { note -> viewModel.addBookmark(note, bookmarkPositionAtCreation); showAddBookmarkDialog = false }) }
+    if (showSeekToTimeDialog) { SeekToTimeDialog(duration = state.duration, onDismiss = { showSeekToTimeDialog = false }, onConfirm = { pos -> viewModel.seekTo(pos); showSeekToTimeDialog = false }) }
+    if (showSkipByAmountDialog) { SkipByAmountDialog(currentPosition = state.currentPosition, duration = state.duration, onDismiss = { showSkipByAmountDialog = false }, onConfirm = { amountMs, isForward -> viewModel.skipByAmount(amountMs, isForward); showSkipByAmountDialog = false }) }
     if (showShareFileConfirmation) {
         AlertDialog(onDismissRequest = { showShareFileConfirmation = false }, title = { Text(stringResource(R.string.share_file_warning_title)) }, text = { Text(stringResource(R.string.share_file_warning_message)) }, confirmButton = { Button(onClick = { showShareFileConfirmation = false; viewModel.shareFile(context) }) { Text(stringResource(R.string.confirm)) } }, dismissButton = { TextButton(onClick = { showShareFileConfirmation = false }) { Text(stringResource(R.string.cancel)) } })
     }
 }
 
-@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit, onShowBookmark: () -> Unit, onLock: () -> Unit) {
-    val currentItem = state.currentMediaItem
-    val context = LocalContext.current
-    val mediaId = currentItem?.mediaId
-    val metadata = remember(mediaId) { mediaId?.let { com.raulburgosmurray.musicplayer.data.MetadataJsonHelper.loadMetadata(context, it) } }
-    val displayTitle = metadata?.title?.takeIf { it.isNotBlank() } ?: currentItem?.mediaMetadata?.title?.toString() ?: "A"
-    var pressedArea by remember { mutableStateOf<CoverTapArea?>(null) }
-    var showMoreMenu by remember { mutableStateOf(false) }
-    
-    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp).verticalScroll(rememberScrollState()).statusBarsPadding().navigationBarsPadding()) {
-        Spacer(Modifier.height(16.dp))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back_btn)) }
-            Row {
-                IconButton(onClick = { viewModel.toggleFavorite() }) { Icon(if (state.isFavorite) Icons.Filled.Favorite else Icons.Default.Favorite, contentDescription = stringResource(R.string.favourites_btn), tint = if (state.isFavorite) Color.Red else LocalContentColor.current) }
-                IconButton(onClick = onShowHistory) { Icon(Icons.Default.History, null) }
-                IconButton(onClick = onShowQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null) }
-                IconButton(onClick = onShowBookmark) { Icon(Icons.Default.Bookmark, null) }
-                IconButton(onClick = {
-                    showMoreMenu = true
-                }) { Icon(Icons.Default.MoreVert, null) }
-                DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
-                    DropdownMenuItem(text = { Text(stringResource(R.string.book_details)) }, leadingIcon = { Icon(Icons.Default.Info, null) }, onClick = { showMoreMenu = false; onShowDetails() })
-                    DropdownMenuItem(text = { Text(stringResource(R.string.share_btn)) }, leadingIcon = { Icon(Icons.Default.Share, null) }, onClick = { showMoreMenu = false; onShowShare() })
-                    if (com.raulburgosmurray.musicplayer.FeatureFlags.P2P_TRANSFER) {
-                        DropdownMenuItem(text = { Text(stringResource(R.string.send)) }, leadingIcon = { Icon(Icons.Default.Wifi, null) }, onClick = { showMoreMenu = false; currentItem?.mediaId?.let { onTransferClick(it) } })
-                    }
-                }
+fun SynopsisAccordion(description: String) {
+    var expanded by remember { mutableStateOf(false) }
+    val chevronRotation by animateFloatAsState(targetValue = if (expanded) 180f else 0f, label = "chevron")
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.animateContentSize()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded }
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    Icons.Default.Subject,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+                Text(
+                    text = stringResource(R.string.synopsis_label),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
+                Icon(
+                    Icons.Default.ExpandMore,
+                    contentDescription = if (expanded) stringResource(R.string.collapse) else stringResource(R.string.expand),
+                    modifier = Modifier
+                        .size(20.dp)
+                        .graphicsLayer { rotationZ = chevronRotation },
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            AnimatedVisibility(visible = expanded) {
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
+                )
             }
         }
-        Spacer(Modifier.height(24.dp))
-        Box(modifier = Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(32.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
-            with(sharedTransitionScope) {
-                var imageLoadError by remember { mutableStateOf(false) }
-                val artworkUri = currentItem?.mediaMetadata?.artworkUri?.toString()
-                if (!artworkUri.isNullOrBlank() && !imageLoadError) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current).data(artworkUri).crossfade(true).listener(onError = { _, _ -> imageLoadError = true }).build(),
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${from}_cover_${currentItem?.mediaId}"), animatedVisibilityScope = animatedVisibilityScope),
-                        contentScale = ContentScale.Crop
-                    )
-                }
-                if (artworkUri.isNullOrBlank() || imageLoadError) {
-                    Box(modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${from}_cover_${currentItem?.mediaId}"), animatedVisibilityScope = animatedVisibilityScope)) {
-                        BookPlaceholder(title = displayTitle, modifier = Modifier.fillMaxSize())
-                    }
-                }
-            }
-            // Touch controls overlay
-            CoverTouchControls(
-                modifier = Modifier.fillMaxSize(),
-                pressedArea = pressedArea,
-                onAreaPressed = { pressedArea = it },
-                onAreaReleased = { pressedArea = null },
-                onLeftTap = { viewModel.skipBackward(Constants.SKIP_BACKWARD_MS) },
-                onCenterTap = { viewModel.togglePlayPause() },
-                onRightTap = { viewModel.skipForward(Constants.SKIP_BACKWARD_MS) }
-            )
-        }
-        Spacer(Modifier.height(32.dp))
-        PlayerControls(state, viewModel, onShowSpeed, onShowTimer)
-        Spacer(Modifier.height(16.dp))
     }
 }
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun LandscapePlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit, onShowBookmark: () -> Unit, onLock: () -> Unit) {
+fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit, onShowBookmark: () -> Unit, onShowEqualizer: () -> Unit, onShowSeekToTime: () -> Unit, onShowSkipByAmount: () -> Unit, onLock: () -> Unit) {
     val currentItem = state.currentMediaItem
     val context = LocalContext.current
     val mediaId = currentItem?.mediaId
-    val metadata = remember(mediaId) { mediaId?.let { com.raulburgosmurray.musicplayer.data.MetadataJsonHelper.loadMetadata(context, it) } }
+    val metadata by produceState<com.raulburgosmurray.musicplayer.data.AudioMetadata?>(initialValue = null, key1 = mediaId) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            mediaId?.let { com.raulburgosmurray.musicplayer.data.MetadataJsonHelper.loadMetadata(context, it) }
+        }
+    }
+    val displayTitle = metadata?.title?.takeIf { it.isNotBlank() } ?: currentItem?.mediaMetadata?.title?.toString() ?: "A"
+    var pressedArea by remember { mutableStateOf<CoverTapArea?>(null) }
+    var showMoreMenu by remember { mutableStateOf(false) }
+
+    BoxWithConstraints(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp).statusBarsPadding().navigationBarsPadding()
+    ) {
+        val maxCoverHeight = (maxHeight * 0.45f).coerceAtMost(maxWidth)
+        val scrollState = rememberScrollState()
+        val canScrollForward by remember { derivedStateOf { scrollState.canScrollForward } }
+        var showScrollHint by remember { mutableStateOf(true) }
+
+        LaunchedEffect(canScrollForward) {
+            if (canScrollForward) {
+                showScrollHint = true
+                delay(3000)
+                showScrollHint = false
+            }
+        }
+
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(modifier = Modifier.fillMaxSize().verticalScroll(scrollState)) {
+                Spacer(Modifier.height(16.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back_btn)) }
+                    Row {
+                        IconButton(onClick = { viewModel.toggleFavorite() }) { Icon(if (state.isFavorite) Icons.Filled.Favorite else Icons.Default.Favorite, contentDescription = stringResource(R.string.favourites_btn), tint = if (state.isFavorite) Color.Red else LocalContentColor.current) }
+                        IconButton(onClick = onShowQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, contentDescription = stringResource(R.string.playback_queue_title)) }
+                        IconButton(onClick = onShowEqualizer) { Icon(Icons.Default.Equalizer, contentDescription = stringResource(R.string.equalizer_title), tint = if (state.eqPreset != EqPreset.FLAT) Color.Red else LocalContentColor.current) }
+                        IconButton(onClick = onLock) { Icon(Icons.Default.Lock, contentDescription = stringResource(R.string.lock_screen)) }
+                        Box {
+                            IconButton(onClick = { showMoreMenu = true }) { Icon(Icons.Default.MoreVert, null) }
+                            DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
+                                DropdownMenuItem(text = { Text(stringResource(R.string.manual_bookmarks)) }, leadingIcon = { Icon(Icons.Default.Bookmark, null) }, onClick = { showMoreMenu = false; onShowBookmark() })
+                                DropdownMenuItem(text = { Text(stringResource(R.string.activity_history_title)) }, leadingIcon = { Icon(Icons.Default.History, null) }, onClick = { showMoreMenu = false; onShowHistory() })
+                                if (state.canReturnToTimerStart) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.return_to_timer_start)) },
+                                        leadingIcon = { Icon(Icons.Default.Restore, null) },
+                                        onClick = { showMoreMenu = false; viewModel.returnToTimerStart() }
+                                    )
+                                }
+                                DropdownMenuItem(text = { Text(stringResource(R.string.go_to_time)) }, leadingIcon = { Icon(Icons.Default.AccessTime, null) }, onClick = { showMoreMenu = false; onShowSeekToTime() })
+                                DropdownMenuItem(text = { Text(stringResource(R.string.skip_by_amount)) }, leadingIcon = { Icon(Icons.Default.SkipNext, null) }, onClick = { showMoreMenu = false; onShowSkipByAmount() })
+                                DropdownMenuItem(text = { Text(stringResource(R.string.book_details)) }, leadingIcon = { Icon(Icons.Default.Info, null) }, onClick = { showMoreMenu = false; onShowDetails() })
+                                DropdownMenuItem(text = { Text(stringResource(R.string.share_btn)) }, leadingIcon = { Icon(Icons.Default.Share, null) }, onClick = { showMoreMenu = false; onShowShare() })
+                                if (com.raulburgosmurray.musicplayer.FeatureFlags.P2P_TRANSFER) {
+                                    DropdownMenuItem(text = { Text(stringResource(R.string.send)) }, leadingIcon = { Icon(Icons.Default.Wifi, null) }, onClick = { showMoreMenu = false; currentItem?.mediaId?.let { onTransferClick(it) } })
+                                }
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(24.dp))
+                Box(modifier = Modifier.fillMaxWidth().heightIn(max = maxCoverHeight)) {
+                    Box(modifier = Modifier.fillMaxHeight().aspectRatio(1f).align(Alignment.Center).clip(RoundedCornerShape(32.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
+                        with(sharedTransitionScope) {
+                            var imageLoadError by remember { mutableStateOf(false) }
+                            val artworkUri = currentItem?.mediaMetadata?.artworkUri?.toString()
+                            if (!artworkUri.isNullOrBlank() && !imageLoadError) {
+                                AsyncImage(
+                                    model = ImageRequest.Builder(LocalContext.current).data(artworkUri).crossfade(true).listener(onError = { _, _ -> imageLoadError = true }).build(),
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${from}_cover_${currentItem?.mediaId}"), animatedVisibilityScope = animatedVisibilityScope),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                            if (artworkUri.isNullOrBlank() || imageLoadError) {
+                                Box(modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${from}_cover_${currentItem?.mediaId}"), animatedVisibilityScope = animatedVisibilityScope)) {
+                                    BookPlaceholder(title = displayTitle, modifier = Modifier.fillMaxSize())
+                                }
+                            }
+                        }
+                        // Touch controls overlay
+                        CoverTouchControls(
+                            modifier = Modifier.fillMaxSize(),
+                            pressedArea = pressedArea,
+                            onAreaPressed = { pressedArea = it },
+                            onAreaReleased = { pressedArea = null },
+                            onLeftTap = { viewModel.skipBackward(Constants.SKIP_BACKWARD_MS) },
+                            onCenterTap = { viewModel.togglePlayPause() },
+                            onRightTap = { viewModel.skipForward(Constants.SKIP_FORWARD_MS) }
+                        )
+                    }
+                }
+                Spacer(Modifier.height(32.dp))
+                PlayerControls(state, viewModel, onShowSpeed, onShowTimer)
+                val synopsis = state.currentMusicDetails?.description
+                if (!synopsis.isNullOrBlank()) {
+                    Spacer(Modifier.height(16.dp))
+                    SynopsisAccordion(description = synopsis)
+                }
+                Spacer(Modifier.height(16.dp))
+            }
+
+            // Scroll hint: gradient + arrow when content overflows
+            AnimatedVisibility(
+                visible = canScrollForward && showScrollHint,
+                modifier = Modifier.align(Alignment.BottomCenter),
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(64.dp)
+                        .background(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    MaterialTheme.colorScheme.background.copy(alpha = 0.7f),
+                                    MaterialTheme.colorScheme.background.copy(alpha = 0.95f)
+                                )
+                            )
+                        ),
+                    contentAlignment = Alignment.BottomCenter
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = stringResource(R.string.scroll_down_hint),
+                        modifier = Modifier.padding(bottom = 8.dp),
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalSharedTransitionApi::class, ExperimentalLayoutApi::class)
+@Composable
+fun LandscapePlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit, onShowBookmark: () -> Unit, onShowEqualizer: () -> Unit, onShowSeekToTime: () -> Unit, onShowSkipByAmount: () -> Unit, onLock: () -> Unit) {
+    val currentItem = state.currentMediaItem
+    val context = LocalContext.current
+    val mediaId = currentItem?.mediaId
+    val metadata by produceState<com.raulburgosmurray.musicplayer.data.AudioMetadata?>(initialValue = null, key1 = mediaId) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            mediaId?.let { com.raulburgosmurray.musicplayer.data.MetadataJsonHelper.loadMetadata(context, it) }
+        }
+    }
     val displayTitle = metadata?.title?.takeIf { it.isNotBlank() } ?: currentItem?.mediaMetadata?.title?.toString() ?: "A"
     var pressedArea by remember { mutableStateOf<CoverTapArea?>(null) }
     
@@ -286,25 +421,50 @@ fun LandscapePlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel,
                 onAreaReleased = { pressedArea = null },
                 onLeftTap = { viewModel.skipBackward(Constants.SKIP_BACKWARD_MS) },
                 onCenterTap = { viewModel.togglePlayPause() },
-                onRightTap = { viewModel.skipForward(Constants.SKIP_BACKWARD_MS) }
+                onRightTap = { viewModel.skipForward(Constants.SKIP_FORWARD_MS) }
             )
             IconButton(onClick = onBack, modifier = Modifier.padding(8.dp).background(Color.Black.copy(alpha = 0.3f), CircleShape)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) }
         }
         Spacer(Modifier.width(24.dp))
         Column(modifier = Modifier.weight(1.2f).fillMaxHeight().verticalScroll(rememberScrollState())) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 IconButton(onClick = { viewModel.toggleFavorite() }) { Icon(if (state.isFavorite) Icons.Filled.Favorite else Icons.Default.Favorite, contentDescription = stringResource(R.string.favourites_btn), tint = if (state.isFavorite) Color.Red else LocalContentColor.current) }
-                IconButton(onClick = onShowHistory) { Icon(Icons.Default.History, null) }
-                IconButton(onClick = onShowQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null) }
-                IconButton(onClick = onShowBookmark) { Icon(Icons.Default.Bookmark, null) }
-                IconButton(onClick = onLock) { Icon(Icons.Default.Lock, null) }
-                IconButton(onClick = onShowDetails) { Icon(Icons.Default.Info, null) }
-                IconButton(onClick = onShowShare) { Icon(Icons.Default.Share, null) }
-                if (com.raulburgosmurray.musicplayer.FeatureFlags.P2P_TRANSFER) {
-                    IconButton(onClick = { currentItem?.mediaId?.let { onTransferClick(it) } }) { Icon(Icons.Default.Wifi, null) }
+                IconButton(onClick = onShowQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, contentDescription = stringResource(R.string.playback_queue_title)) }
+                IconButton(onClick = onShowEqualizer) { Icon(Icons.Default.Equalizer, contentDescription = stringResource(R.string.equalizer_title), tint = if (state.eqPreset != EqPreset.FLAT) Color.Red else LocalContentColor.current) }
+                IconButton(onClick = onLock) { Icon(Icons.Default.Lock, contentDescription = stringResource(R.string.lock_screen)) }
+                Box {
+                    var showMoreMenuLandscape by remember { mutableStateOf(false) }
+                    IconButton(onClick = { showMoreMenuLandscape = true }) { Icon(Icons.Default.MoreVert, contentDescription = null) }
+                    DropdownMenu(expanded = showMoreMenuLandscape, onDismissRequest = { showMoreMenuLandscape = false }) {
+                        DropdownMenuItem(text = { Text(stringResource(R.string.manual_bookmarks)) }, leadingIcon = { Icon(Icons.Default.Bookmark, null) }, onClick = { showMoreMenuLandscape = false; onShowBookmark() })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.activity_history_title)) }, leadingIcon = { Icon(Icons.Default.History, null) }, onClick = { showMoreMenuLandscape = false; onShowHistory() })
+                        if (state.canReturnToTimerStart) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.return_to_timer_start)) },
+                                leadingIcon = { Icon(Icons.Default.Restore, null) },
+                                onClick = { showMoreMenuLandscape = false; viewModel.returnToTimerStart() }
+                            )
+                        }
+                        DropdownMenuItem(text = { Text(stringResource(R.string.go_to_time)) }, leadingIcon = { Icon(Icons.Default.AccessTime, null) }, onClick = { showMoreMenuLandscape = false; onShowSeekToTime() })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.skip_by_amount)) }, leadingIcon = { Icon(Icons.Default.SkipNext, null) }, onClick = { showMoreMenuLandscape = false; onShowSkipByAmount() })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.book_details)) }, leadingIcon = { Icon(Icons.Default.Info, null) }, onClick = { showMoreMenuLandscape = false; onShowDetails() })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.share_btn)) }, leadingIcon = { Icon(Icons.Default.Share, null) }, onClick = { showMoreMenuLandscape = false; onShowShare() })
+                        if (com.raulburgosmurray.musicplayer.FeatureFlags.P2P_TRANSFER) {
+                            DropdownMenuItem(text = { Text(stringResource(R.string.send)) }, leadingIcon = { Icon(Icons.Default.Wifi, null) }, onClick = { showMoreMenuLandscape = false; currentItem?.mediaId?.let { onTransferClick(it) } })
+                        }
+                    }
                 }
             }
             PlayerControls(state, viewModel, onShowSpeed, onShowTimer)
+            val synopsis = state.currentMusicDetails?.description
+            if (!synopsis.isNullOrBlank()) {
+                Spacer(Modifier.height(16.dp))
+                SynopsisAccordion(description = synopsis)
+            }
         }
     }
 }
@@ -314,10 +474,14 @@ fun PlayerControls(state: PlaybackUiState, viewModel: PlaybackViewModel, onShowS
     val currentItem = state.currentMediaItem
     val context = LocalContext.current
     val mediaId = currentItem?.mediaId
-    val metadata = remember(mediaId) { mediaId?.let { com.raulburgosmurray.musicplayer.data.MetadataJsonHelper.loadMetadata(context, it) } }
+    val metadata by produceState<com.raulburgosmurray.musicplayer.data.AudioMetadata?>(initialValue = null, key1 = mediaId) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            mediaId?.let { com.raulburgosmurray.musicplayer.data.MetadataJsonHelper.loadMetadata(context, it) }
+        }
+    }
     val displayTitle = metadata?.title?.takeIf { it.isNotBlank() } ?: currentItem?.mediaMetadata?.title?.toString() ?: stringResource(R.string.unknown_title)
     
-    val isPlaying = state.isPlaying
+    val isPlaying = state.playWhenReady
     val progress = if (state.duration > 0) state.currentPosition.toFloat() / state.duration.toFloat() else 0f
     val duration = state.duration
     val position = state.currentPosition
@@ -355,7 +519,9 @@ fun PlayerControls(state: PlaybackUiState, viewModel: PlaybackViewModel, onShowS
         Spacer(Modifier.height(32.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Surface(onClick = onShowSpeed, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.height(52.dp).weight(1f)) {
-                Box(contentAlignment = Alignment.Center) { Text("${state.playbackSpeed}x", fontWeight = FontWeight.Bold) }
+                Box(contentAlignment = Alignment.Center) {
+                    Text("${state.playbackSpeed}x · ${state.pitch}p", fontWeight = FontWeight.Bold)
+                }
             }
             Surface(onClick = onShowTimer, shape = RoundedCornerShape(16.dp), color = if (activeTimerMinutes > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.height(52.dp).weight(1f)) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
@@ -373,16 +539,28 @@ fun currentMediaItemArtist(item: androidx.media3.common.MediaItem?): String {
 }
 
 @Composable
-fun SpeedSelectorContent(currentSpeed: Float, onSpeedSelected: (Float) -> Unit) {
-    val speeds = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f)
+fun SpeedSelectorContent(currentSpeed: Float, currentPitch: Float, onSpeedSelected: (Float) -> Unit, onPitchSelected: (Float) -> Unit) {
+    val speeds = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.25f)
+    val pitches = listOf(0.8f, 0.9f, 1.0f, 1.1f, 1.2f)
     Column(modifier = Modifier.fillMaxWidth().padding(24.dp).padding(bottom = 32.dp)) {
         Text(stringResource(R.string.playback_speed_selector), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(24.dp))
-        LazyVerticalGrid(columns = GridCells.Fixed(3), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+        Spacer(Modifier.height(16.dp))
+        LazyVerticalGrid(columns = GridCells.Fixed(4), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             items(speeds) { speed ->
                 val isSelected = speed == currentSpeed
-                Surface(onClick = { onSpeedSelected(speed) }, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer, contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer, shape = RoundedCornerShape(16.dp), modifier = Modifier.height(60.dp)) {
-                    Box(contentAlignment = Alignment.Center) { Text("${speed}x", fontWeight = FontWeight.Bold) }
+                Surface(onClick = { onSpeedSelected(speed) }, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer, contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.height(48.dp)) {
+                    Box(contentAlignment = Alignment.Center) { Text("${speed}x", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium) }
+                }
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+        Text(stringResource(R.string.pitch_selector), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(16.dp))
+        LazyVerticalGrid(columns = GridCells.Fixed(5), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            items(pitches) { pitch ->
+                val isSelected = pitch == currentPitch
+                Surface(onClick = { onPitchSelected(pitch) }, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer, contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.height(44.dp)) {
+                    Box(contentAlignment = Alignment.Center) { Text("${pitch}x", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium) }
                 }
             }
         }
@@ -440,7 +618,11 @@ fun QueueSelectorContent(playlist: List<androidx.media3.common.MediaItem>, curre
         LazyColumn(modifier = Modifier.weight(1f, false).heightIn(max = 400.dp)) {
             items(playlist.size) { index ->
                 val item = playlist[index]
-                val itemMetadata = remember(item.mediaId) { item.mediaId?.let { com.raulburgosmurray.musicplayer.data.MetadataJsonHelper.loadMetadata(context, it) } }
+                val itemMetadata by produceState<com.raulburgosmurray.musicplayer.data.AudioMetadata?>(initialValue = null, key1 = item.mediaId) {
+                    value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        item.mediaId?.let { com.raulburgosmurray.musicplayer.data.MetadataJsonHelper.loadMetadata(context, it) }
+                    }
+                }
                 val itemTitle = capitalizeWords(itemMetadata?.title?.takeIf { it.isNotBlank() } ?: item.mediaMetadata.title?.toString() ?: stringResource(R.string.unknown_title))
                 Surface(onClick = { onItemClicked(index) }, color = if (index == currentIndex) MaterialTheme.colorScheme.primaryContainer else Color.Transparent, shape = RoundedCornerShape(12.dp)) {
                     Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -495,12 +677,262 @@ fun ChapterSelectorContent(chapters: List<com.raulburgosmurray.musicplayer.Chapt
 }
 
 @Composable
+fun eqPresetDisplayName(preset: EqPreset): String = when (preset) {
+    EqPreset.FLAT -> stringResource(R.string.eq_preset_flat)
+    EqPreset.VOICE_BOOST -> stringResource(R.string.eq_preset_voice_boost)
+    EqPreset.BASS_CUT -> stringResource(R.string.eq_preset_bass_cut)
+    EqPreset.CLARITY -> stringResource(R.string.eq_preset_clarity)
+}
+
+@Composable
+fun EqualizerSelectorContent(currentPreset: EqPreset, isAvailable: Boolean, onPresetSelected: (EqPreset) -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth().padding(24.dp).padding(bottom = 32.dp)) {
+        Text(stringResource(R.string.equalizer_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(16.dp))
+        if (!isAvailable) {
+            Text(stringResource(R.string.equalizer_not_available), color = MaterialTheme.colorScheme.secondary)
+        } else {
+            EqPreset.values().forEach { preset ->
+                Surface(
+                    onClick = { onPresetSelected(preset) },
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (preset == currentPreset) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+                ) {
+                    Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(eqPresetDisplayName(preset), fontWeight = if (preset == currentPreset) FontWeight.Bold else FontWeight.Normal)
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+        }
+    }
+}
+
+@Composable
 fun AddBookmarkDialog(currentPosition: Long, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
     var note by remember { mutableStateOf("") }
     AlertDialog(onDismissRequest = onDismiss, title = { Text(stringResource(R.string.add_bookmark)) },
         text = { Column { Text(stringResource(R.string.save_position_label, formatDuration(currentPosition))); Spacer(Modifier.height(8.dp)); OutlinedTextField(value = note, onValueChange = { note = it }, label = { Text(stringResource(R.string.note_label)) }, modifier = Modifier.fillMaxWidth()) } },
         confirmButton = { Button(onClick = { onConfirm(note) }) { Text(stringResource(R.string.save)) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } })
+}
+
+@Composable
+fun SeekToTimeDialog(duration: Long, onDismiss: () -> Unit, onConfirm: (Long) -> Unit) {
+    val maxHours = (duration / 3600000).toInt()
+    val maxMinutes = 59
+    val maxSeconds = 59
+
+    var hoursText by remember { mutableStateOf("") }
+    var minutesText by remember { mutableStateOf("") }
+    var secondsText by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf(false) }
+
+    val hours = hoursText.toIntOrNull() ?: 0
+    val minutes = minutesText.toIntOrNull() ?: 0
+    val seconds = secondsText.toIntOrNull() ?: 0
+    val inputMs = (hours * 3600L + minutes * 60L + seconds) * 1000L
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.go_to_time)) },
+        text = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(stringResource(R.string.go_to_time_desc), color = MaterialTheme.colorScheme.secondary)
+                Spacer(Modifier.height(16.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        OutlinedTextField(
+                            value = hoursText,
+                            onValueChange = { if (it.isEmpty() || it.toIntOrNull() != null) hoursText = it },
+                            label = { Text(stringResource(R.string.hours_hint)) },
+                            modifier = Modifier.width(72.dp),
+                            singleLine = true,
+                            isError = error,
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+                        )
+                    }
+                    Text(":", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        OutlinedTextField(
+                            value = minutesText,
+                            onValueChange = { v ->
+                                val n = v.toIntOrNull()
+                                if (v.isEmpty() || (n != null && n >= 0 && n <= maxMinutes)) minutesText = v
+                            },
+                            label = { Text(stringResource(R.string.minutes_hint)) },
+                            modifier = Modifier.width(72.dp),
+                            singleLine = true,
+                            isError = error,
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+                        )
+                    }
+                    Text(":", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        OutlinedTextField(
+                            value = secondsText,
+                            onValueChange = { v ->
+                                val n = v.toIntOrNull()
+                                if (v.isEmpty() || (n != null && n >= 0 && n <= maxSeconds)) secondsText = v
+                            },
+                            label = { Text(stringResource(R.string.seconds_hint)) },
+                            modifier = Modifier.width(72.dp),
+                            singleLine = true,
+                            isError = error,
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+                        )
+                    }
+                }
+                if (error) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(stringResource(R.string.invalid_time), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelMedium)
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                if (inputMs in 0..duration) {
+                    error = false
+                    onConfirm(inputMs)
+                } else {
+                    error = true
+                }
+            }) { Text(stringResource(R.string.go_to_time)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SkipByAmountDialog(
+    currentPosition: Long,
+    duration: Long,
+    onDismiss: () -> Unit,
+    onConfirm: (amountMs: Long, isForward: Boolean) -> Unit
+) {
+    val context = LocalContext.current
+    var amountText by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf("") }
+
+    val units = listOf(
+        stringResource(R.string.unit_minutes) to 60_000L,
+        stringResource(R.string.unit_hours) to 3_600_000L
+    )
+    var selectedUnitIndex by remember { mutableStateOf(0) }
+    var unitMenuExpanded by remember { mutableStateOf(false) }
+
+    var isForward by remember { mutableStateOf(true) }
+
+    val amount = amountText.toLongOrNull()
+    val unitMultiplier = units[selectedUnitIndex].second
+    val amountMs = (amount ?: 0L) * unitMultiplier
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.skip_by_amount)) },
+        text = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(stringResource(R.string.skip_by_amount_desc), color = MaterialTheme.colorScheme.secondary)
+                Spacer(Modifier.height(16.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = amountText,
+                        onValueChange = { v ->
+                            if (v.isEmpty() || (v.toLongOrNull() != null && v.toLongOrNull()!! >= 0)) {
+                                amountText = v
+                                error = false
+                            }
+                        },
+                        modifier = Modifier.width(100.dp),
+                        singleLine = true,
+                        isError = error,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                        )
+                    )
+                    ExposedDropdownMenuBox(
+                        expanded = unitMenuExpanded,
+                        onExpandedChange = { unitMenuExpanded = it }
+                    ) {
+                        OutlinedTextField(
+                            value = units[selectedUnitIndex].first,
+                            onValueChange = {},
+                            readOnly = true,
+                            modifier = Modifier
+                                .menuAnchor()
+                                .width(140.dp),
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = unitMenuExpanded)
+                            }
+                        )
+                        ExposedDropdownMenu(
+                            expanded = unitMenuExpanded,
+                            onDismissRequest = { unitMenuExpanded = false }
+                        ) {
+                            units.forEachIndexed { index, pair ->
+                                DropdownMenuItem(
+                                    text = { Text(pair.first) },
+                                    onClick = {
+                                        selectedUnitIndex = index
+                                        unitMenuExpanded = false
+                                        error = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = { isForward = false },
+                        modifier = Modifier.weight(1f),
+                        colors = if (!isForward) ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer) else ButtonDefaults.outlinedButtonColors()
+                    ) { Text(stringResource(R.string.direction_backward)) }
+                    OutlinedButton(
+                        onClick = { isForward = true },
+                        modifier = Modifier.weight(1f),
+                        colors = if (isForward) ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer) else ButtonDefaults.outlinedButtonColors()
+                    ) { Text(stringResource(R.string.direction_forward)) }
+                }
+                if (error) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        errorMessage,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                if (amount == null || amount <= 0) {
+                    error = true
+                    errorMessage = context.getString(R.string.invalid_skip_amount)
+                    return@Button
+                }
+                val targetPos = if (isForward) {
+                    currentPosition + amountMs
+                } else {
+                    currentPosition - amountMs
+                }
+                if (targetPos < 0 || targetPos > duration) {
+                    error = true
+                    errorMessage = context.getString(R.string.invalid_skip_amount)
+                    return@Button
+                }
+                error = false
+                onConfirm(amountMs, isForward)
+            }) { Text(stringResource(R.string.confirm)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } }
+    )
 }
 
 enum class CoverTapArea { LEFT, CENTER, RIGHT }

@@ -91,6 +91,8 @@
     <string name="rescan_folders">Rescan Folders</string>
     <string name="audiobook_folder">Audiobook Folder</string>
     <string name="scanning_all_memory">Scanning all memory</string>
+    <string name="default_equalizer">Default Equalizer</string>
+    <string name="default_equalizer_desc">Preset applied to books without a custom equalizer setting.</string>
     <string name="about_app">About App</string>
     <string name="undo_seek">UNDO SEEK</string>
     <string name="manual_bookmarks">Manual Bookmarks</string>
@@ -138,6 +140,8 @@
     <string name="welcome_desc">To start, we need you to select the folder where you store your audiobooks.</string>
     <string name="select_folder">Select Folder</string>
     <string name="onboarding_note">You can change this later in Settings.</string>
+    <string name="transfer_by_qr">Receive audiobook via QR</string>
+    <string name="transfer_by_qr_desc">No books? Receive one instantly from another device.</string>
     <string name="book_detected">Book Detected</string>
     <string name="existing_book_msg">%1$s detected in your library. What do you want to do?</string>
     <string name="sync_progress_only">Sync Progress Only (Instant)</string>
@@ -163,6 +167,7 @@
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
     <!-- Screen lock -->
+    <string name="lock_screen">Lock screen</string>
     <string name="screen_locked">Screen locked</string>
     <string name="unlock">Unlock</string>
     <string name="undo">Undo</string>
@@ -218,6 +223,13 @@
     <string name="history_undo_seek">Undo seek</string>
     <string name="history_bookmark_added">Bookmark added</string>
     <string name="history_timer_finished">Sleep timer ended</string>
+    <string name="history_timer_started">Timer started at %1$s</string>
+    <string name="return_to_timer_start">Return to timer start</string>
+    <string name="history_accidental_seek">Accidental jump from %1$s</string>
+    <string name="bookmark_accidental_seek">Position before accidental jump</string>
+    <!-- Sleep Detection -->
+    <string name="history_sleep_detected">Sleep detected — paused</string>
+    <string name="history_sleep_rewind">Rewound %1$s to sleep point</string>
     <!-- Transfer -->
     <string name="ready">Ready</string>
     <string name="no_wifi">No Wi-Fi</string>
@@ -231,6 +243,10 @@
     <string name="delete_confirmation_message">This will permanently delete \"%1$s\" from your device. This action cannot be undone.</string>
     <string name="delete_success">Audiobook deleted</string>
     <string name="delete_error">Failed to delete audiobook</string>
+    <string name="delete_book_in_use_title">Audiobook in use</string>
+    <string name="delete_book_in_use_message">This audiobook is currently playing or paused. You must close it before deleting, or you can force deletion.</string>
+    <string name="close_and_delete">Close book and delete</string>
+    <string name="delete_anyway">Delete anyway</string>
     <!-- Read status -->
     <string name="mark_as_read">Mark as read</string>
     <string name="mark_as_unread">Mark as unread</string>
@@ -238,6 +254,7 @@
     <string name="filter_completed">Completed</string>
     <string name="filter_in_progress">In Progress</string>
     <string name="filter">Filter</string>
+    <string name="scroll_down_hint">Scroll down for more controls</string>
     <!-- Camera permission -->
     <string name="camera_permission_title">📷 Camera Access</string>
     <string name="camera_permission_rationale">We need camera access to:\n\n• Scan QR codes for P2P audiobook transfer\n• Connect with nearby devices easily\n\nNo photos or videos are recorded.</string>
@@ -258,4 +275,55 @@
     <string name="wifi_permission_rationale">This permission allows the app to:\n\n• Discover nearby devices for P2P transfer\n• Transfer audiobooks without internet\n• Connect via Wi-Fi Direct</string>
     <string name="wifi_permission_denied_title">📡 Wi-Fi Permission Denied</string>
     <string name="wifi_permission_denied_message">Without this permission, you won\'t be able to transfer audiobooks to nearby devices. You can enable it anytime in Settings.</string>
+    <string name="equalizer_title">Equalizer</string>
+    <string name="equalizer_not_available">Equalizer is not available on this device</string>
+    <string name="eq_preset_flat">Flat</string>
+    <string name="eq_preset_voice_boost">Voice Boost</string>
+    <string name="eq_preset_bass_cut">Bass Cut</string>
+    <string name="eq_preset_clarity">Clarity</string>
+    <string name="pitch_selector">Pitch</string>
+    <string name="go_to_time">Go to time</string>
+    <string name="go_to_time_desc">Enter a position to jump to</string>
+    <string name="hours_hint">HH</string>
+    <string name="minutes_hint">MM</string>
+    <string name="seconds_hint">SS</string>
+    <string name="invalid_time">Position exceeds duration</string>
+    <string name="skip_by_amount">Skip by amount</string>
+    <string name="skip_by_amount_desc">Enter a time amount to skip</string>
+    <string name="amount_label">Amount</string>
+    <string name="unit_minutes">Minutes</string>
+    <string name="unit_hours">Hours</string>
+    <string name="direction_forward">Forward</string>
+    <string name="direction_backward">Backward</string>
+    <string name="invalid_skip_amount">Invalid amount or exceeds audio duration</string>
+    <string name="history_skip_by_amount_forward">Skip forward %1$s</string>
+    <string name="history_skip_by_amount_backward">Skip backward %1$s</string>
+    <!-- Sleep Detection -->
+    <string name="sleep_detection_title">Sleep Detection</string>
+    <string name="sleep_detection_desc">Automatically pause and rewind when your Amazfit detects you fell asleep.</string>
+    <string name="sleep_detection_enabled">Enable Sleep Detection</string>
+    <string name="sleep_detection_port">Listener Port</string>
+    <string name="sleep_detection_port_desc">Port number for receiving sleep events from the watch.</string>
+    <string name="sleep_detection_status">Status: %1$s</string>
+    <string name="sleep_detection_connected">Connected</string>
+    <string name="sleep_detection_disconnected">Disconnected</string>
+    <string name="sleep_rewind_minutes">Rewind Time</string>
+    <string name="sleep_rewind_minutes_desc">Minutes to rewind when sleep is detected</string>
+    <string name="sleep_fallback_minutes">Fallback Rewind</string>
+    <string name="sleep_fallback_minutes_desc">Rewind if no playback data available</string>
+    <string name="interval_minutes">%1$d min</string>
+
+    <!-- Time announcement -->
+    <string name="time_announcement_title">Time Announcements</string>
+    <string name="time_announcement_desc">Announce the current time over the audiobook.</string>
+    <string name="time_announcement_interval">Announcement Interval</string>
+    <string name="interval_15_min">15 min</string>
+    <string name="interval_30_min">30 min</string>
+    <string name="interval_60_min">1 hour</string>
+    <string name="interval_timer_only">Timer only</string>
+    <string name="time_announcement">It is %1$s</string>
+    <!-- Synopsis accordion -->
+    <string name="synopsis_label">Synopsis</string>
+    <string name="expand">Expand</string>
+    <string name="collapse">Collapse</string>
 </resources>

@@ -21,11 +21,12 @@ data class CachedBook(
     val path: String,
     val artUri: String?,
     val fileSize: Long,
-    val fileName: String = ""
+    val fileName: String = "",
+    val description: String? = null
 )
 
 fun CachedBook.toMusic(): com.raulburgosmurray.musicplayer.Music = 
-    com.raulburgosmurray.musicplayer.Music(id, title, album, artist, duration, path, artUri, fileSize, fileName)
+    com.raulburgosmurray.musicplayer.Music(id, title, album, artist, duration, path, artUri, fileSize, fileName, description = description)
 
 fun com.raulburgosmurray.musicplayer.Music.toCachedBook(): CachedBook = 
-    CachedBook(id, title, album, artist, duration, path, artUri, fileSize, fileName)
+    CachedBook(id, title, album, artist, duration, path, artUri, fileSize, fileName, description)

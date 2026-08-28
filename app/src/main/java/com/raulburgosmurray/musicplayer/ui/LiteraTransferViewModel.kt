@@ -111,7 +111,7 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
                 wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Litera:TransferWake").apply { acquire(15*60*1000L) }
                 wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "Litera:WifiLock").apply { acquire() }
 
-                serverSocket = ServerSocket(); serverSocket?.reuseAddress = true; serverSocket?.bind(InetSocketAddress(ip, Constants.TRANSFER_SERVER_PORT))
+                serverSocket = ServerSocket(); serverSocket?.reuseAddress = true; serverSocket?.soTimeout = Constants.SOCKET_ACCEPT_TIMEOUT_MS; serverSocket?.bind(InetSocketAddress(ip, Constants.TRANSFER_SERVER_PORT))
 
                 while (isActive) {
                     val clientSocket = try { serverSocket?.accept() } catch (e: Exception) { null } ?: break
@@ -147,7 +147,10 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
                     
                     withContext(Dispatchers.Main) { _uiState.value = _uiState.value.copy(transferStatus = context.getString(R.string.sending, title)) }
 
-                    val inputStream: InputStream = if (path.startsWith("content://")) { context.contentResolver.openInputStream(Uri.parse(path))!! } else { FileInputStream(File(path)) }
+                    val inputStream: InputStream = if (path.startsWith("content://")) {
+                        context.contentResolver.openInputStream(Uri.parse(path))
+                            ?: throw IllegalStateException("No se pudo abrir el archivo: $path")
+                    } else { FileInputStream(File(path)) }
                     inputStream.use { i ->
                         val buffer = ByteArray(65536); var bytesRead: Int
                         while (i.read(buffer).also { bytesRead = it } != -1) { output.write(buffer, 0, bytesRead) }
@@ -241,7 +244,7 @@ class LiteraTransferViewModel(application: Application) : AndroidViewModel(appli
             finalUri = newFile?.uri?.toString()
             context.contentResolver.openOutputStream(newFile!!.uri)!!
         } else {
-            val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), "Litera/Inbox")
+            val dir = File(context.getExternalFilesDir(Environment.DIRECTORY_MUSIC), "Litera/Inbox")
             if (!dir.exists()) dir.mkdirs()
             val f = File(dir, fileName); finalPath = f.absolutePath; FileOutputStream(f)
         }

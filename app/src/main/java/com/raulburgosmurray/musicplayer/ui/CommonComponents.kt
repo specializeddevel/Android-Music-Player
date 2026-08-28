@@ -28,6 +28,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.abs
 
+fun capitalizeWords(text: String): String {
+    return text
+        .replace(Regex("\\.[a-zA-Z0-9]{2,4}$"), "")
+        .replace("_", " ")
+        .replace("-", " ")
+        .split(" ")
+        .filter { it.isNotEmpty() }
+        .joinToString(" ") { word -> word.lowercase().replaceFirstChar { it.titlecase() } }
+}
+
 private fun hueToRgb(p: Float, q: Float, t: Float): Float {
     var tNorm = t
     if (tNorm < 0f) tNorm += 1f
@@ -88,12 +98,15 @@ fun BookPlaceholder(title: String, modifier: Modifier = Modifier) {
             .joinToString(" ") { word -> word.lowercase().replaceFirstChar { it.titlecase() } }
     }
     val colors = remember(title) { generateBookColors(title) }
-    val gradient = Brush.verticalGradient(
-        colors = listOf(colors.first, colors.second),
-        startY = 0f,
-        endY = Float.POSITIVE_INFINITY
-    )
-    
+    val gradient = remember(colors) {
+        Brush.verticalGradient(
+            colors = listOf(colors.first, colors.second),
+            startY = 0f,
+            endY = Float.POSITIVE_INFINITY
+        )
+    }
+    val initial = remember(displayTitle) { displayTitle.firstOrNull()?.uppercase() ?: "?" }
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -108,11 +121,12 @@ fun BookPlaceholder(title: String, modifier: Modifier = Modifier) {
             verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text = "📚",
-                fontSize = 48.sp,
-                modifier = Modifier.padding(bottom = 12.dp)
+                text = initial,
+                fontSize = 64.sp,
+                color = Color.White.copy(alpha = 0.4f),
+                fontWeight = FontWeight.Black,
+                modifier = Modifier.padding(bottom = 8.dp)
             )
-            
             Text(
                 text = displayTitle,
                 style = MaterialTheme.typography.titleLarge,
@@ -129,12 +143,14 @@ fun BookPlaceholder(title: String, modifier: Modifier = Modifier) {
 @Composable
 fun CompactBookPlaceholder(title: String, modifier: Modifier = Modifier) {
     val colors = remember(title) { generateBookColors(title) }
-    val gradient = Brush.verticalGradient(
-        colors = listOf(colors.first, colors.second),
-        startY = 0f,
-        endY = Float.POSITIVE_INFINITY
-    )
-    
+    val gradient = remember(colors) {
+        Brush.verticalGradient(
+            colors = listOf(colors.first, colors.second),
+            startY = 0f,
+            endY = Float.POSITIVE_INFINITY
+        )
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -149,8 +165,10 @@ fun CompactBookPlaceholder(title: String, modifier: Modifier = Modifier) {
             verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text = "📖",
-                fontSize = 18.sp
+                text = title.firstOrNull()?.uppercase() ?: "?",
+                fontSize = 18.sp,
+                color = Color.White.copy(alpha = 0.5f),
+                fontWeight = FontWeight.Black
             )
             
             Spacer(Modifier.height(2.dp))
