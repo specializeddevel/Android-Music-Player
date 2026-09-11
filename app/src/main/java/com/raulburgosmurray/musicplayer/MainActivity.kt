@@ -56,11 +56,10 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.navArgument
 import androidx.navigation.NavType
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
-import com.gun0912.tedpermission.PermissionListener
-import com.gun0912.tedpermission.normal.TedPermission
 import com.raulburgosmurray.musicplayer.ui.*
 import com.raulburgosmurray.musicplayer.ui.theme.MusicPlayerTheme
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
@@ -95,6 +94,19 @@ class MainActivity : ComponentActivity() {
     private var sleepDetectionReceiver: com.raulburgosmurray.musicplayer.sleep.SleepDetectionReceiver? = null
     private var backPressedTime = 0L
 
+    private val permissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val storagePerm = getStoragePermission()
+        if (permissions[storagePerm] == true) {
+            lifecycleScope.launch {
+                val uris = settingsViewModel.libraryRootUris.first()
+                val scanAll = settingsViewModel.scanAllMemory.first()
+                mainViewModel.smartLoadBooks(if (scanAll) emptyList() else uris, scanAll)
+            }
+        }
+    }
+
     private val syncReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == PlaybackService.SYNC_ACTION) syncViewModel.uploadOnly()
@@ -116,17 +128,35 @@ class MainActivity : ComponentActivity() {
         playbackViewModel = ViewModelProvider(this)[PlaybackViewModel::class.java]
         playbackViewModel.initController(this)
         if (FeatureFlags.SLEEP_DETECTION) {
-            setupSleepDetection()
+            observeSleepDetectionSettings()
         }
+
+        lifecycleScope.launch {
+            mainViewModel.books.collect { if (it.isNotEmpty()) playbackViewModel.loadPersistedQueue(it) }
+        }
+
+        startUI()
         checkPermissions()
     }
 
-    private fun setupSleepDetection() {
-        val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
-        val enabled = prefs.getBoolean("sleep_detection_enabled", false)
-        val port = prefs.getInt("sleep_detection_port", 50002)
-        
-        if (enabled) {
+    private fun observeSleepDetectionSettings() {
+        lifecycleScope.launch {
+            combine(
+                settingsViewModel.isSleepDetectionEnabled,
+                settingsViewModel.sleepDetectionPort
+            ) { enabled, port -> enabled to port }
+                .collect { (enabled, port) ->
+                    if (enabled) {
+                        startSleepDetectionReceiver(port)
+                    } else {
+                        sleepDetectionReceiver?.stopListening()
+                    }
+                }
+        }
+    }
+
+    private fun startSleepDetectionReceiver(port: Int) {
+        if (sleepDetectionReceiver == null) {
             sleepDetectionReceiver = com.raulburgosmurray.musicplayer.sleep.SleepDetectionReceiver(
                 context = this,
                 onSleepDetected = { sleepOnsetMinutes ->
@@ -135,8 +165,8 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             )
-            sleepDetectionReceiver?.startListening(port)
         }
+        sleepDetectionReceiver?.startListening(port)
     }
 
     override fun onDestroy() {
@@ -145,96 +175,31 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 
+    private fun getStoragePermission(): String {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Manifest.permission.READ_MEDIA_AUDIO
+        } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+    }
+
     private fun checkPermissions() {
-        val essentialPermissions = mutableListOf<String>()
-        val optionalPermissions = mutableListOf<String>()
+        val permissionsToRequest = mutableListOf<String>()
+        val storagePermission = getStoragePermission()
 
-        essentialPermissions.add(
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
-                Manifest.permission.READ_MEDIA_AUDIO
-            else
-                Manifest.permission.READ_EXTERNAL_STORAGE
-        )
-
-        optionalPermissions.add(Manifest.permission.CAMERA)
+        if (ContextCompat.checkSelfPermission(this, storagePermission) != PackageManager.PERMISSION_GRANTED) {
+            permissionsToRequest.add(storagePermission)
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            optionalPermissions.add(Manifest.permission.POST_NOTIFICATIONS)
-            optionalPermissions.add(Manifest.permission.NEARBY_WIFI_DEVICES)
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
+            }
         }
 
-        TedPermission.create()
-            .setPermissionListener(object : PermissionListener {
-                override fun onPermissionGranted() {
-                    checkOptionalPermissions(optionalPermissions)
-                }
-                override fun onPermissionDenied(deniedPermissions: MutableList<String>?) {
-                    checkOptionalPermissions(optionalPermissions)
-                }
-            })
-            .setPermissions(*essentialPermissions.toTypedArray())
-            .check()
-    }
-
-    private fun checkOptionalPermissions(optionalPermissions: List<String>) {
-        if (optionalPermissions.isEmpty()) {
-            loadBooksAndStartUI()
-            return
+        if (permissionsToRequest.isNotEmpty()) {
+            permissionLauncher.launch(permissionsToRequest.toTypedArray())
         }
-
-        val currentPerm = optionalPermissions.first()
-        val remaining = optionalPermissions.drop(1)
-
-        val (rationaleTitle, rationaleMessage, deniedTitle, deniedMessage) = when (currentPerm) {
-            Manifest.permission.CAMERA -> Quad(
-                R.string.camera_permission_title,
-                R.string.camera_permission_rationale,
-                R.string.camera_permission_denied_title,
-                R.string.camera_permission_denied_message
-            )
-            Manifest.permission.POST_NOTIFICATIONS -> Quad(
-                R.string.notification_permission_title,
-                R.string.notification_permission_rationale,
-                R.string.notification_permission_denied_title,
-                R.string.notification_permission_denied_message
-            )
-            Manifest.permission.NEARBY_WIFI_DEVICES -> Quad(
-                R.string.wifi_permission_title,
-                R.string.wifi_permission_rationale,
-                R.string.wifi_permission_denied_title,
-                R.string.wifi_permission_denied_message
-            )
-            else -> Quad(R.string.app_name, R.string.app_name, R.string.app_name, R.string.app_name)
-        }
-
-        TedPermission.create()
-            .setPermissionListener(object : PermissionListener {
-                override fun onPermissionGranted() {
-                    checkOptionalPermissions(remaining)
-                }
-                override fun onPermissionDenied(deniedPermissions: MutableList<String>?) {
-                    checkOptionalPermissions(remaining)
-                }
-            })
-            .setRationaleTitle(rationaleTitle)
-            .setRationaleMessage(rationaleMessage)
-            .setDeniedTitle(deniedTitle)
-            .setDeniedMessage(deniedMessage)
-            .setGotoSettingButton(true)
-            .setPermissions(currentPerm)
-            .check()
-    }
-
-    private data class Quad<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
-
-    private fun loadBooksAndStartUI() {
-        lifecycleScope.launch {
-            val uris = settingsViewModel.libraryRootUris.first()
-            val scanAll = settingsViewModel.scanAllMemory.first()
-            mainViewModel.smartLoadBooks(if (scanAll) emptyList() else uris, scanAll)
-        }
-        lifecycleScope.launch { mainViewModel.books.collect { if (it.isNotEmpty()) playbackViewModel.loadPersistedQueue(it) } }
-        startUI()
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
