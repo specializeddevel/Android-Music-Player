@@ -5,8 +5,8 @@
     "appName": "Sleep Detector",
     "appType": "app",
     "version": {
-      "code": 5,
-      "name": "1.0.4"
+      "code": 14,
+      "name": "1.0.13"
     },
     "icon": "C:/Users/raulb/Develop/Android-Music-Player/zepp-sleep-detector/assets/active-max.r/icon.png",
     "vender": "raulburgosmurray",
@@ -34,7 +34,7 @@
           ]
         },
         "app-service": {
-          "services": ["app-service/sleep_service"]
+          "services": ["app-service/index"]
         },
         "app-side": {
           "path": "app-side/index"

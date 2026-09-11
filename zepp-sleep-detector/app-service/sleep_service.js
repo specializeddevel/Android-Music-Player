@@ -1,19 +1,26 @@
 import { Sleep, Time } from '@zos/sensor'
 import { localStorage } from '@zos/storage'
-import * as notification from '@zos/notification'
 
 const STORAGE_KEY = 'sleep_event'
 const STATUS_KEY = 'sleep_service_status'
 const COUNT_KEY = 'sleep_check_count'
 const LOG_KEY = 'sleep_service_log'
-const LAST_WAKE_KEY = 'sleep_last_wake_event'
+const HEARTBEAT_KEY = 'sleep_service_heartbeat'
+const LAST_CHECK_KEY = 'last_sleep_check'
+const LAST_SLEEP_STATUS_KEY = 'last_sleep_status'
 
-const sleepSensor = new Sleep()
-const timeSensor = new Time()
-
+let sleepSensor = null
+let timeSensor = null
 let checkCount = 0
 let lastStatus = -1
 let wasSleeping = false
+
+function heartbeat(status) {
+  const now = Date.now()
+  localStorage.setItem(HEARTBEAT_KEY, String(now))
+  localStorage.setItem(LAST_CHECK_KEY, String(now))
+  if (status) localStorage.setItem(STATUS_KEY, status)
+}
 
 function logEvent(msg) {
   const now = new Date()
@@ -30,12 +37,6 @@ function logEvent(msg) {
 }
 
 function notifyAndroid(sleepOnsetMinutes, timestamp) {
-  notification.notify({
-    title: 'Sleep Detected',
-    content: 'Notifying Android app...',
-    actions: []
-  })
-
   const eventData = JSON.stringify({
     type: 'sleep_detected',
     sleepOnsetMinutes: sleepOnsetMinutes,
@@ -46,17 +47,30 @@ function notifyAndroid(sleepOnsetMinutes, timestamp) {
 }
 
 function checkSleep() {
+  checkCount++
+  localStorage.setItem(COUNT_KEY, String(checkCount))
+  heartbeat('checking')
+
   try {
+    if (!sleepSensor) {
+      localStorage.setItem(STATUS_KEY, 'no sleep sensor')
+      logEvent('ERROR: sleep sensor missing')
+      return
+    }
+
     const status = sleepSensor.getSleepingStatus()
-    checkCount++
-
-    localStorage.setItem(COUNT_KEY, String(checkCount))
-    localStorage.setItem(STATUS_KEY, 'running')
-
     const now = Date.now()
-    localStorage.setItem('last_sleep_check', now)
+    localStorage.setItem(STATUS_KEY, 'running')
+    localStorage.setItem(HEARTBEAT_KEY, String(now))
+    localStorage.setItem(LAST_CHECK_KEY, String(now))
+    localStorage.setItem(LAST_SLEEP_STATUS_KEY, String(status))
 
-    const timeStr = timeSensor.getHours() + ':' + timeSensor.getMinutes() + ':' + timeSensor.getSeconds()
+    let timeStr = new Date(now).getHours() + ':' + new Date(now).getMinutes() + ':' + new Date(now).getSeconds()
+    if (timeSensor) {
+      try {
+        timeStr = timeSensor.getHours() + ':' + timeSensor.getMinutes() + ':' + timeSensor.getSeconds()
+      } catch (e) {}
+    }
     logEvent('#' + checkCount + ' time=' + timeStr + ' sleep=' + status + ' prev=' + lastStatus)
 
     if (status === 1) {
@@ -71,7 +85,6 @@ function checkSleep() {
       if (wasSleeping) {
         wasSleeping = false
         logEvent('SLEEP END')
-        localStorage.setItem(LAST_WAKE_KEY, now)
       }
     }
 
@@ -84,10 +97,11 @@ function checkSleep() {
 
 AppService({
   onInit() {
+    heartbeat('onInit')
     logEvent('=== SERVICE START ===')
-    localStorage.setItem(STATUS_KEY, 'starting')
 
     try {
+      sleepSensor = new Sleep()
       sleepSensor.initialize()
       logEvent('Sleep sensor initialized')
     } catch (e) {
@@ -95,16 +109,24 @@ AppService({
     }
 
     try {
+      timeSensor = new Time()
       timeSensor.initialize()
       logEvent('Time sensor initialized')
     } catch (e) {
       logEvent('Time init ERROR: ' + String(e))
     }
 
-    timeSensor.onPerMinute(function () {
-      logEvent('onPerMinute fired')
-      checkSleep()
-    })
+    if (timeSensor) {
+      try {
+        timeSensor.onPerMinute(function () {
+          logEvent('onPerMinute fired')
+          checkSleep()
+        })
+      } catch (e) {
+        logEvent('Time onPerMinute ERROR: ' + String(e))
+        localStorage.setItem(STATUS_KEY, 'timer error: ' + String(e))
+      }
+    }
 
     checkSleep()
     logEvent('First check done, onPerMinute registered')
@@ -113,7 +135,7 @@ AppService({
   onDestroy() {
     logEvent('=== SERVICE DESTROYED ===')
     localStorage.setItem(STATUS_KEY, 'stopped')
-    try { sleepSensor.stop() } catch (e) {}
-    try { timeSensor.stop() } catch (e) {}
+    try { if (sleepSensor) sleepSensor.stop() } catch (e) {}
+    try { if (timeSensor) timeSensor.stop() } catch (e) {}
   }
 })
