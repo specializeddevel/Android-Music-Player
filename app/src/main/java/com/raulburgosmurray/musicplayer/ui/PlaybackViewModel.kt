@@ -917,21 +917,25 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
         val mediaId = _uiState.value.currentMusicDetails?.id ?: controller?.currentMediaItem?.mediaId
         mediaId?.let { id ->
             viewModelScope.launch(Dispatchers.IO) {
-                val existing = progressRepository.getProgress(id)
-                if (existing != null) {
-                    progressRepository.saveProgress(existing.copy(playbackSpeed = speed, pitch = currentPitch))
-                } else {
-                    val currentPos = controller?.currentPosition ?: 0L
-                    val duration = controller?.duration ?: 0L
-                    progressRepository.saveProgress(
-                        AudiobookProgress(
-                            mediaId = id,
-                            lastPosition = currentPos,
-                            duration = duration,
-                            playbackSpeed = speed,
-                            pitch = currentPitch
+                try {
+                    val existing = progressRepository.getProgress(id)
+                    if (existing != null) {
+                        progressRepository.saveProgress(existing.copy(playbackSpeed = speed, pitch = currentPitch))
+                    } else {
+                        val currentPos = controller?.currentPosition ?: 0L
+                        val duration = controller?.duration ?: 0L
+                        progressRepository.saveProgress(
+                            AudiobookProgress(
+                                mediaId = id,
+                                lastPosition = currentPos,
+                                duration = duration,
+                                playbackSpeed = speed,
+                                pitch = currentPitch
+                            )
                         )
-                    )
+                    }
+                } catch (e: Exception) {
+                    Log.e("PlaybackVM", "Error saving playback speed for $id", e)
                 }
             }
         }
@@ -939,46 +943,33 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
 
     fun setPitch(pitch: Float) {
         val currentSpeed = _uiState.value.playbackSpeed
-        controller?.let { ctrl ->
-            val wasPlaying = ctrl.isPlaying
-            val currentPos = ctrl.currentPosition.coerceAtLeast(0L)
-
-            // Changing pitch while playing can corrupt the AudioTrack pipeline on some devices.
-            // Pause first, apply parameters, force a seek to rebuild the renderer, then resume.
-            if (wasPlaying) {
-                ctrl.pause()
-            }
-            ctrl.setPlaybackParameters(
-                androidx.media3.common.PlaybackParameters(currentSpeed, pitch)
-            )
-            // Force renderer rebuild to avoid a zombie audio sink
-            if (ctrl.playbackState != Player.STATE_IDLE) {
-                ctrl.seekTo(currentPos)
-            }
-            if (wasPlaying) {
-                ctrl.play()
-            }
-        }
+        controller?.setPlaybackParameters(
+            androidx.media3.common.PlaybackParameters(currentSpeed, pitch)
+        )
         _uiState.value = _uiState.value.copy(pitch = pitch)
         // Persist pitch per-book
         val mediaId = _uiState.value.currentMusicDetails?.id ?: controller?.currentMediaItem?.mediaId
         mediaId?.let { id ->
             viewModelScope.launch(Dispatchers.IO) {
-                val existing = progressRepository.getProgress(id)
-                if (existing != null) {
-                    progressRepository.saveProgress(existing.copy(pitch = pitch, playbackSpeed = currentSpeed))
-                } else {
-                    val currentPos = controller?.currentPosition ?: 0L
-                    val duration = controller?.duration ?: 0L
-                    progressRepository.saveProgress(
-                        AudiobookProgress(
-                            mediaId = id,
-                            lastPosition = currentPos,
-                            duration = duration,
-                            playbackSpeed = currentSpeed,
-                            pitch = pitch
+                try {
+                    val existing = progressRepository.getProgress(id)
+                    if (existing != null) {
+                        progressRepository.saveProgress(existing.copy(pitch = pitch, playbackSpeed = currentSpeed))
+                    } else {
+                        val currentPos = controller?.currentPosition ?: 0L
+                        val duration = controller?.duration ?: 0L
+                        progressRepository.saveProgress(
+                            AudiobookProgress(
+                                mediaId = id,
+                                lastPosition = currentPos,
+                                duration = duration,
+                                playbackSpeed = currentSpeed,
+                                pitch = pitch
+                            )
                         )
-                    )
+                    }
+                } catch (e: Exception) {
+                    Log.e("PlaybackVM", "Error saving pitch for $id", e)
                 }
             }
         }
@@ -1176,23 +1167,27 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
         val mediaId = _uiState.value.currentMusicDetails?.id ?: controller?.currentMediaItem?.mediaId
         mediaId?.let { id ->
             viewModelScope.launch(Dispatchers.IO) {
-                val existing = progressRepository.getProgress(id)
-                if (existing != null) {
-                    progressRepository.saveProgress(existing.copy(eqPresetName = preset.name))
-                } else {
-                    // Create a minimal record so the preset is preserved even for never-played books
-                    val currentPos = controller?.currentPosition ?: 0L
-                    val duration = controller?.duration ?: 0L
-                    progressRepository.saveProgress(
-                        AudiobookProgress(
-                            mediaId = id,
-                            lastPosition = currentPos,
-                            duration = duration,
-                            playbackSpeed = _uiState.value.playbackSpeed,
-                            pitch = _uiState.value.pitch,
-                            eqPresetName = preset.name
+                try {
+                    val existing = progressRepository.getProgress(id)
+                    if (existing != null) {
+                        progressRepository.saveProgress(existing.copy(eqPresetName = preset.name))
+                    } else {
+                        // Create a minimal record so the preset is preserved even for never-played books
+                        val currentPos = controller?.currentPosition ?: 0L
+                        val duration = controller?.duration ?: 0L
+                        progressRepository.saveProgress(
+                            AudiobookProgress(
+                                mediaId = id,
+                                lastPosition = currentPos,
+                                duration = duration,
+                                playbackSpeed = _uiState.value.playbackSpeed,
+                                pitch = _uiState.value.pitch,
+                                eqPresetName = preset.name
+                            )
                         )
-                    )
+                    }
+                } catch (e: Exception) {
+                    Log.e("PlaybackVM", "Error saving EQ preset for $id", e)
                 }
             }
         }
