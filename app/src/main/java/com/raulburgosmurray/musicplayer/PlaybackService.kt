@@ -323,14 +323,27 @@ class PlaybackService : MediaSessionService() {
                 // Preserve per-book EQ preset if it exists; fall back to global prefs only when empty
                 val eqName = currentProgress?.eqPresetName?.takeIf { it.isNotEmpty() }
                     ?: getSharedPreferences("eq_prefs", MODE_PRIVATE).getString("eq_preset", "").orEmpty()
+
+                // If player parameters are default (1.0) while buffering/preparing, retain saved custom values
+                val speedToSave = if (p.playbackState == Player.STATE_BUFFERING && speed == 1.0f && currentProgress != null && currentProgress.playbackSpeed != 1.0f) {
+                    currentProgress.playbackSpeed
+                } else {
+                    speed
+                }
+                val pitchToSave = if (p.playbackState == Player.STATE_BUFFERING && pitch == 1.0f && currentProgress != null && currentProgress.pitch != 1.0f) {
+                    currentProgress.pitch
+                } else {
+                    pitch
+                }
+
                 database.progressDao().saveProgress(
                     AudiobookProgress(
                         mediaId = currentMediaItem.mediaId,
                         lastPosition = position,
                         duration = duration,
                         lastPauseTimestamp = pauseToSave,
-                        playbackSpeed = speed,
-                        pitch = pitch,
+                        playbackSpeed = speedToSave,
+                        pitch = pitchToSave,
                         eqPresetName = eqName,
                         isRead = finalIsRead
                     )
@@ -370,14 +383,26 @@ class PlaybackService : MediaSessionService() {
                 // Preserve per-book EQ preset if it exists; fall back to global prefs only when empty
                 val eqName = existing?.eqPresetName?.takeIf { it.isNotEmpty() }
                     ?: getSharedPreferences("eq_prefs", MODE_PRIVATE).getString("eq_preset", "").orEmpty()
+
+                val speedToSave = if (p.playbackState == Player.STATE_BUFFERING && speed == 1.0f && existing != null && existing.playbackSpeed != 1.0f) {
+                    existing.playbackSpeed
+                } else {
+                    speed
+                }
+                val pitchToSave = if (p.playbackState == Player.STATE_BUFFERING && pitch == 1.0f && existing != null && existing.pitch != 1.0f) {
+                    existing.pitch
+                } else {
+                    pitch
+                }
+
                 database.progressDao().saveProgress(
                     AudiobookProgress(
                         mediaId = currentMediaItem.mediaId,
                         lastPosition = position,
                         duration = duration,
                         lastPauseTimestamp = System.currentTimeMillis(),
-                        playbackSpeed = speed,
-                        pitch = pitch,
+                        playbackSpeed = speedToSave,
+                        pitch = pitchToSave,
                         eqPresetName = eqName,
                         isRead = (existing?.isRead ?: false) || progressPercent >= 0.99f
                     )

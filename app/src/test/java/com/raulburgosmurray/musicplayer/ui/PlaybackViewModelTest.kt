@@ -98,7 +98,30 @@ class PlaybackViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
         
-        verify { controller.setPlaybackSpeed(speed) }
+        verify { controller.setPlaybackParameters(androidx.media3.common.PlaybackParameters(speed, 1.0f)) }
+    }
+
+    @Test
+    fun `setPitch updates state and calls controller with preserved speed`() = runTest(testDispatcher) {
+        // Given
+        val viewModel = PlaybackViewModel(application)
+        val controllerField: Field = PlaybackViewModel::class.java.getDeclaredField("controller")
+        controllerField.isAccessible = true
+        controllerField.set(viewModel, controller)
+
+        val pitch = 1.2f
+
+        // When
+        viewModel.setPitch(pitch)
+
+        // Then
+        viewModel.uiState.test {
+            val state = awaitItem()
+            assertEquals(pitch, state.pitch)
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        verify { controller.setPlaybackParameters(androidx.media3.common.PlaybackParameters(1.0f, pitch)) }
     }
     
     @Test
