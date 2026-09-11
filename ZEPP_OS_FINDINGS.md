@@ -657,6 +657,217 @@ AppSideService(BaseSideService({
 
 ---
 
+## 🟡 Hallazgo #18: En handlers de widgets, captura la instancia de `BasePage`
+
+### El problema
+Dentro de callbacks de widgets como `click_func`, `this` puede no ser la instancia de `BasePage`. Llamar `this.request(...)` desde ahí puede fallar o no enviar eventos al Side Service.
+
+### La solución
+Capturar la instancia de página al inicio de `build()` y usar esa referencia dentro del callback:
+
+```javascript
+build: function () {
+  var page = this
+
+  hmUI.createWidget(hmUI.widget.BUTTON, {
+    click_func: function () {
+      page.request({ method: "SLEEP_DETECTED" })
+    }
+  })
+}
+```
+
+---
+
+## 🟡 Hallazgo #19: La UI debe leer el estado real del App Service
+
+### El problema
+Si la página solo usa una bandera en `localStorage` para pintar `ON/OFF`, puede mostrar `OFF` aunque el App Service siga activo. También es engañoso actualizar "Last check" con `Date.now()` desde la página, porque eso no confirma que el servicio haya consultado el sensor.
+
+### La solución
+Usar `appService.getAllAppServices()` para confirmar si el servicio está corriendo y mostrar el último chequeo escrito por el servicio:
+
+```javascript
+function running() {
+  var services = appService.getAllAppServices()
+  return services && services.indexOf("app-service/sleep_service") >= 0
+}
+
+var lastCheck = localStorage.getItem("last_sleep_check")
+```
+
+La página puede tener su propio timer para refrescar la UI, pero el timestamp mostrado debe venir del App Service.
+
+---
+
+## 🟡 Hallazgo #20: No mostrar "Service started" hasta confirmar resultado
+
+### El problema
+Si la página reintenta arrancar un App Service cuando el heartbeat está viejo, puede mostrar toasts repetidos de "Service started" aunque el servicio no haya escrito heartbeat ni `last_sleep_check`.
+
+### La solución
+Tratar `appService.start()` como intento de arranque, no como confirmación de vida:
+- Mostrar "starting" durante el intento.
+- Solo considerar vivo al servicio cuando actualiza heartbeat o aparece en `getAllAppServices()`.
+- Limitar reintentos automáticos, por ejemplo cada 60 segundos.
+- En reintentos automáticos, evitar toasts salvo error accionable.
+
+---
+
+## 🟡 Hallazgo #21: Servicio listado sin heartbeat requiere stop antes de restart
+
+### El problema
+Después de `appService.stop()` y un `start()` inmediato, `getAllAppServices()` puede seguir listando el servicio aunque el App Service no esté ejecutando `onInit()` ni escribiendo heartbeat. La UI puede quedar alternando entre `start requested` y `service listed`.
+
+### La solución
+Si el servicio aparece en `getAllAppServices()` pero el heartbeat está vencido, tratarlo como instancia stale:
+
+```javascript
+if (running() && !alive()) {
+  appService.stop({
+    url: SERVICE_FILE,
+    complete_func: function () {
+      appService.start({ url: SERVICE_FILE, reload: true })
+    }
+  })
+}
+```
+
+No asumir que "listed" equivale a "running"; la señal confiable es que el servicio escriba heartbeat o `last_sleep_check`.
+
+---
+
+## 🟡 Hallazgo #22: `appService.start/stop` debe probar `file` y usar `url` solo como fallback
+
+### El problema
+La documentación oficial v3+ de `@zos/app-service` define el parámetro requerido como `file`, y debe coincidir con el servicio declarado en `app.json`. Usar solo `url` puede dejar la UI en `starting` o con un servicio listado pero sin heartbeat.
+
+### La solución
+Usar `file` primero y registrar el retorno/callback. Si devuelve error explícito o callback fallido, intentar `url` como fallback por compatibilidad con builds anteriores probados en este repo.
+
+```javascript
+appService.start({
+  file: "app-service/sleep_service",
+  reload: true,
+  complete_func: function (info) {
+    console.log(JSON.stringify(info))
+  }
+})
+```
+
+Mostrar en la UI el retorno de `start`, la lista de `getAllAppServices()`, `sleep_service_heartbeat` y `sleep_check_count` para distinguir entre:
+- arranque rechazado;
+- servicio listado pero congelado;
+- servicio realmente ejecutando checks.
+
+---
+
+## 🟡 Hallazgo #23: El App Service debe escribir heartbeat antes de inicializar sensores
+
+### El problema
+Si el servicio queda en `stale listed` y `sleep_service_heartbeat` no cambia, el runtime listó el servicio pero el módulo no llegó a ejecutar checks. Un fallo temprano en constructores/imports o en inicialización de sensores puede parecer un servicio vivo desde `getAllAppServices()`.
+
+### La solución
+En `onInit()`, escribir primero `sleep_service_heartbeat`, `last_sleep_check` y `sleep_service_status = "onInit"`. Después crear/inicializar `Sleep` y `Time` dentro de bloques `try/catch`.
+
+También conviene incrementar `sleep_check_count` antes de llamar a `Sleep.getSleepingStatus()` y persistir `last_sleep_status` cuando la lectura funcione. Así la UI distingue:
+- `checks 0`: `onInit()` no se ejecutó o el módulo crasheó antes.
+- `status onInit` sin checks: fallo al inicializar sensores/timer.
+- `checks > 0` y `sleep 0/1`: servicio vivo y sensor respondiendo.
+
+---
+
+## 🟡 Hallazgo #24: Preferir `app-service/index` como entrypoint del servicio
+
+### El problema
+En pruebas con `services: ["app-service/sleep_service"]`, el servicio podía quedar listado por `getAllAppServices()` pero sin ejecutar `onInit()` ni actualizar heartbeat. Para descartar problemas de resolución de rutas del runtime, usar el entrypoint convencional `app-service/index`.
+
+### La solución
+Declarar el servicio y arrancarlo con la misma ruta:
+
+```json
+"app-service": {
+  "services": ["app-service/index"]
+}
+```
+
+```javascript
+appService.start({ file: "app-service/index", reload: true })
+```
+
+Mantener la UI y `getAllAppServices()` apuntando exactamente a esa ruta.
+
+---
+
+## 🟡 Hallazgo #25: Aislar imports estáticos del App Service
+
+### El problema
+Si el servicio queda en `waiting heartbeat`, aparece listado pero nunca escribe `sleep_service_heartbeat`. Eso puede pasar si un import estático o código top-level falla antes de que `AppService({ onInit })` se registre.
+
+### Diagnóstico
+Probar primero un `app-service/index.js` mínimo que solo importe `@zos/storage` y escriba:
+- `sleep_service_status = "service alive"`
+- `sleep_check_count = "1"`
+- `sleep_service_heartbeat = Date.now()`
+
+Si ese servicio mínimo funciona, el bloqueo está en imports/APIs añadidas después, por ejemplo `@zos/sensor`. Si tampoco funciona, el problema está en permisos, declaración de servicio, runtime o instalación del paquete.
+
+---
+
+## 🟡 Hallazgo #26: Mostrar código de retorno de `appService.start`
+
+### El problema
+`getAllAppServices()` puede listar un servicio aunque no escriba heartbeat, y los fallbacks silenciosos (`url` después de `file`) confunden el diagnóstico.
+
+### La solución
+Durante diagnóstico, usar solo:
+
+```javascript
+appService.start({
+  file: "app-service/index",
+  reload: false,
+  complete_func: function (info) {
+    // info.result true/false
+  }
+})
+```
+
+Mostrar en pantalla `ret` y `cb`. Códigos oficiales:
+- `0`: éxito
+- `1`: parámetro inválido
+- `2`: error de estado del servicio
+- `3`: sin permiso
+- `4`: sin memoria
+- `5`: no soportado
+- `6`: prohibido
+- `7`: límite de servicios alcanzado
+- `255`: desconocido
+
+---
+
+## 🟡 Hallazgo #27: `ret 2` requiere detener y esperar antes de iniciar
+
+### El problema
+`appService.start()` puede devolver `ret 2`, que la documentación oficial define como `Service Status Error`. En la práctica aparece cuando Zepp conserva un servicio listado/atascado y rechaza otro arranque inmediato.
+
+### La solución
+Antes de iniciar, ejecutar `appService.stop({ file })`, esperar unos segundos y recién después llamar a `start({ file })`.
+
+```javascript
+appService.stop({
+  file: "app-service/index",
+  complete_func: function () {
+    createSysTimer(false, 3000, function () {
+      appService.start({ file: "app-service/index", reload: false })
+    })
+  }
+})
+```
+
+No reintentar `start()` inmediatamente tras `stop()`: puede seguir devolviendo `ret 2`.
+
+---
+
 ## 🔴 Hallazgo #17: App Service requiere `requestPermission` dinámico (CRÍTICO)
 
 ### El problema

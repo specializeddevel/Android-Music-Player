@@ -465,25 +465,11 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
     private var lastScannedUri: String? = null
 
     private fun extractChapters(uriString: String) {
-        val uri = android.net.Uri.parse(uriString)
         viewModelScope.launch(Dispatchers.IO) {
-            val chaptersList = mutableListOf<Chapter>()
-            val retriever = android.media.MediaMetadataRetriever()
-            val context = getApplication<Application>().applicationContext
-            try {
-                if (uriString.startsWith("content://")) {
-                    context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
-                        retriever.setDataSource(pfd.fileDescriptor)
-                    }
-                } else {
-                    retriever.setDataSource(uriString)
-                }
-                // Aquí iría la lógica de extracción de capítulos (si la hubiera)
-            } catch (e: Exception) {
-                Log.e("PlaybackVM", "Error al extraer capítulos de $uriString", e)
-            } finally {
-                try { retriever.release() } catch (e: Exception) {}
-            }
+            val chaptersList = com.raulburgosmurray.musicplayer.data.ChapterExtractor.extractChapters(
+                getApplication(),
+                uriString
+            )
             withContext(Dispatchers.Main) {
                 _uiState.value = _uiState.value.copy(chapters = chaptersList)
             }
@@ -856,16 +842,10 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
                 it.pause()
             } else {
                 logAction(getApplication<Application>().getString(R.string.history_play))
-                it.play()
-                // Defensive: if player is stuck in idle/zombie state, force a rebuild
-                if (!it.isPlaying && it.playbackState == Player.STATE_IDLE) {
-                    val currentIndex = it.currentMediaItemIndex
-                    val currentPos = it.currentPosition
-                    it.stop()
+                if (it.playbackState == Player.STATE_IDLE && it.mediaItemCount > 0) {
                     it.prepare()
-                    it.seekTo(currentIndex, currentPos)
-                    it.play()
                 }
+                it.play()
             }
         }
     }
