@@ -555,16 +555,14 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
                 val startIndex = if (lastMediaId != null) {
                     itemsToLoad.indexOfFirst { it.mediaId == lastMediaId }.coerceAtLeast(0)
                 } else 0
-                val rawSaved = if (lastMediaId != null) {
+                val targetMediaId = itemsToLoad.getOrNull(startIndex)?.mediaId
+                val targetProgress = if (targetMediaId != null) {
                     withContext(Dispatchers.IO) {
-                        progressRepository.getProgress(lastMediaId)?.lastPosition ?: 0L
+                        progressRepository.getProgress(targetMediaId)
                     }
-                } else 0L
-                val savedDuration = if (lastMediaId != null) {
-                    withContext(Dispatchers.IO) {
-                        progressRepository.getProgress(lastMediaId)?.duration ?: 0L
-                    }
-                } else 0L
+                } else null
+                val rawSaved = targetProgress?.lastPosition ?: 0L
+                val savedDuration = targetProgress?.duration ?: 0L
                 val savedPosition = sanitizePosition(rawSaved, sanitizeDuration(savedDuration))
 
                 // Optimistic UI update so slider doesn't flash at 0
@@ -714,10 +712,16 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
             override fun onPlaybackStateChanged(playbackState: Int) {
                 val safeDuration = sanitizeDuration(player.duration)
                 val safePosition = sanitizePosition(player.currentPosition, safeDuration)
+                val currentPosToKeep = if (playbackState == Player.STATE_BUFFERING && safePosition == 0L && _uiState.value.currentPosition > 0L) {
+                    _uiState.value.currentPosition
+                } else {
+                    safePosition
+                }
+                val durationToKeep = if (safeDuration > 0L) safeDuration else _uiState.value.duration
                 _uiState.value = _uiState.value.copy(
                     isReady = playbackState == Player.STATE_READY,
-                    duration = safeDuration,
-                    currentPosition = safePosition
+                    duration = durationToKeep,
+                    currentPosition = currentPosToKeep
                 )
                 if (playbackState == Player.STATE_READY) {
                     attachEqualizer()

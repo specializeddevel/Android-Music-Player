@@ -54,6 +54,75 @@ class PlaybackService : MediaSessionService() {
 
     private var currentPlayingMediaId: String? = null
 
+    private val playerListener = object : Player.Listener {
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            currentPlayingMediaId = mediaItem?.mediaId
+            mediaItem?.mediaId?.let { item ->
+                restorePositionOnTransition(item)
+            }
+        }
+
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            val p = player ?: return
+            if (isPlaying) {
+                applySmartRewindOnPlay()
+                startPeriodicSave()
+            } else {
+                stopPeriodicSave()
+                // Solo guardamos marca de pausa si el usuario pausó manualmente
+                if (!p.playWhenReady) {
+                    saveCurrentProgress(isPausing = true)
+                } else {
+                    saveCurrentProgress(isPausing = false)
+                }
+            }
+        }
+
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            if (playbackState == Player.STATE_ENDED || playbackState == Player.STATE_IDLE) {
+                saveCurrentProgress()
+            }
+        }
+
+        override fun onPlayerError(error: PlaybackException) {
+            Log.e("PlaybackService", "Player error: ${error.errorCodeName}", error)
+            // Save progress before any recovery attempt
+            saveCurrentProgress()
+            // Do NOT recreate the player/session: that disconnects all MediaControllers.
+            // For local audiobooks, the player enters STATE_IDLE; the UI can re-prepare.
+            val p = player ?: return
+            if (p.playbackState == Player.STATE_IDLE && p.mediaItemCount > 0) {
+                p.prepare()
+            }
+        }
+
+        override fun onPositionDiscontinuity(
+            oldPosition: Player.PositionInfo,
+            newPosition: Player.PositionInfo,
+            reason: Int
+        ) {
+            if (reason != Player.DISCONTINUITY_REASON_SEEK) return
+            val backward = oldPosition.positionMs - newPosition.positionMs
+            if (backward > Constants.SKIP_BACKWARD_MS * 2 && newPosition.positionMs < 5_000L) {
+                val savedPos = oldPosition.positionMs
+                val mediaId = player?.currentMediaItem?.mediaId ?: return
+                serviceScope.launch(Dispatchers.IO) {
+                    try {
+                        database.bookmarkDao().insertBookmark(
+                            Bookmark(
+                                 mediaId = mediaId,
+                                 position = savedPos,
+                                 note = getString(R.string.bookmark_accidental_seek)
+                            )
+                        )
+                    } catch (e: Exception) {
+                        Log.e("PlaybackService", "Error guardando marcador de recuperación", e)
+                    }
+                }
+            }
+        }
+    }
+
     @OptIn(UnstableApi::class)
     private fun createPlayerAndSession() {
         // Configuración profesional para Audiolibros (Voz humana)
@@ -89,79 +158,7 @@ class PlaybackService : MediaSessionService() {
             .setLoadControl(loadControl)
             .build().apply {
                 (application as ApplicationClass).audioSessionId = audioSessionId
-                addListener(object : Player.Listener {
-                    override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                        val oldId = currentPlayingMediaId
-                        val newId = mediaItem?.mediaId
-                        if (oldId != null && oldId != newId) {
-                            saveProgressForMediaId(oldId)
-                        }
-                        currentPlayingMediaId = newId
-                        newId?.let { item ->
-                            restorePositionOnTransition(item)
-                        }
-                    }
-
-                    override fun onIsPlayingChanged(isPlaying: Boolean) {
-                        val p = player ?: return
-                        if (isPlaying) {
-                            applySmartRewindOnPlay()
-                            startPeriodicSave()
-                        } else {
-                            stopPeriodicSave()
-                            // Solo guardamos marca de pausa si el usuario pausó manualmente
-                            if (!p.playWhenReady) {
-                                saveCurrentProgress(isPausing = true)
-                            } else {
-                                saveCurrentProgress(isPausing = false)
-                            }
-                        }
-                    }
-
-                    override fun onPlaybackStateChanged(playbackState: Int) {
-                        if (playbackState == Player.STATE_ENDED || playbackState == Player.STATE_IDLE) {
-                            saveCurrentProgress()
-                        }
-                    }
-
-                    override fun onPlayerError(error: PlaybackException) {
-                        Log.e("PlaybackService", "Player error: ${error.errorCodeName}", error)
-                        // Save progress before any recovery attempt
-                        saveCurrentProgress()
-                        // Do NOT recreate the player/session: that disconnects all MediaControllers.
-                        // For local audiobooks, the player enters STATE_IDLE; the UI can re-prepare.
-                        val p = player ?: return
-                        if (p.playbackState == Player.STATE_IDLE && p.mediaItemCount > 0) {
-                            p.prepare()
-                        }
-                    }
-
-                    override fun onPositionDiscontinuity(
-                        oldPosition: Player.PositionInfo,
-                        newPosition: Player.PositionInfo,
-                        reason: Int
-                    ) {
-                        if (reason != Player.DISCONTINUITY_REASON_SEEK) return
-                        val backward = oldPosition.positionMs - newPosition.positionMs
-                        if (backward > Constants.SKIP_BACKWARD_MS * 2 && newPosition.positionMs < 5_000L) {
-                            val savedPos = oldPosition.positionMs
-                            val mediaId = player?.currentMediaItem?.mediaId ?: return
-                            serviceScope.launch(Dispatchers.IO) {
-                                try {
-                                    database.bookmarkDao().insertBookmark(
-                                        Bookmark(
-                                             mediaId = mediaId,
-                                             position = savedPos,
-                                             note = getString(R.string.bookmark_accidental_seek)
-                                        )
-                                    )
-                                } catch (e: Exception) {
-                                    Log.e("PlaybackService", "Error guardando marcador de recuperación", e)
-                                }
-                            }
-                        }
-                    }
-                })
+                addListener(playerListener)
             }
 
         val intent = Intent(this, MainActivity::class.java)
@@ -248,8 +245,11 @@ class PlaybackService : MediaSessionService() {
                     if (rewindMs > 0 && isActive) {
                         withContext(Dispatchers.Main) {
                             val currentPlayer = player ?: return@withContext
-                            val newPos = (currentPlayer.currentPosition - rewindMs).coerceAtLeast(0L)
-                            currentPlayer.seekTo(newPos)
+                            val currentPos = currentPlayer.currentPosition
+                            if (currentPos > rewindMs) {
+                                val newPos = (currentPos - rewindMs).coerceAtLeast(0L)
+                                currentPlayer.seekTo(newPos)
+                            }
                         }
                     }
                 }
@@ -289,53 +289,17 @@ class PlaybackService : MediaSessionService() {
     }
 
     private fun releaseResources() {
-        player?.let {
-            it.pause()
-            it.stop()
-            it.release()
-        }
+        val p = player
         player = null
+        if (p != null) {
+            p.removeListener(playerListener)
+            p.pause()
+            p.stop()
+            p.release()
+        }
         mediaSession?.let {
             it.release()
             mediaSession = null
-        }
-    }
-
-    private fun saveProgressForMediaId(mediaId: String) {
-        val p = player ?: return
-        val position = p.currentPosition.coerceAtLeast(0L)
-        val rawDuration = p.duration
-        val speed = p.playbackParameters.speed
-        val pitch = p.playbackParameters.pitch
-
-        serviceScope.launch(Dispatchers.IO) {
-            try {
-                val currentProgress = database.progressDao().getProgress(mediaId)
-                val duration = if (rawDuration > 0) rawDuration else (currentProgress?.duration ?: 0L)
-                val safePosition = if (duration > 0) position.coerceAtMost(duration) else position
-                val progressPercent = if (duration > 0) safePosition.toFloat() / duration.toFloat() else 0f
-                val shouldMarkAsRead = progressPercent >= 0.99f
-                val currentIsRead = currentProgress?.isRead ?: false
-                val finalIsRead = currentIsRead || shouldMarkAsRead
-
-                val eqName = currentProgress?.eqPresetName?.takeIf { it.isNotEmpty() }
-                    ?: getSharedPreferences("eq_prefs", MODE_PRIVATE).getString("eq_preset", "").orEmpty()
-
-                database.progressDao().saveProgress(
-                    AudiobookProgress(
-                        mediaId = mediaId,
-                        lastPosition = safePosition,
-                        duration = duration,
-                        lastPauseTimestamp = System.currentTimeMillis(),
-                        playbackSpeed = speed,
-                        pitch = pitch,
-                        eqPresetName = eqName,
-                        isRead = finalIsRead
-                    )
-                )
-            } catch (e: Exception) {
-                Log.e("PlaybackService", "Error guardando progreso saliente de $mediaId", e)
-            }
         }
     }
 
@@ -359,7 +323,12 @@ class PlaybackService : MediaSessionService() {
                 
                 if (duration > com.raulburgosmurray.musicplayer.ui.PlaybackViewModel.MAX_REASONABLE_DURATION_MS) return@launch
                 
-                val safePosition = if (duration > 0) position.coerceAtMost(duration) else position
+                val safePosition = when {
+                    position > 0 && duration > 0 -> position.coerceAtMost(duration)
+                    position > 0 -> position
+                    currentProgress != null && currentProgress.lastPosition > 0 -> currentProgress.lastPosition
+                    else -> 0L
+                }
                 val pauseToSave = if (isPausing) newPauseTimestamp else (currentProgress?.lastPauseTimestamp ?: 0L)
                 
                 // Auto-mark as read when progress reaches 99% or more
@@ -428,7 +397,12 @@ class PlaybackService : MediaSessionService() {
                 val existing = database.progressDao().getProgress(mediaId)
                 val duration = if (rawDuration > 0) rawDuration else (existing?.duration ?: 0L)
                 if (duration > com.raulburgosmurray.musicplayer.ui.PlaybackViewModel.MAX_REASONABLE_DURATION_MS) return@runBlocking
-                val safePosition = if (duration > 0) position.coerceAtMost(duration) else position
+                val safePosition = when {
+                    position > 0 && duration > 0 -> position.coerceAtMost(duration)
+                    position > 0 -> position
+                    existing != null && existing.lastPosition > 0 -> existing.lastPosition
+                    else -> 0L
+                }
                 val progressPercent = if (duration > 0) safePosition.toFloat() / duration.toFloat() else 0f
                 
                 // Preserve per-book EQ preset if it exists; fall back to global prefs only when empty
