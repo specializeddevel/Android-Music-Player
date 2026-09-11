@@ -30,51 +30,90 @@ object ChapterExtractor {
     }
 
     private fun extractFromContentUri(context: Context, uri: Uri): List<Chapter> {
-        val tempFile = copyToTempFile(context, uri) ?: return emptyList()
+        val pathOrUri = uri.toString().lowercase()
+        if (pathOrUri.endsWith(".mp3") || pathOrUri.endsWith(".wav") || pathOrUri.endsWith(".ogg") || pathOrUri.endsWith(".flac")) {
+            return emptyList()
+        }
+
         return try {
-            parseChplAtom(tempFile)
-        } finally {
-            tempFile.delete()
+            context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
+                java.io.FileInputStream(pfd.fileDescriptor).channel.use { channel ->
+                    parseChplFromChannel(channel)
+                }
+            } ?: emptyList()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to parse chapters from content URI: $uri", e)
+            emptyList()
         }
     }
 
     private fun extractFromLocalFile(path: String): List<Chapter> {
         val file = File(path)
         if (!file.exists()) return emptyList()
-        return parseChplAtom(file)
-    }
-
-    private fun copyToTempFile(context: Context, uri: Uri): File? {
-        return try {
-            val tempFile = File(context.cacheDir, "chapter_${System.currentTimeMillis()}.m4b")
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                tempFile.outputStream().use { output ->
-                    input.copyTo(output, bufferSize = 8192)
-                }
-            }
-            if (tempFile.exists() && tempFile.length() > 0) tempFile else null
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to copy content URI to temp file", e)
-            null
-        }
-    }
-
-    private fun parseChplAtom(file: File): List<Chapter> {
-        try {
-            val size = file.length()
-            if (size > MAX_FILE_SIZE_FOR_MEMORY) {
-                return parseChplStreaming(file)
-            }
-            val data = file.readBytes()
-            val offset = findAtomOffset(data, "chpl")
-            if (offset == null) {
-                return parseChplFromUdta(data)
-            }
-            return parseChplFromOffset(data, offset)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to parse chpl atom from ${file.name}", e)
+        val lower = path.lowercase()
+        if (lower.endsWith(".mp3") || lower.endsWith(".wav") || lower.endsWith(".ogg") || lower.endsWith(".flac")) {
             return emptyList()
         }
+        return try {
+            java.io.FileInputStream(file).channel.use { channel ->
+                parseChplFromChannel(channel)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to parse chapters from local file: $path", e)
+            emptyList()
+        }
+    }
+
+    private fun parseChplFromChannel(channel: java.nio.channels.FileChannel): List<Chapter> {
+        try {
+            val chplData = findAtomFromChannel(channel, channel.size(), "chpl") ?: return emptyList()
+            return parseChplFromOffset(chplData, 0)
+        } catch (e: Exception) {
+            Log.e(TAG, "Channel parse failed", e)
+            return emptyList()
+        }
+    }
+
+    private fun findAtomFromChannel(channel: java.nio.channels.FileChannel, fileSize: Long, targetAtom: String): ByteArray? {
+        val stack = java.util.ArrayDeque<Pair<Long, Long>>()
+        stack.push(Pair(0L, fileSize))
+        val headerBuf = ByteBuffer.allocate(8).order(ByteOrder.BIG_ENDIAN)
+
+        while (stack.isNotEmpty()) {
+            val (start, end) = stack.pop()
+            var pos = start
+
+            while (pos + 8 <= end) {
+                channel.position(pos)
+                headerBuf.clear()
+                val read = channel.read(headerBuf)
+                if (read < 8) break
+                headerBuf.flip()
+                val size = headerBuf.int.toLong() and 0xFFFFFFFFL
+                val nameBytes = ByteArray(4)
+                headerBuf.get(nameBytes)
+                val name = String(nameBytes, Charsets.US_ASCII)
+
+                if (name == targetAtom && size >= 8 && size <= 10 * 1024 * 1024) {
+                    val atomData = ByteArray(size.toInt())
+                    channel.position(pos)
+                    val atomBuf = ByteBuffer.wrap(atomData)
+                    while (atomBuf.hasRemaining()) {
+                        if (channel.read(atomBuf) == -1) break
+                    }
+                    return atomData
+                }
+
+                val containerAtoms = setOf("moov", "udta", "meta", "mdia", "minf", "stbl", "trak", "edts")
+                if (name in containerAtoms && size > 8) {
+                    stack.push(Pair(pos + 8, minOf(pos + size, end)))
+                }
+
+                if (size < 8) break
+                pos += size
+            }
+        }
+        return null
     }
 
     private fun parseChplFromUdta(data: ByteArray): List<Chapter> {

@@ -28,6 +28,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 
+import androidx.media3.extractor.DefaultExtractorsFactory
+import androidx.media3.extractor.mp3.Mp3Extractor
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+
 class PlaybackService : MediaSessionService() {
 
     companion object {
@@ -59,16 +63,24 @@ class PlaybackService : MediaSessionService() {
         val renderersFactory = DefaultRenderersFactory(this)
             .setEnableAudioTrackPlaybackParams(false) // Force SonicAudioProcessor for stable pitch support
 
+        val extractorsFactory = DefaultExtractorsFactory()
+            .setMp3ExtractorFlags(
+                Mp3Extractor.FLAG_ENABLE_INDEX_SEEKING or
+                Mp3Extractor.FLAG_ENABLE_CONSTANT_BITRATE_SEEKING
+            )
+        val mediaSourceFactory = DefaultMediaSourceFactory(this, extractorsFactory)
+
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
                 10_000,  // minBufferMs
                 20_000,  // maxBufferMs
-                1_500,   // bufferForPlaybackMs
-                3_000    // bufferForPlaybackAfterRebufferMs
+                250,     // bufferForPlaybackMs (instant startup)
+                500      // bufferForPlaybackAfterRebufferMs (fast rebuffer)
             )
             .build()
 
         player = ExoPlayer.Builder(this, renderersFactory)
+            .setMediaSourceFactory(mediaSourceFactory)
             .setAudioAttributes(audioAttributes, true) // TRUE activa el manejo de Audio Focus automático
             .setHandleAudioBecomingNoisy(true)         // TRUE pausa automáticamente al desconectar audífonos
             .setWakeMode(C.WAKE_MODE_LOCAL)           // Optimizado para archivos locales
@@ -130,9 +142,9 @@ class PlaybackService : MediaSessionService() {
                                 try {
                                     database.bookmarkDao().insertBookmark(
                                         Bookmark(
-                                            mediaId = mediaId,
-                                            position = savedPos,
-                                            note = getString(R.string.bookmark_accidental_seek)
+                                             mediaId = mediaId,
+                                             position = savedPos,
+                                             note = getString(R.string.bookmark_accidental_seek)
                                         )
                                     )
                                 } catch (e: Exception) {
@@ -157,6 +169,7 @@ class PlaybackService : MediaSessionService() {
 
     private fun calculateRewindMs(elapsed: Long): Long {
         return when {
+            elapsed < 3_000L -> 0L // No rewind for rapid taps / immediate pauses
             elapsed < Constants.SMART_REWIND_VERY_SHORT_PAUSE_MS -> Constants.SMART_REWIND_VERY_SHORT_AMOUNT_MS
             elapsed < Constants.SMART_REWIND_SHORT_PAUSE_MS -> Constants.SMART_REWIND_SHORT_AMOUNT_MS
             elapsed < Constants.SMART_REWIND_MEDIUM_PAUSE_MS -> Constants.SMART_REWIND_MEDIUM_AMOUNT_MS
@@ -172,9 +185,6 @@ class PlaybackService : MediaSessionService() {
                 withContext(Dispatchers.Main) {
                     val currentPlayer = player ?: return@withContext
                     if (progress != null) {
-                        if (Math.abs(currentPlayer.currentPosition - progress.lastPosition) > 1000) {
-                            currentPlayer.seekTo(progress.lastPosition)
-                        }
                         // Restaurar la velocidad y pitch guardados (mínimo 0.1 para evitar errores)
                         val speed = progress.playbackSpeed.coerceAtLeast(0.1f)
                         val pitch = progress.pitch.coerceAtLeast(0.1f)
@@ -185,11 +195,13 @@ class PlaybackService : MediaSessionService() {
                         if (progress.eqPresetName.isNotEmpty()) {
                             try {
                                 val preset = EqPreset.valueOf(progress.eqPresetName)
-                                // El equalizer se restaurará via PlaybackViewModel.attachEqualizer
-                                // Guardamos en prefs para que el ViewModel lo lea
                                 getSharedPreferences("eq_prefs", MODE_PRIVATE).edit()
                                     .putString("eq_preset", preset.name).apply()
                             } catch (_: IllegalArgumentException) {}
+                        }
+                        // Solo hacer seek si la posición actual no fue seteada por setMediaItems/seekTo
+                        if (currentPlayer.currentPosition == 0L && progress.lastPosition > 1000L) {
+                            currentPlayer.seekTo(progress.lastPosition)
                         }
                     } else {
                         // Libro nuevo: resetear velocidad y pitch a 1.0f por defecto
