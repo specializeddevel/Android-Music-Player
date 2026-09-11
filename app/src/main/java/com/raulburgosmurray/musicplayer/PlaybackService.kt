@@ -322,7 +322,7 @@ class PlaybackService : MediaSessionService() {
 
                 // Preserve per-book EQ preset if it exists; fall back to global prefs only when empty
                 val eqName = currentProgress?.eqPresetName?.takeIf { it.isNotEmpty() }
-                    ?: getSharedPreferences("eq_prefs", MODE_PRIVATE).getString("eq_preset", "") ?: ""
+                    ?: getSharedPreferences("eq_prefs", MODE_PRIVATE).getString("eq_preset", "").orEmpty()
                 database.progressDao().saveProgress(
                     AudiobookProgress(
                         mediaId = currentMediaItem.mediaId,
@@ -369,7 +369,7 @@ class PlaybackService : MediaSessionService() {
                 val progressPercent = position.toFloat() / duration.toFloat()
                 // Preserve per-book EQ preset if it exists; fall back to global prefs only when empty
                 val eqName = existing?.eqPresetName?.takeIf { it.isNotEmpty() }
-                    ?: getSharedPreferences("eq_prefs", MODE_PRIVATE).getString("eq_preset", "") ?: ""
+                    ?: getSharedPreferences("eq_prefs", MODE_PRIVATE).getString("eq_preset", "").orEmpty()
                 database.progressDao().saveProgress(
                     AudiobookProgress(
                         mediaId = currentMediaItem.mediaId,

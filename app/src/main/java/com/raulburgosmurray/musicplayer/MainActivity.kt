@@ -170,7 +170,11 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        try { unregisterReceiver(syncReceiver) } catch (e: Exception) {}
+        try {
+            unregisterReceiver(syncReceiver)
+        } catch (e: Exception) {
+            Log.w("MainActivity", "Failed to unregister syncReceiver", e)
+        }
         sleepDetectionReceiver?.stopListening()
         super.onDestroy()
     }
@@ -191,10 +195,10 @@ class MainActivity : ComponentActivity() {
             permissionsToRequest.add(storagePermission)
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
-            }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
         }
 
         if (permissionsToRequest.isNotEmpty()) {
@@ -406,14 +410,26 @@ class MainActivity : ComponentActivity() {
 
                                                 DisposableEffect(Unit) {
                                                     onDispose {
-                                                        try { processCameraProvider?.unbindAll() } catch (e: Exception) {}
-                                                        try { executor.shutdown() } catch (e: Exception) {}
+                                                        try {
+                                                            processCameraProvider?.unbindAll()
+                                                        } catch (e: Exception) {
+                                                            Log.w("MainActivity", "Failed to unbind camera provider on dispose", e)
+                                                        }
+                                                        try {
+                                                            executor.shutdown()
+                                                        } catch (e: Exception) {
+                                                            Log.w("MainActivity", "Failed to shutdown camera executor", e)
+                                                        }
                                                     }
                                                 }
 
                                                 LaunchedEffect(state.isDownloading) {
                                                     if (state.isDownloading) {
-                                                        try { processCameraProvider?.unbindAll() } catch (e: Exception) {}
+                                                        try {
+                                                            processCameraProvider?.unbindAll()
+                                                        } catch (e: Exception) {
+                                                            Log.w("MainActivity", "Failed to unbind camera provider when downloading", e)
+                                                        }
                                                     }
                                                 }
 

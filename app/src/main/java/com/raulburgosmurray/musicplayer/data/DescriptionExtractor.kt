@@ -95,10 +95,14 @@ object DescriptionExtractor {
             Log.d(TAG, "Partial copy: ${tempFile.length()} bytes, ext=.$ext, path=${tempFile.absolutePath}")
             extractFromLocalFile(tempFile.absolutePath)
         } catch (e: Exception) {
-            Log.d(TAG, "Partial copy failed for $uri", e)
+            Log.e(TAG, "Partial copy failed for $uri", e)
             null
         } finally {
-            tempFile?.delete()
+            tempFile?.let { file ->
+                if (!file.delete()) {
+                    Log.w(TAG, "Failed to delete temp file: ${file.absolutePath}")
+                }
+            }
         }
     }
 

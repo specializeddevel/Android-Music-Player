@@ -80,7 +80,9 @@ object MetadataJsonHelper {
             val fileName = "${mediaId.hashCode()}.json"
             val file = File(metadataDir, fileName)
             if (file.exists()) {
-                file.delete()
+                if (!file.delete()) {
+                    Log.w(TAG, "Failed to delete metadata for $mediaId")
+                }
                 metadataCache.remove(mediaId)
                 Log.d(TAG, "Deleted metadata for $mediaId")
             }

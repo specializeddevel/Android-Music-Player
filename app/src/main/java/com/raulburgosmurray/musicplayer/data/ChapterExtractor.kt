@@ -14,6 +14,7 @@ object ChapterExtractor {
     private const val TAG = "ChapterExtractor"
     private const val MAX_ATOM_DEPTH = 20
     private const val MAX_FILE_SIZE_FOR_MEMORY = 150L * 1024 * 1024
+    private const val MAX_ATOM_SIZE = 10L * 1024 * 1024
 
     fun extractChapters(context: Context, uriString: String): List<Chapter> {
         return try {
@@ -74,6 +75,32 @@ object ChapterExtractor {
         }
     }
 
+    private data class AtomHeader(val size: Long, val name: String)
+
+    private val containerAtoms = setOf("moov", "udta", "meta", "mdia", "minf", "stbl", "trak", "edts")
+
+    private fun readAtomHeader(channel: java.nio.channels.FileChannel, pos: Long, headerBuf: ByteBuffer): AtomHeader? {
+        channel.position(pos)
+        headerBuf.clear()
+        if (channel.read(headerBuf) < 8) return null
+        headerBuf.flip()
+        val size = headerBuf.int.toLong() and 0xFFFFFFFFL
+        val nameBytes = ByteArray(4)
+        headerBuf.get(nameBytes)
+        val name = String(nameBytes, Charsets.US_ASCII)
+        return AtomHeader(size, name)
+    }
+
+    private fun readAtomData(channel: java.nio.channels.FileChannel, pos: Long, size: Int): ByteArray {
+        val atomData = ByteArray(size)
+        channel.position(pos)
+        val atomBuf = ByteBuffer.wrap(atomData)
+        while (atomBuf.hasRemaining()) {
+            if (channel.read(atomBuf) == -1) break
+        }
+        return atomData
+    }
+
     private fun findAtomFromChannel(channel: java.nio.channels.FileChannel, fileSize: Long, targetAtom: String): ByteArray? {
         val stack = java.util.ArrayDeque<Pair<Long, Long>>()
         stack.push(Pair(0L, fileSize))
@@ -84,33 +111,18 @@ object ChapterExtractor {
             var pos = start
 
             while (pos + 8 <= end) {
-                channel.position(pos)
-                headerBuf.clear()
-                val read = channel.read(headerBuf)
-                if (read < 8) break
-                headerBuf.flip()
-                val size = headerBuf.int.toLong() and 0xFFFFFFFFL
-                val nameBytes = ByteArray(4)
-                headerBuf.get(nameBytes)
-                val name = String(nameBytes, Charsets.US_ASCII)
+                val header = readAtomHeader(channel, pos, headerBuf) ?: break
 
-                if (name == targetAtom && size >= 8 && size <= 10 * 1024 * 1024) {
-                    val atomData = ByteArray(size.toInt())
-                    channel.position(pos)
-                    val atomBuf = ByteBuffer.wrap(atomData)
-                    while (atomBuf.hasRemaining()) {
-                        if (channel.read(atomBuf) == -1) break
-                    }
-                    return atomData
+                if (header.name == targetAtom && header.size in 8..MAX_ATOM_SIZE) {
+                    return readAtomData(channel, pos, header.size.toInt())
                 }
 
-                val containerAtoms = setOf("moov", "udta", "meta", "mdia", "minf", "stbl", "trak", "edts")
-                if (name in containerAtoms && size > 8) {
-                    stack.push(Pair(pos + 8, minOf(pos + size, end)))
+                if (header.name in containerAtoms && header.size > 8) {
+                    stack.push(Pair(pos + 8, minOf(pos + header.size, end)))
                 }
 
-                if (size < 8) break
-                pos += size
+                if (header.size < 8) break
+                pos += header.size
             }
         }
         return null
