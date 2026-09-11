@@ -919,11 +919,15 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
             viewModelScope.launch(Dispatchers.IO) {
                 try {
                     val existing = progressRepository.getProgress(id)
+                    val currentPos = existing?.lastPosition ?: controller?.currentPosition?.coerceAtLeast(0L) ?: 0L
+                    val cachedBook = bookRepository.getAllBooks().first().find { it.id == id }
+                    val duration = existing?.duration?.takeIf { it > 0 }
+                        ?: controller?.duration?.takeIf { it > 0 }
+                        ?: cachedBook?.duration
+                        ?: 0L
                     if (existing != null) {
-                        progressRepository.saveProgress(existing.copy(playbackSpeed = speed, pitch = currentPitch))
+                        progressRepository.saveProgress(existing.copy(playbackSpeed = speed, pitch = currentPitch, duration = duration))
                     } else {
-                        val currentPos = controller?.currentPosition ?: 0L
-                        val duration = controller?.duration ?: 0L
                         progressRepository.saveProgress(
                             AudiobookProgress(
                                 mediaId = id,
@@ -953,11 +957,15 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
             viewModelScope.launch(Dispatchers.IO) {
                 try {
                     val existing = progressRepository.getProgress(id)
+                    val currentPos = existing?.lastPosition ?: controller?.currentPosition?.coerceAtLeast(0L) ?: 0L
+                    val cachedBook = bookRepository.getAllBooks().first().find { it.id == id }
+                    val duration = existing?.duration?.takeIf { it > 0 }
+                        ?: controller?.duration?.takeIf { it > 0 }
+                        ?: cachedBook?.duration
+                        ?: 0L
                     if (existing != null) {
-                        progressRepository.saveProgress(existing.copy(pitch = pitch, playbackSpeed = currentSpeed))
+                        progressRepository.saveProgress(existing.copy(pitch = pitch, playbackSpeed = currentSpeed, duration = duration))
                     } else {
-                        val currentPos = controller?.currentPosition ?: 0L
-                        val duration = controller?.duration ?: 0L
                         progressRepository.saveProgress(
                             AudiobookProgress(
                                 mediaId = id,
@@ -1048,17 +1056,42 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
         viewModelScope.launch {
             val player = controller
             if (player != null) {
+                // Save progress of the currently active book before switching
+                val currentActiveId = player.currentMediaItem?.mediaId
+                if (currentActiveId != null && player.playbackState != Player.STATE_IDLE) {
+                    val currentPos = player.currentPosition.coerceAtLeast(0L)
+                    val rawDuration = player.duration
+                    val currentSpeed = player.playbackParameters.speed
+                    val currentPitch = player.playbackParameters.pitch
+                    withContext(Dispatchers.IO) {
+                        try {
+                            val existing = progressRepository.getProgress(currentActiveId)
+                            val finalDur = if (rawDuration > 0) rawDuration else (existing?.duration ?: 0L)
+                            if (existing != null) {
+                                progressRepository.saveProgress(
+                                    existing.copy(
+                                        lastPosition = currentPos,
+                                        duration = finalDur,
+                                        playbackSpeed = currentSpeed,
+                                        pitch = currentPitch,
+                                        lastPauseTimestamp = System.currentTimeMillis()
+                                    )
+                                )
+                            }
+                        } catch (e: Exception) {
+                            Log.e("PlaybackVM", "Error saving current book progress before switch", e)
+                        }
+                    }
+                }
+
                 val mediaId = mediaItems.getOrNull(startIndex)?.mediaId
-                val rawSaved = if (mediaId != null) {
+                val targetProgress = if (mediaId != null) {
                     withContext(Dispatchers.IO) {
-                        progressRepository.getProgress(mediaId)?.lastPosition ?: 0L
+                        progressRepository.getProgress(mediaId)
                     }
-                } else 0L
-                val savedDuration = if (mediaId != null) {
-                    withContext(Dispatchers.IO) {
-                        progressRepository.getProgress(mediaId)?.duration ?: 0L
-                    }
-                } else 0L
+                } else null
+                val rawSaved = targetProgress?.lastPosition ?: 0L
+                val savedDuration = targetProgress?.duration ?: 0L
                 val savedPosition = sanitizePosition(rawSaved, sanitizeDuration(savedDuration))
 
                 // Optimistic UI update so slider doesn't flash at 0

@@ -52,6 +52,8 @@ class PlaybackService : MediaSessionService() {
         createPlayerAndSession()
     }
 
+    private var currentPlayingMediaId: String? = null
+
     @OptIn(UnstableApi::class)
     private fun createPlayerAndSession() {
         // Configuración profesional para Audiolibros (Voz humana)
@@ -89,8 +91,14 @@ class PlaybackService : MediaSessionService() {
                 (application as ApplicationClass).audioSessionId = audioSessionId
                 addListener(object : Player.Listener {
                     override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                        mediaItem?.let { item ->
-                            restorePositionOnTransition(item.mediaId)
+                        val oldId = currentPlayingMediaId
+                        val newId = mediaItem?.mediaId
+                        if (oldId != null && oldId != newId) {
+                            saveProgressForMediaId(oldId)
+                        }
+                        currentPlayingMediaId = newId
+                        newId?.let { item ->
+                            restorePositionOnTransition(item)
                         }
                     }
 
@@ -293,29 +301,69 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
+    private fun saveProgressForMediaId(mediaId: String) {
+        val p = player ?: return
+        val position = p.currentPosition.coerceAtLeast(0L)
+        val rawDuration = p.duration
+        val speed = p.playbackParameters.speed
+        val pitch = p.playbackParameters.pitch
+
+        serviceScope.launch(Dispatchers.IO) {
+            try {
+                val currentProgress = database.progressDao().getProgress(mediaId)
+                val duration = if (rawDuration > 0) rawDuration else (currentProgress?.duration ?: 0L)
+                val safePosition = if (duration > 0) position.coerceAtMost(duration) else position
+                val progressPercent = if (duration > 0) safePosition.toFloat() / duration.toFloat() else 0f
+                val shouldMarkAsRead = progressPercent >= 0.99f
+                val currentIsRead = currentProgress?.isRead ?: false
+                val finalIsRead = currentIsRead || shouldMarkAsRead
+
+                val eqName = currentProgress?.eqPresetName?.takeIf { it.isNotEmpty() }
+                    ?: getSharedPreferences("eq_prefs", MODE_PRIVATE).getString("eq_preset", "").orEmpty()
+
+                database.progressDao().saveProgress(
+                    AudiobookProgress(
+                        mediaId = mediaId,
+                        lastPosition = safePosition,
+                        duration = duration,
+                        lastPauseTimestamp = System.currentTimeMillis(),
+                        playbackSpeed = speed,
+                        pitch = pitch,
+                        eqPresetName = eqName,
+                        isRead = finalIsRead
+                    )
+                )
+            } catch (e: Exception) {
+                Log.e("PlaybackService", "Error guardando progreso saliente de $mediaId", e)
+            }
+        }
+    }
+
     private fun saveCurrentProgress(isPausing: Boolean = false) {
         val p = player ?: return
         if (p.playbackState == Player.STATE_IDLE) return
         
         val currentMediaItem = p.currentMediaItem ?: return
-        val position = p.currentPosition
-        val duration = p.duration
+        val mediaId = currentMediaItem.mediaId
+        val position = p.currentPosition.coerceAtLeast(0L)
+        val rawDuration = p.duration
         val speed = p.playbackParameters.speed
         val pitch = p.playbackParameters.pitch
-        
-        // Defensive: reject obviously corrupt values before they poison the DB
-        if (duration <= 0 || position < 0 || position > duration * 2) return
-        if (duration > com.raulburgosmurray.musicplayer.ui.PlaybackViewModel.MAX_REASONABLE_DURATION_MS) return
         
         val newPauseTimestamp = if (isPausing) System.currentTimeMillis() else 0L
         
         serviceScope.launch(Dispatchers.IO) {
             try {
-                val currentProgress = database.progressDao().getProgress(currentMediaItem.mediaId)
+                val currentProgress = database.progressDao().getProgress(mediaId)
+                val duration = if (rawDuration > 0) rawDuration else (currentProgress?.duration ?: 0L)
+                
+                if (duration > com.raulburgosmurray.musicplayer.ui.PlaybackViewModel.MAX_REASONABLE_DURATION_MS) return@launch
+                
+                val safePosition = if (duration > 0) position.coerceAtMost(duration) else position
                 val pauseToSave = if (isPausing) newPauseTimestamp else (currentProgress?.lastPauseTimestamp ?: 0L)
                 
                 // Auto-mark as read when progress reaches 99% or more
-                val progressPercent = if (duration > 0) position.toFloat() / duration.toFloat() else 0f
+                val progressPercent = if (duration > 0) safePosition.toFloat() / duration.toFloat() else 0f
                 val shouldMarkAsRead = progressPercent >= 0.99f
                 val currentIsRead = currentProgress?.isRead ?: false
                 val finalIsRead = currentIsRead || shouldMarkAsRead
@@ -338,8 +386,8 @@ class PlaybackService : MediaSessionService() {
 
                 database.progressDao().saveProgress(
                     AudiobookProgress(
-                        mediaId = currentMediaItem.mediaId,
-                        lastPosition = position,
+                        mediaId = mediaId,
+                        lastPosition = safePosition,
                         duration = duration,
                         lastPauseTimestamp = pauseToSave,
                         playbackSpeed = speedToSave,
@@ -369,17 +417,20 @@ class PlaybackService : MediaSessionService() {
         val p = player ?: return
         if (p.playbackState == Player.STATE_IDLE) return
         val currentMediaItem = p.currentMediaItem ?: return
-        val position = p.currentPosition
-        val duration = p.duration
+        val mediaId = currentMediaItem.mediaId
+        val position = p.currentPosition.coerceAtLeast(0L)
+        val rawDuration = p.duration
         val speed = p.playbackParameters.speed
         val pitch = p.playbackParameters.pitch
-        if (duration <= 0 || position < 0 || position > duration * 2) return
-        if (duration > com.raulburgosmurray.musicplayer.ui.PlaybackViewModel.MAX_REASONABLE_DURATION_MS) return
 
         runBlocking(Dispatchers.IO) {
             try {
-                val existing = database.progressDao().getProgress(currentMediaItem.mediaId)
-                val progressPercent = position.toFloat() / duration.toFloat()
+                val existing = database.progressDao().getProgress(mediaId)
+                val duration = if (rawDuration > 0) rawDuration else (existing?.duration ?: 0L)
+                if (duration > com.raulburgosmurray.musicplayer.ui.PlaybackViewModel.MAX_REASONABLE_DURATION_MS) return@runBlocking
+                val safePosition = if (duration > 0) position.coerceAtMost(duration) else position
+                val progressPercent = if (duration > 0) safePosition.toFloat() / duration.toFloat() else 0f
+                
                 // Preserve per-book EQ preset if it exists; fall back to global prefs only when empty
                 val eqName = existing?.eqPresetName?.takeIf { it.isNotEmpty() }
                     ?: getSharedPreferences("eq_prefs", MODE_PRIVATE).getString("eq_preset", "").orEmpty()
@@ -397,8 +448,8 @@ class PlaybackService : MediaSessionService() {
 
                 database.progressDao().saveProgress(
                     AudiobookProgress(
-                        mediaId = currentMediaItem.mediaId,
-                        lastPosition = position,
+                        mediaId = mediaId,
+                        lastPosition = safePosition,
                         duration = duration,
                         lastPauseTimestamp = System.currentTimeMillis(),
                         playbackSpeed = speedToSave,
