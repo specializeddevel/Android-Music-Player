@@ -68,7 +68,9 @@ class SleepDetectionReceiver(
         receiverJob = null
         try {
             serverSocket?.close()
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Log.w(TAG, "Error closing server socket", e)
+        }
         serverSocket = null
     }
 
@@ -89,12 +91,12 @@ class SleepDetectionReceiver(
 
             // Leer headers
             var contentLength = 0
-            var line: String?
-            while (reader.readLine().also { line = it } != null) {
-                if (line.isNullOrEmpty()) break
-                if (line!!.startsWith("Content-Length:")) {
-                    contentLength = line!!.substringAfter(":").trim().toIntOrNull() ?: 0
+            var headerLine = reader.readLine()
+            while (!headerLine.isNullOrEmpty()) {
+                if (headerLine.startsWith("Content-Length:", ignoreCase = true)) {
+                    contentLength = headerLine.substringAfter(":").trim().toIntOrNull() ?: 0
                 }
+                headerLine = reader.readLine()
             }
 
             // Leer body
@@ -119,7 +121,11 @@ class SleepDetectionReceiver(
         } catch (e: Exception) {
             Log.e(TAG, "Error handling connection", e)
         } finally {
-            try { socket.close() } catch (_: Exception) {}
+            try {
+                socket.close()
+            } catch (e: Exception) {
+                Log.w(TAG, "Error closing client socket", e)
+            }
         }
     }
 
@@ -127,7 +133,9 @@ class SleepDetectionReceiver(
         try {
             val response = """HTTP/1.1 $code $message\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"""
             socket.getOutputStream().write(response.toByteArray())
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Log.w(TAG, "Error sending HTTP response", e)
+        }
     }
 
     @Serializable
