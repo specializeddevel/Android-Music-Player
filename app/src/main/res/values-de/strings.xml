@@ -313,4 +313,5 @@
     <string name="history_sleep_detected">Schlaf erkannt — pausiert</string>
     <string name="history_sleep_rewind">%1$s zum Schlafpunkt zurückgespult</string>
     <string name="interval_minutes">%1$d min</string>
+    <string name="now_playing">Wird wiedergegeben</string>
 </resources>

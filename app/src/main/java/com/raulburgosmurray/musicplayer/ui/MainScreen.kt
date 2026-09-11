@@ -14,6 +14,7 @@ import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
@@ -344,7 +345,7 @@ fun MainScreen(
                                 items = displayedBooks,
                                 key = { it.id },
                                 contentType = { "book" }
-                            ) { book -> with(sharedTransitionScope) { BookListItem(book = book, isFavorite = favoriteIdsSet.contains(book.id), isRead = readStatusSet.contains(book.id), progress = bookProgress[book.id] ?: 0f, animatedVisibilityScope = animatedVisibilityScope, onAddToQueue = { onQueueClick(book) }, onLongClick = { onBookLongClick(book) }, onClick = { onBookClick(book) }) } }
+                            ) { book -> with(sharedTransitionScope) { BookListItem(book = book, isFavorite = favoriteIdsSet.contains(book.id), isRead = readStatusSet.contains(book.id), progress = bookProgress[book.id] ?: 0f, isPlaying = playbackState.isPlaying && playbackState.currentMediaItem?.mediaId == book.id, animatedVisibilityScope = animatedVisibilityScope, onAddToQueue = { onQueueClick(book) }, onLongClick = { onBookLongClick(book) }, onClick = { onBookClick(book) }) } }
                         }
                     } else {
                         // AJUSTE DINÁMICO DE COLUMNAS: Solo 4 si es tableta Y horizontal. En móvil horizontal 3.
@@ -359,7 +360,7 @@ fun MainScreen(
                                 items = displayedBooks,
                                 key = { it.id },
                                 contentType = { "book" }
-                            ) { book -> with(sharedTransitionScope) { BookGridItem(book = book, isFavorite = favoriteIdsSet.contains(book.id), isRead = readStatusSet.contains(book.id), progress = bookProgress[book.id] ?: 0f, animatedVisibilityScope = animatedVisibilityScope, onAddToQueue = { onQueueClick(book) }, onLongClick = { onBookLongClick(book) }, onClick = { onBookClick(book) }) } }
+                            ) { book -> with(sharedTransitionScope) { BookGridItem(book = book, keyPrefix = "list", isFavorite = favoriteIdsSet.contains(book.id), isRead = readStatusSet.contains(book.id), progress = bookProgress[book.id] ?: 0f, isPlaying = playbackState.isPlaying && playbackState.currentMediaItem?.mediaId == book.id, animatedVisibilityScope = animatedVisibilityScope, onAddToQueue = { onQueueClick(book) }, onLongClick = { onBookLongClick(book) }, onClick = { onBookClick(book) }) } }
                         }
                     }
                 }
@@ -623,7 +624,7 @@ fun openFolder(context: android.content.Context, path: String) {
 
 @OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun androidx.compose.animation.SharedTransitionScope.BookGridItem(book: Music, isFavorite: Boolean, isRead: Boolean, progress: Float, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, keyPrefix: String = "grid", onAddToQueue: () -> Unit, onLongClick: () -> Unit, onClick: () -> Unit) {
+fun androidx.compose.animation.SharedTransitionScope.BookGridItem(book: Music, isFavorite: Boolean, isRead: Boolean, progress: Float, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, keyPrefix: String = "grid", isPlaying: Boolean = false, onAddToQueue: () -> Unit, onLongClick: () -> Unit, onClick: () -> Unit) {
     val context = LocalContext.current
     val displayTitle = remember(book.title) { capitalizeWords(book.title) }
     val displayArtist = remember(book.artist) { capitalizeWords(book.artist) }
@@ -635,16 +636,18 @@ fun androidx.compose.animation.SharedTransitionScope.BookGridItem(book: Music, i
         modifier = Modifier
             .fillMaxWidth()
             .height(240.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .sharedElement(rememberSharedContentState(key = "${keyPrefix}_cover_${book.id}"), animatedVisibilityScope = animatedVisibilityScope)
+            .clip(BookCoverShape)
+            .then(if (isPlaying) Modifier.border(2.dp, primaryColor, BookCoverShape) else Modifier)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
     ) {
         // Cover image or placeholder — fills entire card
-        if (!book.artUri.isNullOrBlank()) {
-            AsyncImage(model = artRequest, contentDescription = null, contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().graphicsLayer(alpha = coverAlpha))
-        } else {
-            BookPlaceholder(title = displayTitle, modifier = Modifier.fillMaxSize().graphicsLayer(alpha = coverAlpha))
+        Box(modifier = Modifier.fillMaxSize().sharedBookCover(this@BookGridItem, "${keyPrefix}_cover_${book.id}", animatedVisibilityScope)) {
+            if (!book.artUri.isNullOrBlank()) {
+                AsyncImage(model = artRequest, contentDescription = null, contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize().graphicsLayer(alpha = coverAlpha))
+            } else {
+                BookPlaceholder(title = displayTitle, modifier = Modifier.fillMaxSize().graphicsLayer(alpha = coverAlpha))
+            }
         }
 
         // Bottom text overlay
@@ -655,6 +658,7 @@ fun androidx.compose.animation.SharedTransitionScope.BookGridItem(book: Music, i
                 .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.6f))
                 .padding(8.dp)
         ) {
+            if (isPlaying) Text(stringResource(R.string.now_playing), style = MaterialTheme.typography.labelSmall, color = androidx.compose.ui.graphics.Color.White, fontWeight = FontWeight.Bold)
             Text(text = displayTitle, style = MaterialTheme.typography.labelLarge, color = androidx.compose.ui.graphics.Color.White, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(text = displayArtist, style = MaterialTheme.typography.labelSmall, color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.8f), maxLines = 1, overflow = TextOverflow.Ellipsis)
             val currentPos = remember(progress, book.duration) { (progress * book.duration).toLong() }
@@ -686,7 +690,7 @@ fun androidx.compose.animation.SharedTransitionScope.MiniPlayer(state: PlaybackU
     
     Surface(modifier = Modifier.fillMaxWidth().padding(8.dp).height(72.dp).clickable(onClick = onClick), shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.primaryContainer, tonalElevation = 8.dp) {
         Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-Card(shape = RoundedCornerShape(8.dp), modifier = Modifier.size(56.dp).sharedElement(rememberSharedContentState(key = "mini_cover_${currentItem.mediaId}"), animatedVisibilityScope = animatedVisibilityScope)) {
+            Box(modifier = Modifier.size(56.dp).sharedBookCover(this@MiniPlayer, "mini_cover_${currentItem.mediaId}", animatedVisibilityScope)) {
                 val artworkUri = currentItem.mediaMetadata.artworkUri?.toString()
                 if (!artworkUri.isNullOrBlank()) AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(artworkUri).crossfade(true).placeholder(R.drawable.ic_audiobook_cover).build(), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                 else CompactBookPlaceholder(title = displayLetter, modifier = Modifier.fillMaxSize())
@@ -704,13 +708,12 @@ Card(shape = RoundedCornerShape(8.dp), modifier = Modifier.size(56.dp).sharedEle
 
 @OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun androidx.compose.animation.SharedTransitionScope.BookListItem(book: Music, isFavorite: Boolean, isRead: Boolean, progress: Float, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, keyPrefix: String = "list", onAddToQueue: () -> Unit, onLongClick: () -> Unit, onClick: () -> Unit) {
+fun androidx.compose.animation.SharedTransitionScope.BookListItem(book: Music, isFavorite: Boolean, isRead: Boolean, progress: Float, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, keyPrefix: String = "list", isPlaying: Boolean = false, onAddToQueue: () -> Unit, onLongClick: () -> Unit, onClick: () -> Unit) {
     val context = LocalContext.current
     val displayTitle = remember(book.title) { capitalizeWords(book.title) }
     val displayArtist = remember(book.artist) { capitalizeWords(book.artist) }
     val artRequest = remember(book.artUri) { ImageRequest.Builder(context).data(book.artUri).crossfade(true).placeholder(R.drawable.ic_audiobook_cover).error(R.drawable.ic_audiobook_cover).build() }
-    val bgAlpha = if (isRead) 0.3f else 0.5f
-    val bgColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = bgAlpha)
+    val bgColor = if (isPlaying) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow
     val primaryColor = MaterialTheme.colorScheme.primary
 
     Column(
@@ -718,20 +721,19 @@ fun androidx.compose.animation.SharedTransitionScope.BookListItem(book: Music, i
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(bgColor)
+            .then(if (isPlaying) Modifier.border(1.dp, primaryColor.copy(alpha = 0.5f), RoundedCornerShape(16.dp)) else Modifier)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
     ) {
         Row(modifier = Modifier.padding(12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier = Modifier
-                    .size(60.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .sharedElement(rememberSharedContentState(key = "${keyPrefix}_cover_${book.id}"), animatedVisibilityScope = animatedVisibilityScope)
+                modifier = Modifier.size(60.dp).sharedBookCover(this@BookListItem, "${keyPrefix}_cover_${book.id}", animatedVisibilityScope)
             ) {
                 if (!book.artUri.isNullOrBlank()) AsyncImage(model = artRequest, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                 else CompactBookPlaceholder(title = displayTitle, modifier = Modifier.fillMaxSize())
             }
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
+                if (isPlaying) Text(stringResource(R.string.now_playing), style = MaterialTheme.typography.labelSmall, color = primaryColor, fontWeight = FontWeight.SemiBold)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(text = displayTitle, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f, false), maxLines = 2, overflow = TextOverflow.Ellipsis, color = if (isRead) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface)
                     if (isFavorite) { Spacer(modifier = Modifier.width(4.dp)); Icon(Icons.Default.Favorite, contentDescription = null, tint = androidx.compose.ui.graphics.Color.Red, modifier = Modifier.size(16.dp)) }
@@ -741,7 +743,7 @@ fun androidx.compose.animation.SharedTransitionScope.BookListItem(book: Music, i
                 val currentPos = remember(progress, book.duration) { (progress * book.duration).toLong() }
                 Text(text = if (progress > 0f) "${formatDuration(currentPos)} / ${formatDuration(book.duration)}" else formatDuration(book.duration), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
             }
-            IconButton(onClick = onAddToQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = stringResource(R.string.playlist_btn), tint = primaryColor) }
+            IconButton(onClick = onAddToQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = stringResource(R.string.playlist_btn), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
             Icon(Icons.Default.PlayCircle, contentDescription = null, tint = primaryColor, modifier = Modifier.size(32.dp))
         }
         if (progress > 0f) LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(4.dp), color = primaryColor, trackColor = androidx.compose.ui.graphics.Color.Transparent)

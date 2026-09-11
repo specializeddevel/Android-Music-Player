@@ -322,4 +322,5 @@
     <string name="history_sleep_detected">Sueño detectado — pausado</string>
     <string name="history_sleep_rewind">Retrocedido %1$s al punto de sueño</string>
     <string name="interval_minutes">%1$d min</string>
+    <string name="now_playing">Reproduciendo</string>
 </resources>
