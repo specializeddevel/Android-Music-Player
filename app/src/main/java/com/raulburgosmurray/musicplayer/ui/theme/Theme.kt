@@ -6,6 +6,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -34,11 +35,8 @@ fun MusicPlayerTheme(
     val colorScheme = when {
         // 1. Prioridad: Si hay un color de portada (Seed Color)
         seedColor != null && dynamicColor -> {
-            // Generamos un esquema basado en el color de la portada de forma manual (Compatible con todas las versiones)
-            if (darkTheme) {
-                darkColorScheme(primary = seedColor, onPrimary = Color.White, primaryContainer = seedColor.copy(alpha = 0.3f))
-            } else {
-                lightColorScheme(primary = seedColor, onPrimary = Color.White, primaryContainer = seedColor.copy(alpha = 0.1f))
+            remember(seedColor, darkTheme) {
+                artworkColorScheme(seedColor, darkTheme)
             }
         }
         

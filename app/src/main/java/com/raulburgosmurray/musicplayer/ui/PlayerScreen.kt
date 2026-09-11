@@ -28,7 +28,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
@@ -242,6 +241,33 @@ fun SynopsisAccordion(description: String) {
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
+private fun androidx.compose.animation.SharedTransitionScope.PlayerArtwork(
+    state: PlaybackUiState,
+    title: String,
+    from: String,
+    animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope
+) {
+    val artworkUri = state.currentMediaItem?.mediaMetadata?.artworkUri?.toString()
+    var imageLoadError by remember(artworkUri) { mutableStateOf(false) }
+    val context = LocalContext.current
+    val request = remember(artworkUri, context) {
+        ImageRequest.Builder(context)
+            .data(artworkUri)
+            .placeholder(R.drawable.ic_audiobook_cover)
+            .listener(onError = { _, _ -> imageLoadError = true })
+            .build()
+    }
+    Box(modifier = Modifier.fillMaxSize().sharedBookCover(this, "${from}_cover_${state.currentMediaItem?.mediaId}", animatedVisibilityScope)) {
+        if (!artworkUri.isNullOrBlank() && !imageLoadError) {
+            AsyncImage(model = request, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        } else {
+            BookPlaceholder(title = title, modifier = Modifier.fillMaxSize())
+        }
+    }
+}
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
 fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, sharedTransitionScope: androidx.compose.animation.SharedTransitionScope, animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope, from: String, onBack: () -> Unit, onTransferClick: (String) -> Unit, onShowHistory: () -> Unit, onShowQueue: () -> Unit, onShowDetails: () -> Unit, onShowShare: () -> Unit, onShowSpeed: () -> Unit, onShowTimer: () -> Unit, onShowBookmark: () -> Unit, onShowEqualizer: () -> Unit, onShowSeekToTime: () -> Unit, onShowSkipByAmount: () -> Unit, onLock: () -> Unit) {
     val currentItem = state.currentMediaItem
     val context = LocalContext.current
@@ -258,7 +284,7 @@ fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, 
     BoxWithConstraints(
         modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp).statusBarsPadding().navigationBarsPadding()
     ) {
-        val maxCoverHeight = (maxHeight * 0.45f).coerceAtMost(maxWidth)
+        val maxCoverHeight = (maxHeight * 0.40f).coerceAtMost(maxWidth)
         val scrollState = rememberScrollState()
         val canScrollForward by remember { derivedStateOf { scrollState.canScrollForward } }
         var showScrollHint by remember { mutableStateOf(true) }
@@ -273,7 +299,7 @@ fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, 
 
         Box(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize().verticalScroll(scrollState)) {
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(8.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back_btn)) }
                     Row {
@@ -304,25 +330,11 @@ fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, 
                         }
                     }
                 }
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(12.dp))
                 Box(modifier = Modifier.fillMaxWidth().heightIn(max = maxCoverHeight)) {
-                    Box(modifier = Modifier.fillMaxHeight().aspectRatio(1f).align(Alignment.Center).clip(RoundedCornerShape(32.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
+                    Box(modifier = Modifier.fillMaxHeight().aspectRatio(1f).align(Alignment.Center).clip(BookCoverShape).background(MaterialTheme.colorScheme.surfaceVariant)) {
                         with(sharedTransitionScope) {
-                            var imageLoadError by remember { mutableStateOf(false) }
-                            val artworkUri = currentItem?.mediaMetadata?.artworkUri?.toString()
-                            if (!artworkUri.isNullOrBlank() && !imageLoadError) {
-                                AsyncImage(
-                                    model = ImageRequest.Builder(LocalContext.current).data(artworkUri).crossfade(true).listener(onError = { _, _ -> imageLoadError = true }).build(),
-                                    contentDescription = null,
-                                    modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${from}_cover_${currentItem?.mediaId}"), animatedVisibilityScope = animatedVisibilityScope),
-                                    contentScale = ContentScale.Crop
-                                )
-                            }
-                            if (artworkUri.isNullOrBlank() || imageLoadError) {
-                                Box(modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${from}_cover_${currentItem?.mediaId}"), animatedVisibilityScope = animatedVisibilityScope)) {
-                                    BookPlaceholder(title = displayTitle, modifier = Modifier.fillMaxSize())
-                                }
-                            }
+                            PlayerArtwork(state, displayTitle, from, animatedVisibilityScope)
                         }
                         // Touch controls overlay
                         CoverTouchControls(
@@ -336,7 +348,7 @@ fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, 
                         )
                     }
                 }
-                Spacer(Modifier.height(32.dp))
+                Spacer(Modifier.height(20.dp))
                 PlayerControls(state, viewModel, onShowSpeed, onShowTimer)
                 val synopsis = state.currentMusicDetails?.description
                 if (!synopsis.isNullOrBlank()) {
@@ -346,35 +358,19 @@ fun PortraitPlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel, 
                 Spacer(Modifier.height(16.dp))
             }
 
-            // Scroll hint: gradient + arrow when content overflows
+            // A small hint in the side gutter leaves the controls unobscured.
             AnimatedVisibility(
                 visible = canScrollForward && showScrollHint,
-                modifier = Modifier.align(Alignment.BottomCenter),
+                modifier = Modifier.align(Alignment.BottomEnd).offset(x = 22.dp),
                 enter = fadeIn(),
                 exit = fadeOut()
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(64.dp)
-                        .background(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.7f),
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.95f)
-                                )
-                            )
-                        ),
-                    contentAlignment = Alignment.BottomCenter
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.KeyboardArrowDown,
-                        contentDescription = stringResource(R.string.scroll_down_hint),
-                        modifier = Modifier.padding(bottom = 8.dp),
-                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowDown,
+                    contentDescription = stringResource(R.string.scroll_down_hint),
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
@@ -395,23 +391,9 @@ fun LandscapePlayerContent(state: PlaybackUiState, viewModel: PlaybackViewModel,
     var pressedArea by remember { mutableStateOf<CoverTapArea?>(null) }
     
     Row(modifier = Modifier.fillMaxSize().padding(16.dp).statusBarsPadding().navigationBarsPadding()) {
-        Box(modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(24.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
+        Box(modifier = Modifier.weight(1f).fillMaxHeight().clip(BookCoverShape).background(MaterialTheme.colorScheme.surfaceVariant)) {
             with(sharedTransitionScope) {
-                var imageLoadError by remember { mutableStateOf(false) }
-                val artworkUri = currentItem?.mediaMetadata?.artworkUri?.toString()
-                if (!artworkUri.isNullOrBlank() && !imageLoadError) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current).data(artworkUri).crossfade(true).listener(onError = { _, _ -> imageLoadError = true }).build(),
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${from}_cover_${currentItem?.mediaId}"), animatedVisibilityScope = animatedVisibilityScope),
-                        contentScale = ContentScale.Crop
-                    )
-                }
-                if (artworkUri.isNullOrBlank() || imageLoadError) {
-                    Box(modifier = Modifier.fillMaxSize().sharedElement(rememberSharedContentState(key = "${from}_cover_${currentItem?.mediaId}"), animatedVisibilityScope = animatedVisibilityScope)) {
-                        BookPlaceholder(title = displayTitle, modifier = Modifier.fillMaxSize())
-                    }
-                }
+                PlayerArtwork(state, displayTitle, from, animatedVisibilityScope)
             }
             // Touch controls overlay
             CoverTouchControls(
@@ -489,42 +471,39 @@ fun PlayerControls(state: PlaybackUiState, viewModel: PlaybackViewModel, onShowS
     val showUndoButton = state.lastPositionBeforeSeek != null
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text(text = displayTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(text = currentMediaItemArtist(currentItem), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
-        Spacer(Modifier.height(16.dp))
+        Text(text = displayTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(text = currentMediaItemArtist(currentItem), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(8.dp))
         Slider(value = progress.coerceIn(0f, 1f), onValueChange = { viewModel.seekTo((it * duration).toLong()) }, modifier = Modifier.fillMaxWidth())
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(text = formatDuration(position), style = MaterialTheme.typography.labelSmall)
-            Text(text = formatDuration(state.duration), style = MaterialTheme.typography.labelSmall)
-        }
-        if (showUndoButton) {
-            Spacer(Modifier.height(8.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+        Row(modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(text = formatDuration(position), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (showUndoButton) {
                 TextButton(
                     onClick = { viewModel.undoSeek() },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary)
                 ) {
                     Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text(stringResource(R.string.undo), style = MaterialTheme.typography.labelSmall)
+                    Text(stringResource(R.string.undo), style = MaterialTheme.typography.labelMedium)
                 }
             }
+            Text(text = formatDuration(state.duration), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(Modifier.height(4.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = { viewModel.skipBackward(Constants.SKIP_FORWARD_MS) }) { Icon(Icons.Default.Replay10, stringResource(R.string.history_skip_backward, Constants.SKIP_FORWARD_MS / 1000), modifier = Modifier.size(40.dp)) }
+            FilledIconButton(onClick = { viewModel.togglePlayPause() }, modifier = Modifier.size(64.dp), shape = RoundedCornerShape(20.dp)) { Icon(if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, stringResource(R.string.pause_play_btn), modifier = Modifier.size(32.dp)) }
+            IconButton(onClick = { viewModel.skipForward(Constants.SKIP_FORWARD_MS) }) { Icon(Icons.Default.Forward10, stringResource(R.string.history_skip_forward, Constants.SKIP_FORWARD_MS / 1000), modifier = Modifier.size(40.dp)) }
         }
         Spacer(Modifier.height(16.dp))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { viewModel.skipBackward(Constants.SKIP_FORWARD_MS) }) { Icon(Icons.Default.Replay10, null, modifier = Modifier.size(40.dp)) }
-            FilledIconButton(onClick = { viewModel.togglePlayPause() }, modifier = Modifier.size(64.dp), shape = RoundedCornerShape(20.dp)) { Icon(if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, null, modifier = Modifier.size(32.dp)) }
-            IconButton(onClick = { viewModel.skipForward(Constants.SKIP_FORWARD_MS) }) { Icon(Icons.Default.Forward10, null, modifier = Modifier.size(40.dp)) }
-        }
-        Spacer(Modifier.height(32.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Surface(onClick = onShowSpeed, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.height(52.dp).weight(1f)) {
-                Box(contentAlignment = Alignment.Center) {
+            Surface(onClick = onShowSpeed, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.heightIn(min = 52.dp).weight(1f)) {
+                Box(modifier = Modifier.padding(horizontal = 12.dp, vertical = 14.dp), contentAlignment = Alignment.Center) {
                     Text("${state.playbackSpeed}x · ${state.pitch}p", fontWeight = FontWeight.Bold)
                 }
             }
-            Surface(onClick = onShowTimer, shape = RoundedCornerShape(16.dp), color = if (activeTimerMinutes > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.height(52.dp).weight(1f)) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Surface(onClick = onShowTimer, shape = RoundedCornerShape(16.dp), color = if (activeTimerMinutes > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer, contentColor = if (activeTimerMinutes > 0) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.heightIn(min = 52.dp).weight(1f)) {
+                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 14.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                     Text(if (activeTimerMinutes > 0) "${activeTimerMinutes}m" else stringResource(R.string.timer_btn), fontWeight = FontWeight.Bold)
                     if (state.isShakeWaiting) Text(stringResource(R.string.shake_visual_prompt), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold)
                 }

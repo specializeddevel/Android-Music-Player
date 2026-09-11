@@ -313,4 +313,5 @@
     <string name="history_sleep_detected">睡眠検出 — 一時停止</string>
     <string name="history_sleep_rewind">睡眠ポイントまで%1$s巻き戻し</string>
     <string name="interval_minutes">%1$d分</string>
+    <string name="now_playing">再生中</string>
 </resources>

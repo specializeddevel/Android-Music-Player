@@ -28,6 +28,22 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.abs
 
+// A proportional radius stays rounded at every size of a shared cover transition.
+val BookCoverShape = RoundedCornerShape(percent = 10)
+
+@OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
+@Composable
+fun Modifier.sharedBookCover(
+    sharedTransitionScope: androidx.compose.animation.SharedTransitionScope,
+    key: String,
+    animatedVisibilityScope: androidx.compose.animation.AnimatedVisibilityScope
+): Modifier = with(sharedTransitionScope) {
+    this@sharedBookCover
+        .sharedElement(rememberSharedContentState(key), animatedVisibilityScope)
+        // Must follow sharedElement: parent clips do not apply inside its overlay.
+        .clip(BookCoverShape)
+}
+
 fun capitalizeWords(text: String): String {
     return text
         .replace(Regex("\\.[a-zA-Z0-9]{2,4}$"), "")

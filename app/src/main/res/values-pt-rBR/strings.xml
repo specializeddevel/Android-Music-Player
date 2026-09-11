@@ -313,4 +313,5 @@
     <string name="history_sleep_detected">Sono detectado — pausado</string>
     <string name="history_sleep_rewind">Retrocedido %1$s para o ponto de sono</string>
     <string name="interval_minutes">%1$d min</string>
+    <string name="now_playing">Reproduzindo</string>
 </resources>
