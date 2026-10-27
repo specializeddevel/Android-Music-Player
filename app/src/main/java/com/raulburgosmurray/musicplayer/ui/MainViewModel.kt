@@ -16,6 +16,7 @@ import com.raulburgosmurray.musicplayer.data.MusicScanner
 import com.raulburgosmurray.musicplayer.data.MetadataJsonHelper
 import com.raulburgosmurray.musicplayer.data.toMusic
 import com.raulburgosmurray.musicplayer.data.toCachedBook
+import com.raulburgosmurray.musicplayer.data.withEditedMetadata
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -25,7 +26,7 @@ import java.io.File
 import android.os.Environment
 
 enum class SortOrder { TITLE, ARTIST, PROGRESS, RECENT }
-enum class BookFilter { ALL, COMPLETED, IN_PROGRESS }
+enum class BookFilter { ALL, LOCAL_ONLY, SERVER_ONLY, IN_PROGRESS, COMPLETED }
 
 private data class FilterData(val filter: BookFilter, val readStatus: Map<String, Boolean>)
 
@@ -45,10 +46,8 @@ class MainViewModel(application: Application, settingsViewModel: SettingsViewMod
         .map { list ->
             val context = getApplication<Application>()
             list.map { cached ->
-                val editedTitle = MetadataJsonHelper.loadMetadata(context, cached.id)
-                    ?.title?.takeIf { it.isNotBlank() }
-                val music = cached.toMusic()
-                if (editedTitle != null) music.copy(title = editedTitle) else music
+                val editedMetadata = MetadataJsonHelper.loadMetadata(context, cached.id)
+                cached.withEditedMetadata(editedMetadata).toMusic()
             }
         }
         .flowOn(Dispatchers.IO)
@@ -71,12 +70,16 @@ class MainViewModel(application: Application, settingsViewModel: SettingsViewMod
         Pair(filter, readStatus) 
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(Constants.STATEFLOW_STOP_TIMEOUT_MS), Pair(BookFilter.ALL, emptyMap()))
 
+    val allBooksUnfiltered: StateFlow<List<Music>> = _books
+
     val books: StateFlow<List<Music>> = combine(_books, sortOrder, _bookProgress, _bookActivityTimestamps, filterAndReadStatus) { books, order, progress, timestamps, filterData ->
         val (filter, readStatus) = filterData
         val filtered = when (filter) {
             BookFilter.ALL -> books
+            BookFilter.LOCAL_ONLY -> books.filter { !it.path.startsWith("http://") && !it.path.startsWith("https://") }
+            BookFilter.SERVER_ONLY -> books.filter { it.path.startsWith("http://") || it.path.startsWith("https://") || it.id.startsWith("abs_") }
+            BookFilter.IN_PROGRESS -> books.filter { (progress[it.id] ?: 0f) > 0f && readStatus[it.id] != true }
             BookFilter.COMPLETED -> books.filter { readStatus[it.id] == true }
-            BookFilter.IN_PROGRESS -> books.filter { readStatus[it.id] != true }
         }
         val sorted = when (order) {
             SortOrder.TITLE -> filtered.sortedBy { it.title.lowercase() }
@@ -215,8 +218,15 @@ class MainViewModel(application: Application, settingsViewModel: SettingsViewMod
                 }
             }
             withContext(Dispatchers.IO) {
-                bookRepository.clearCache()
-                bookRepository.saveBooks(audioFiles.map { it.toCachedBook() })
+                val absRepo = com.raulburgosmurray.musicplayer.data.AudiobookshelfRepository(getApplication())
+                if (absRepo.isConnected()) {
+                    bookRepository.clearLocalCache()
+                    bookRepository.saveBooks(audioFiles.map { it.toCachedBook() })
+                    absRepo.resync()
+                } else {
+                    bookRepository.clearCache()
+                    bookRepository.saveBooks(audioFiles.map { it.toCachedBook() })
+                }
             }
             _isLoading.value = false
         }
@@ -235,7 +245,8 @@ class MainViewModel(application: Application, settingsViewModel: SettingsViewMod
                 }
             }
             withContext(Dispatchers.IO) {
-                bookRepository.clearCache()
+                // Inbox scanning is additive. Clearing here also removed every book
+                // discovered through MediaStore or the user's SAF folders.
                 bookRepository.saveBooks(audioFiles.map { it.toCachedBook() })
             }
             _isLoading.value = false

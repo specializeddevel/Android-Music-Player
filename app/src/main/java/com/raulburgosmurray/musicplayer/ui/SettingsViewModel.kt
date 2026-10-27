@@ -3,6 +3,8 @@ package com.raulburgosmurray.musicplayer.ui
 import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,6 +19,7 @@ enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
     private val prefs = application.getSharedPreferences("settings", Context.MODE_PRIVATE)
+    private val isFirstRun = prefs.getBoolean("is_first_run", true)
     
     private val _isDynamicThemingEnabled = MutableStateFlow(
         prefs.getBoolean("dynamic_theming", true)
@@ -34,19 +37,27 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val libraryRootUris: StateFlow<List<String>> = _libraryRootUris.asStateFlow()
 
     private fun getInitialLibraryRootUris(): List<String> {
-        val isFirstRun = prefs.getBoolean("is_first_run", true)
-        return if (isFirstRun) {
-            prefs.edit().putBoolean("is_first_run", false).apply()
-            emptyList()
-        } else {
-            prefs.getStringSet("library_root_uris", emptySet())?.toList() ?: emptyList()
-        }
+        return if (isFirstRun) emptyList()
+        else prefs.getStringSet("library_root_uris", emptySet())?.toList() ?: emptyList()
     }
 
     private val _scanAllMemory = MutableStateFlow(
-        if (prefs.getBoolean("is_first_run", true)) false else prefs.getBoolean("scan_all_memory", false)
+        if (isFirstRun) false else prefs.getBoolean("scan_all_memory", false)
     )
     val scanAllMemory: StateFlow<Boolean> = _scanAllMemory.asStateFlow()
+
+    private val _hasCompletedOnboarding = MutableStateFlow(
+        if (isFirstRun) false
+        else prefs.getBoolean("onboarding_completed", _libraryRootUris.value.isNotEmpty())
+    )
+    val hasCompletedOnboarding: StateFlow<Boolean> = _hasCompletedOnboarding.asStateFlow()
+
+    init {
+        // Mark the first-run state only after both onboarding-related values have
+        // been read from the same snapshot. This prevents a stale scan preference
+        // from bypassing the onboarding screen on a clean install.
+        if (isFirstRun) prefs.edit().putBoolean("is_first_run", false).apply()
+    }
 
     private val _sortOrder = MutableStateFlow(
         SortOrder.valueOf(prefs.getString("sort_order", SortOrder.TITLE.name) ?: SortOrder.TITLE.name)
@@ -98,6 +109,85 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _sleepFallbackMinutes = MutableStateFlow(prefs.getInt("sleep_fallback_minutes", 0))
     val sleepFallbackMinutes: StateFlow<Int> = _sleepFallbackMinutes.asStateFlow()
 
+    // Audiobookshelf Integration
+    val absRepository = com.raulburgosmurray.musicplayer.data.AudiobookshelfRepository(application)
+
+    private val _isAbsConnected = MutableStateFlow(absRepository.isConnected())
+    val isAbsConnected: StateFlow<Boolean> = _isAbsConnected.asStateFlow()
+
+    private val _absServerUrl = MutableStateFlow(absRepository.getServerUrl() ?: "")
+    val absServerUrl: StateFlow<String> = _absServerUrl.asStateFlow()
+
+    private val _absUsername = MutableStateFlow(absRepository.getUsername() ?: "")
+    val absUsername: StateFlow<String> = _absUsername.asStateFlow()
+
+    private val _absLibraryName = MutableStateFlow(absRepository.getLibraryName() ?: "")
+    val absLibraryName: StateFlow<String> = _absLibraryName.asStateFlow()
+
+    private val _absLastSyncTime = MutableStateFlow(absRepository.getLastSyncTime())
+    val absLastSyncTime: StateFlow<Long> = _absLastSyncTime.asStateFlow()
+
+    private val _isAbsSyncing = MutableStateFlow(false)
+    val isAbsSyncing: StateFlow<Boolean> = _isAbsSyncing.asStateFlow()
+
+    private val _absSyncError = MutableStateFlow<String?>(null)
+    val absSyncError: StateFlow<String?> = _absSyncError.asStateFlow()
+
+    fun connectAudiobookshelf(url: String, user: String, pass: String, onComplete: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            _isAbsSyncing.value = true
+            _absSyncError.value = null
+            val result = absRepository.connectAndSync(url, user, pass)
+            _isAbsSyncing.value = false
+            result.fold(
+                onSuccess = {
+                    _isAbsConnected.value = true
+                    _absServerUrl.value = absRepository.getServerUrl() ?: ""
+                    _absUsername.value = absRepository.getUsername() ?: ""
+                    _absLibraryName.value = absRepository.getLibraryName() ?: ""
+                    _absLastSyncTime.value = absRepository.getLastSyncTime()
+                    _hasCompletedOnboarding.value = true
+                    onComplete(true)
+                },
+                onFailure = { error ->
+                    _absSyncError.value = error.localizedMessage ?: "Error al conectar"
+                    onComplete(false)
+                }
+            )
+        }
+    }
+
+    fun resyncAudiobookshelf(onComplete: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            _isAbsSyncing.value = true
+            _absSyncError.value = null
+            val result = absRepository.resync()
+            _isAbsSyncing.value = false
+            result.fold(
+                onSuccess = {
+                    _absLastSyncTime.value = absRepository.getLastSyncTime()
+                    onComplete(true)
+                },
+                onFailure = { error ->
+                    _absSyncError.value = error.localizedMessage ?: "Error al sincronizar"
+                    onComplete(false)
+                }
+            )
+        }
+    }
+
+    fun disconnectAudiobookshelf() {
+        viewModelScope.launch {
+            absRepository.disconnect()
+            _isAbsConnected.value = false
+            _absServerUrl.value = ""
+            _absUsername.value = ""
+            _absLibraryName.value = ""
+            _absLastSyncTime.value = 0L
+            _absSyncError.value = null
+        }
+    }
+
     fun setDynamicThemingEnabled(enabled: Boolean) {
         _isDynamicThemingEnabled.value = enabled
         prefs.edit().putBoolean("dynamic_theming", enabled).apply()
@@ -113,7 +203,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         if (current.size < 3 && !current.contains(uri)) {
             current.add(uri)
             _libraryRootUris.value = current
-            prefs.edit().putStringSet("library_root_uris", current.toSet()).apply()
+            _hasCompletedOnboarding.value = true
+            prefs.edit().putStringSet("library_root_uris", current.toSet())
+                .putBoolean("onboarding_completed", true).apply()
         }
     }
 
@@ -121,12 +213,22 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         val current = _libraryRootUris.value.toMutableList()
         current.remove(uri)
         _libraryRootUris.value = current
-        prefs.edit().putStringSet("library_root_uris", current.toSet()).apply()
+        if (current.isEmpty() && !_scanAllMemory.value) {
+            _hasCompletedOnboarding.value = false
+        }
+        prefs.edit().putStringSet("library_root_uris", current.toSet())
+            .putBoolean("onboarding_completed", _hasCompletedOnboarding.value).apply()
     }
 
     fun setScanAllMemory(enabled: Boolean) {
         _scanAllMemory.value = enabled
-        prefs.edit().putBoolean("scan_all_memory", enabled).apply()
+        if (enabled) {
+            _hasCompletedOnboarding.value = true
+        } else if (_libraryRootUris.value.isEmpty()) {
+            _hasCompletedOnboarding.value = false
+        }
+        prefs.edit().putBoolean("scan_all_memory", enabled)
+            .putBoolean("onboarding_completed", _hasCompletedOnboarding.value).apply()
     }
 
     fun setSortOrder(order: SortOrder) {

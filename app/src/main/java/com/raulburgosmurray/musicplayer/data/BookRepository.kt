@@ -17,6 +17,8 @@ class BookRepository(private val cachedBookDao: CachedBookDao) {
 
     suspend fun clearCache() = cachedBookDao.clearCache()
 
+    suspend fun clearLocalCache() = cachedBookDao.clearLocalCache()
+
     suspend fun updateDescription(id: String, description: String) = cachedBookDao.updateDescription(id, description)
 
     suspend fun deleteBookById(id: String) = cachedBookDao.deleteBookById(id)

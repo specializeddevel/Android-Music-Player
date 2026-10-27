@@ -5,7 +5,10 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.raulburgosmurray.musicplayer.data.AppDatabase
 import com.raulburgosmurray.musicplayer.data.AudiobookProgress
+import com.raulburgosmurray.musicplayer.data.CachedBook
+import com.raulburgosmurray.musicplayer.data.CloudProgress
 import com.raulburgosmurray.musicplayer.data.ProgressDao
+import com.raulburgosmurray.musicplayer.data.portableBookKey
 import io.mockk.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -110,5 +113,40 @@ class SyncViewModelTest {
         coVerify { progressDao.upsertAll(match { list -> 
             list.size == 1 && list[0].mediaId == mediaId 
         }) }
+    }
+
+    @Test
+    fun `portable cloud progress is saved under this devices media id`() = runTest {
+        val viewModel = SyncViewModel(application)
+        val localBook = CachedBook(
+            id = "content://media/external/audio/media/987",
+            title = "Book",
+            album = "Series",
+            artist = "Author",
+            duration = 2_000L,
+            path = "content://media/external/audio/media/987",
+            artUri = null,
+            fileSize = 8_000L,
+            fileName = "book.m4b"
+        )
+        val cloud = CloudProgress(
+            bookKey = portableBookKey(localBook),
+            lastPosition = 900L,
+            duration = 2_000L,
+            lastUpdated = 3_000L,
+            lastPauseTimestamp = 2_500L,
+            playbackSpeed = 1.2f,
+            pitch = 1f,
+            eqPresetName = "CLARITY",
+            isRead = false
+        )
+
+        viewModel.mergePortableProgress(emptyList(), listOf(cloud), listOf(localBook))
+
+        coVerify {
+            progressDao.upsertAll(match { progress ->
+                progress.single().mediaId == localBook.id && progress.single().lastPosition == 900L
+            })
+        }
     }
 }

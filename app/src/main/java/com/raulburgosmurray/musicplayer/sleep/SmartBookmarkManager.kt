@@ -17,6 +17,7 @@ class SmartBookmarkManager {
     )
 
     private val snapshots = mutableListOf<PlaybackSnapshot>()
+    private val snapshotsLock = Any()
     private var trackingJob: Job? = null
 
     /**
@@ -30,14 +31,16 @@ class SmartBookmarkManager {
             while (isActive) {
                 playerProvider()?.let { player ->
                     if (player.isPlaying) {
-                        snapshots.add(
-                            PlaybackSnapshot(
-                                position = player.currentPosition.coerceAtLeast(0L),
-                                timestamp = System.currentTimeMillis(),
-                                playbackSpeed = player.playbackParameters.speed.coerceAtLeast(0.1f)
+                        synchronized(snapshotsLock) {
+                            snapshots.add(
+                                PlaybackSnapshot(
+                                    position = player.currentPosition.coerceAtLeast(0L),
+                                    timestamp = System.currentTimeMillis(),
+                                    playbackSpeed = player.playbackParameters.speed.coerceAtLeast(0.1f)
+                                )
                             )
-                        )
-                        pruneOldSnapshots()
+                            pruneOldSnapshots()
+                        }
                     }
                 }
                 delay(SNAPSHOT_INTERVAL_MS)
@@ -51,7 +54,7 @@ class SmartBookmarkManager {
     fun stopTracking() {
         trackingJob?.cancel()
         trackingJob = null
-        snapshots.clear()
+        synchronized(snapshotsLock) { snapshots.clear() }
     }
 
     /**
@@ -62,13 +65,11 @@ class SmartBookmarkManager {
      * @return Posición en ms donde se durmió, o -1 si no hay datos suficientes
      */
     fun calculateSleepBookmark(sleepStartTimeMillis: Long): Long {
-        if (snapshots.isEmpty()) return -1L
-
-        // Encontrar snapshot más cercano ANTES del momento de dormirse
-        val closestSnapshot = snapshots
-            .filter { it.timestamp <= sleepStartTimeMillis }
-            .maxByOrNull { it.timestamp }
-            ?: return -1L
+        val closestSnapshot = synchronized(snapshotsLock) {
+            snapshots
+                .filter { it.timestamp <= sleepStartTimeMillis }
+                .maxByOrNull { it.timestamp }
+        } ?: return -1L
 
         // Calcular cuánto audio avanzó entre el snapshot y el momento de dormirse
         val timeDeltaMs = sleepStartTimeMillis - closestSnapshot.timestamp

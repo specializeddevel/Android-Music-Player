@@ -26,9 +26,9 @@ class GoogleDriveService(context: Context, accountName: String) {
         ).setApplicationName("Litera").build()
     }
 
-    private val SYNC_FILE_NAME = "litera_progress_v1.json"
+    private val SYNC_FILE_NAME = "litera_progress_v2.json"
 
-    suspend fun uploadProgress(progressList: List<AudiobookProgress>): Boolean = withContext(Dispatchers.IO) {
+    suspend fun uploadProgress(progressList: List<CloudProgress>): Boolean = withContext(Dispatchers.IO) {
         try {
             val json = Gson().toJson(progressList)
             val content = ByteArrayContent.fromString("application/json", json)
@@ -51,12 +51,12 @@ class GoogleDriveService(context: Context, accountName: String) {
         }
     }
 
-    suspend fun downloadProgress(): List<AudiobookProgress>? = withContext(Dispatchers.IO) {
+    suspend fun downloadProgress(): List<CloudProgress>? = withContext(Dispatchers.IO) {
         try {
             val fileId = findFileId() ?: return@withContext null
             val inputStream = driveService.files().get(fileId).executeMediaAsInputStream()
             val json = inputStream.bufferedReader().use { it.readText() }
-            Gson().fromJson(json, Array<AudiobookProgress>::class.java).toList()
+            Gson().fromJson(json, Array<CloudProgress>::class.java).toList()
         } catch (e: Exception) {
             e.printStackTrace()
             null

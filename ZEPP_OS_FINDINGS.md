@@ -974,6 +974,16 @@ const isRunning = services.includes("app-service/sleep_service")
 
 ## 🔄 Mantenimiento de este documento
 
+## 🔴 Hallazgo #28: `localStorage` no transporta eventos al Side Service
+
+### El problema
+El `localStorage` del App Service del reloj y el entorno del Side Service del teléfono no forman un canal de sincronización. Guardar `sleep_event` en el reloj y consultarlo desde `app-side` deja el evento atrapado en el dispositivo.
+
+### Solución aplicada
+El servicio registrado `app-service/index` ejecuta la detección real y envía el evento mediante `peerSocket` (`@zos/messaging`). Se usa un prefijo de protocolo propio (`LITERA_SLEEP_V1:`) para coexistir con ZML. El Side Service confirma el evento sólo después de que Android responde con HTTP 2xx; hasta recibir ese ACK, el reloj conserva y reintenta el evento.
+
+La página mantiene la solicitud dinámica de `device:os.bg_service`, usa `url: "app-service/index"` de acuerdo con el comportamiento validado en este proyecto y no usa `hmUI.showToast()`.
+
 **Este documento DEBE ser actualizado** cuando:
 - Se descubra un nuevo error o solución
 - Zepp OS publique una nueva versión mayor

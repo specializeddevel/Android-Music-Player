@@ -1,14 +1,12 @@
 import { BaseSideService } from '@zeppos/zml/base-side'
-
-const SLEEP_EVENT_KEY = 'sleep_event'
-const POLL_INTERVAL = 5000
+import { peerSocket } from '@zos/messaging'
+import { encodeSleepMessage, decodeSleepMessage } from '../shared/sleep-message'
 
 let lastEventTimestamp = 0
-let pollCount = 0
 
 function sendToAndroid(event) {
   console.log('Sending to Android:', JSON.stringify(event))
-  fetch({
+  return fetch({
     url: 'http://localhost:50002/sleep',
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -18,8 +16,13 @@ function sendToAndroid(event) {
     })
   }).then(function (response) {
     console.log('Android responded:', response.status)
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error('Android HTTP status ' + response.status)
+    }
+    return response
   }).catch(function (error) {
     console.error('Failed to notify Android:', error)
+    throw error
   })
 }
 
@@ -27,24 +30,19 @@ AppSideService(
   BaseSideService({
     onInit() {
       console.log('Side Service initialized')
-      var self = this
+      this.sleepMessageListener = function (payload) {
+        var event = decodeSleepMessage(payload)
+        if (!event || event.type !== 'sleep_detected') return
 
-      self.pollTimer = setInterval(function () {
-        pollCount++
-        try {
-          var eventData = localStorage.getItem(SLEEP_EVENT_KEY)
-          if (eventData) {
-            var event = JSON.parse(eventData)
-            if (event.timestamp !== lastEventTimestamp) {
-              lastEventTimestamp = event.timestamp
-              console.log('Sleep event found:', eventData)
-              sendToAndroid(event)
-            }
-          }
-        } catch (e) {
-          console.error('Poll error:', e)
-        }
-      }, POLL_INTERVAL)
+        if (event.timestamp === lastEventTimestamp) return
+        sendToAndroid(event).then(function () {
+          lastEventTimestamp = event.timestamp
+          peerSocket.send(encodeSleepMessage({ type: 'sleep_ack', timestamp: event.timestamp }))
+        }).catch(function (error) {
+          console.error('Sleep event remains pending:', error)
+        })
+      }
+      peerSocket.addListener('message', this.sleepMessageListener)
     },
 
     onRequest(req, res) {
@@ -65,9 +63,9 @@ AppSideService(
 
     onRun() {},
     onDestroy() {
-      console.log('Side Service destroying, clearing timer')
-      if (this.pollTimer) {
-        clearInterval(this.pollTimer)
+      console.log('Side Service destroying')
+      if (this.sleepMessageListener) {
+        peerSocket.removeListener('message', this.sleepMessageListener)
       }
     },
   })

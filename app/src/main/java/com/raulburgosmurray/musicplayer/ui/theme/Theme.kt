@@ -14,15 +14,25 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+    primary = LiteraBlueDark,
+    onPrimary = Color(0xFF003258),
+    primaryContainer = LiteraBlueContainerDark,
+    onPrimaryContainer = Color(0xFFD4E4FF),
+    secondary = LiteraSlateDark,
+    secondaryContainer = LiteraSlateContainerDark,
+    tertiary = LiteraAmberDark,
+    tertiaryContainer = LiteraAmberContainerDark
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
+    primary = LiteraBlue,
+    onPrimary = Color.White,
+    primaryContainer = LiteraBlueContainer,
+    onPrimaryContainer = Color(0xFF001C38),
+    secondary = LiteraSlate,
+    secondaryContainer = LiteraSlateContainer,
+    tertiary = LiteraAmber,
+    tertiaryContainer = LiteraAmberContainer
 )
 
 @Composable
@@ -62,7 +72,7 @@ fun MusicPlayerTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = Typography,
+        typography = LiteraTypography,
         content = content
     )
 }

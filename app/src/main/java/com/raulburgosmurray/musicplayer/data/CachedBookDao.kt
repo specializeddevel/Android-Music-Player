@@ -25,6 +25,18 @@ interface CachedBookDao {
     @Query("DELETE FROM cached_books")
     suspend fun clearCache()
 
+    @Query("DELETE FROM cached_books WHERE id NOT LIKE 'abs_%'")
+    suspend fun clearLocalCache()
+
+    @Query("UPDATE cached_books SET id = 'local_' || id WHERE id LIKE 'abs_%' AND path NOT LIKE 'http://%' AND path NOT LIKE 'https://%'")
+    suspend fun convertDownloadedAbsBooksToLocal()
+
+    @Query("DELETE FROM cached_books WHERE id LIKE 'abs_%' AND (path LIKE 'http://%' OR path LIKE 'https://%')")
+    suspend fun deleteRemoteStreamingBooks()
+
+    @Query("DELETE FROM cached_books WHERE id LIKE 'abs_%'")
+    suspend fun deleteAllAbsBooks()
+
     @Query("UPDATE cached_books SET description = :description WHERE id = :id")
     suspend fun updateDescription(id: String, description: String)
 

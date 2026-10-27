@@ -11,6 +11,7 @@ import com.raulburgosmurray.musicplayer.data.MetadataHelper
 import com.raulburgosmurray.musicplayer.data.MetadataJsonHelper
 import com.raulburgosmurray.musicplayer.data.AppDatabase
 import com.raulburgosmurray.musicplayer.data.BookRepository
+import com.raulburgosmurray.musicplayer.data.withEditedMetadata
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -138,34 +139,35 @@ class MetadataEditorViewModel(application: Application) : AndroidViewModel(appli
 
     fun saveMetadata() {
         val metadata = _uiState.value.metadata ?: return
+        val newArtUri = _uiState.value.newArtUri
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
             try {
                 val context = getApplication<Application>()
                 
-                withContext(Dispatchers.IO) {
+                val updatedMetadata = withContext(Dispatchers.IO) {
                     var updatedMetadata = metadata
                     
-                    if (_uiState.value.newArtUri != null) {
-                        val artUri = saveCoverArt(context, metadata.mediaId, _uiState.value.newArtUri!!)
+                    if (newArtUri != null) {
+                        val artUri = saveCoverArt(context, metadata.mediaId, newArtUri)
                         updatedMetadata = metadata.copy(artUri = artUri)
-                        
-                        val encodedMediaId = MetadataJsonHelper.encodeMediaIdForDatabase(metadata.mediaId)
-                        val cachedBook = bookRepository.getBookById(encodedMediaId)
-                        if (cachedBook != null) {
-                            bookRepository.saveBooks(listOf(cachedBook.copy(artUri = artUri)))
-                        }
                     }
-                    
+
+                    val encodedMediaId = MetadataJsonHelper.encodeMediaIdForDatabase(metadata.mediaId)
+                    val cachedBook = bookRepository.getBookById(encodedMediaId)
+                    if (cachedBook != null) {
+                        bookRepository.saveBooks(listOf(cachedBook.withEditedMetadata(updatedMetadata)))
+                    }
+
                     MetadataJsonHelper.saveMetadata(context, updatedMetadata)
+                    updatedMetadata
                 }
                 
                 _uiState.value = _uiState.value.copy(
                     isSaving = false,
                     saveSuccess = true,
-                    metadata = _uiState.value.metadata?.copy(
-                        artUri = _uiState.value.newArtUri?.toString() ?: metadata.artUri
-                    )
+                    metadata = updatedMetadata,
+                    newArtUri = null
                 )
             } catch (e: Exception) {
                 Log.e("MetadataEditorVM", "Error saving metadata", e)

@@ -98,4 +98,80 @@ class CachedBookTest {
         assertNull(cachedBook.artUri)
         assertEquals("", cachedBook.fileName)
     }
+
+    @Test
+    fun `edited metadata updates every editable library field`() {
+        val cachedBook = sampleBook()
+        val metadata = sampleMetadata(
+            title = "Edited title",
+            artist = "Edited author",
+            album = "Edited album",
+            artUri = "file://edited-cover.jpg",
+            userEditedFields = setOf(
+                AudioMetadata.FIELD_TITLE,
+                AudioMetadata.FIELD_ARTIST,
+                AudioMetadata.FIELD_ALBUM,
+                AudioMetadata.FIELD_ART_URI
+            )
+        )
+
+        val updated = cachedBook.withEditedMetadata(metadata)
+
+        assertEquals("Edited title", updated.title)
+        assertEquals("Edited author", updated.artist)
+        assertEquals("Edited album", updated.album)
+        assertEquals("file://edited-cover.jpg", updated.artUri)
+    }
+
+    @Test
+    fun `metadata fields not edited by the user do not replace scanned values`() {
+        val cachedBook = sampleBook()
+        val metadata = sampleMetadata(
+            title = "Extractor title",
+            artist = "Extractor author",
+            album = "Extractor album",
+            artUri = "file://extractor-cover.jpg",
+            userEditedFields = setOf(AudioMetadata.FIELD_TITLE)
+        )
+
+        val updated = cachedBook.withEditedMetadata(metadata)
+
+        assertEquals("Extractor title", updated.title)
+        assertEquals("Original author", updated.artist)
+        assertEquals("Original album", updated.album)
+        assertEquals("file://original-cover.jpg", updated.artUri)
+    }
+
+    private fun sampleBook() = CachedBook(
+        id = "test-id",
+        title = "Original title",
+        album = "Original album",
+        artist = "Original author",
+        duration = 1_000L,
+        path = "/path/file.mp3",
+        artUri = "file://original-cover.jpg",
+        fileSize = 2_000L,
+        fileName = "file.mp3"
+    )
+
+    private fun sampleMetadata(
+        title: String,
+        artist: String,
+        album: String,
+        artUri: String?,
+        userEditedFields: Set<String>
+    ) = AudioMetadata(
+        mediaId = "test-id",
+        title = title,
+        artist = artist,
+        album = album,
+        year = null,
+        genre = null,
+        trackNumber = null,
+        comment = null,
+        artUri = artUri,
+        duration = 1_000L,
+        fileName = "file.mp3",
+        userEditedFields = userEditedFields
+    )
 }

@@ -28,5 +28,16 @@ data class CachedBook(
 fun CachedBook.toMusic(): com.raulburgosmurray.musicplayer.Music = 
     com.raulburgosmurray.musicplayer.Music(id, title, album, artist, duration, path, artUri, fileSize, fileName, description = description)
 
+fun CachedBook.withEditedMetadata(metadata: AudioMetadata?): CachedBook {
+    if (metadata == null) return this
+
+    return copy(
+        title = if (metadata.isUserEdited(AudioMetadata.FIELD_TITLE)) metadata.title else title,
+        artist = if (metadata.isUserEdited(AudioMetadata.FIELD_ARTIST)) metadata.artist else artist,
+        album = if (metadata.isUserEdited(AudioMetadata.FIELD_ALBUM)) metadata.album.orEmpty() else album,
+        artUri = if (metadata.isUserEdited(AudioMetadata.FIELD_ART_URI)) metadata.artUri else artUri
+    )
+}
+
 fun com.raulburgosmurray.musicplayer.Music.toCachedBook(): CachedBook = 
     CachedBook(id, title, album, artist, duration, path, artUri, fileSize, fileName, description)

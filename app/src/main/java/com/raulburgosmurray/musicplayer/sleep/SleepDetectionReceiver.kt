@@ -8,6 +8,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.decodeFromString
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import java.io.Reader
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.SocketTimeoutException
@@ -99,10 +100,16 @@ class SleepDetectionReceiver(
                 headerLine = reader.readLine()
             }
 
-            // Leer body
-            val body = CharArray(contentLength)
-            reader.read(body, 0, contentLength)
-            val bodyString = String(body)
+            if (contentLength !in 1..MAX_BODY_SIZE) {
+                sendResponse(socket, 400, "Bad Request")
+                return
+            }
+
+            val bodyString = readExactBody(reader, contentLength)
+            if (bodyString == null) {
+                sendResponse(socket, 400, "Bad Request")
+                return
+            }
             Log.d(TAG, "Request body: $bodyString")
 
             // Parsear JSON
@@ -131,7 +138,7 @@ class SleepDetectionReceiver(
 
     private fun sendResponse(socket: Socket, code: Int, message: String) {
         try {
-            val response = """HTTP/1.1 $code $message\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"""
+            val response = buildHttpResponse(code, message)
             socket.getOutputStream().write(response.toByteArray())
         } catch (e: Exception) {
             Log.w(TAG, "Error sending HTTP response", e)
@@ -148,5 +155,25 @@ class SleepDetectionReceiver(
         private const val TAG = "SleepDetectionReceiver"
         private const val SOCKET_ACCEPT_TIMEOUT_MS = 5000
         private const val SOCKET_READ_TIMEOUT_MS = 10000
+        private const val MAX_BODY_SIZE = 16 * 1024
     }
 }
+
+internal fun readExactBody(reader: Reader, contentLength: Int): String? {
+    if (contentLength < 0) return null
+    val body = CharArray(contentLength)
+    var offset = 0
+    while (offset < contentLength) {
+        val read = reader.read(body, offset, contentLength - offset)
+        if (read < 0) return null
+        if (read == 0) continue
+        offset += read
+    }
+    return String(body)
+}
+
+internal fun buildHttpResponse(code: Int, message: String): String =
+    "HTTP/1.1 $code $message\r\n" +
+        "Content-Length: 0\r\n" +
+        "Connection: close\r\n" +
+        "\r\n"

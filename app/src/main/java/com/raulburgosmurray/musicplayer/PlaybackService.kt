@@ -16,8 +16,8 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.raulburgosmurray.musicplayer.data.AppDatabase
-import com.raulburgosmurray.musicplayer.data.AudiobookProgress
 import com.raulburgosmurray.musicplayer.data.Bookmark
+import com.raulburgosmurray.musicplayer.data.ProgressUpdate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -34,6 +34,8 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 
 class PlaybackService : MediaSessionService() {
 
+    private data class PlaybackSnapshot(val duration: Long, val speed: Float, val pitch: Float)
+
     companion object {
         const val SYNC_ACTION = "com.raulburgosmurray.musicplayer.SYNC_PROGRESS"
     }
@@ -43,6 +45,9 @@ class PlaybackService : MediaSessionService() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var saveProgressJob: Job? = null
     private var smartRewindJob: Job? = null
+    private var restoreProgressJob: Job? = null
+    private var isApplyingStoredParameters = false
+    private val playbackSnapshots = mutableMapOf<String, PlaybackSnapshot>()
     private lateinit var database: AppDatabase
 
     @OptIn(UnstableApi::class)
@@ -65,7 +70,6 @@ class PlaybackService : MediaSessionService() {
 
         val extractorsFactory = DefaultExtractorsFactory()
             .setMp3ExtractorFlags(
-                Mp3Extractor.FLAG_ENABLE_INDEX_SEEKING or
                 Mp3Extractor.FLAG_ENABLE_CONSTANT_BITRATE_SEEKING
             )
         val mediaSourceFactory = DefaultMediaSourceFactory(this, extractorsFactory)
@@ -88,8 +92,13 @@ class PlaybackService : MediaSessionService() {
             .build().apply {
                 (application as ApplicationClass).audioSessionId = audioSessionId
                 addListener(object : Player.Listener {
+                    override fun onAudioSessionIdChanged(audioSessionId: Int) {
+                        (application as ApplicationClass).audioSessionId = audioSessionId
+                    }
+
                     override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                         mediaItem?.let { item ->
+                            applyStoredParameters(1f, 1f)
                             restorePositionOnTransition(item.mediaId)
                         }
                     }
@@ -97,7 +106,6 @@ class PlaybackService : MediaSessionService() {
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
                         val p = player ?: return
                         if (isPlaying) {
-                            applySmartRewindOnPlay()
                             startPeriodicSave()
                         } else {
                             stopPeriodicSave()
@@ -111,21 +119,40 @@ class PlaybackService : MediaSessionService() {
                     }
 
                     override fun onPlaybackStateChanged(playbackState: Int) {
+                        player?.let(::rememberCurrentSnapshot)
                         if (playbackState == Player.STATE_ENDED || playbackState == Player.STATE_IDLE) {
                             saveCurrentProgress()
                         }
                     }
 
                     override fun onPlayerError(error: PlaybackException) {
-                        Log.e("PlaybackService", "Player error: ${error.errorCodeName}", error)
-                        // Save progress before any recovery attempt
-                        saveCurrentProgress()
-                        // Do NOT recreate the player/session: that disconnects all MediaControllers.
-                        // For local audiobooks, the player enters STATE_IDLE; the UI can re-prepare.
                         val p = player ?: return
-                        if (p.playbackState == Player.STATE_IDLE && p.mediaItemCount > 0) {
-                            p.prepare()
+                        Log.e(
+                            "PlaybackService",
+                            "Player error=${error.errorCodeName}, mediaId=${p.currentMediaItem?.mediaId}, " +
+                                "position=${p.currentPosition}, duration=${p.duration}, cause=${error.cause?.message}",
+                            error
+                        )
+                        saveCurrentProgress()
+                        // A damaged frame would fail again at the same position. Keep the session and
+                        // queue intact, but require an explicit user retry instead of looping prepare().
+                        p.playWhenReady = false
+                    }
+
+                    override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                        if (playWhenReady) {
+                            // This callback represents a play request. Buffering during a seek does
+                            // not retrigger it, so smart rewind cannot overwrite a manual destination.
+                            applySmartRewindOnPlay()
                         }
+                    }
+
+                    override fun onPlaybackParametersChanged(playbackParameters: androidx.media3.common.PlaybackParameters) {
+                        if (!isApplyingStoredParameters) {
+                            // A manual change wins over a database read that is still in flight.
+                            restoreProgressJob?.cancel()
+                        }
+                        player?.let(::rememberCurrentSnapshot)
                     }
 
                     override fun onPositionDiscontinuity(
@@ -133,7 +160,15 @@ class PlaybackService : MediaSessionService() {
                         newPosition: Player.PositionInfo,
                         reason: Int
                     ) {
+                        if (oldPosition.mediaItemIndex != newPosition.mediaItemIndex) {
+                            val oldMediaId = oldPosition.mediaItem?.mediaId
+                            saveOutgoingProgress(oldMediaId, oldPosition.positionMs)
+                            return
+                        }
                         if (reason != Player.DISCONTINUITY_REASON_SEEK) return
+                        val seekedMediaId = newPosition.mediaItem?.mediaId
+                            ?: player?.currentMediaItem?.mediaId
+                        saveOutgoingProgress(seekedMediaId, newPosition.positionMs)
                         val backward = oldPosition.positionMs - newPosition.positionMs
                         if (backward > Constants.SKIP_BACKWARD_MS * 2 && newPosition.positionMs < 5_000L) {
                             val savedPos = oldPosition.positionMs
@@ -179,18 +214,18 @@ class PlaybackService : MediaSessionService() {
     }
 
     private fun restorePositionOnTransition(mediaId: String) {
-        serviceScope.launch(Dispatchers.IO) {
+        restoreProgressJob?.cancel()
+        restoreProgressJob = serviceScope.launch(Dispatchers.IO) {
             try {
                 val progress = database.progressDao().getProgress(mediaId)
                 withContext(Dispatchers.Main) {
                     val currentPlayer = player ?: return@withContext
+                    if (currentPlayer.currentMediaItem?.mediaId != mediaId) return@withContext
                     if (progress != null) {
                         // Restaurar la velocidad y pitch guardados (mínimo 0.1 para evitar errores)
                         val speed = progress.playbackSpeed.coerceAtLeast(0.1f)
                         val pitch = progress.pitch.coerceAtLeast(0.1f)
-                        currentPlayer.setPlaybackParameters(
-                            androidx.media3.common.PlaybackParameters(speed, pitch)
-                        )
+                        applyStoredParameters(speed, pitch)
                         // Restaurar equalizer preset si existe
                         if (progress.eqPresetName.isNotEmpty()) {
                             try {
@@ -205,10 +240,9 @@ class PlaybackService : MediaSessionService() {
                         }
                     } else {
                         // Libro nuevo: resetear velocidad y pitch a 1.0f por defecto
-                        currentPlayer.setPlaybackParameters(
-                            androidx.media3.common.PlaybackParameters(1.0f, 1.0f)
-                        )
+                        applyStoredParameters(1.0f, 1.0f)
                     }
+                    rememberCurrentSnapshot(currentPlayer)
                 }
             } catch (e: Exception) {
                 Log.e("PlaybackService", "Error restaurando posición", e)
@@ -233,9 +267,10 @@ class PlaybackService : MediaSessionService() {
                     val elapsed = System.currentTimeMillis() - lastPause
                     val rewindMs = calculateRewindMs(elapsed)
 
-                    progress?.let {
-                        database.progressDao().saveProgress(it.copy(lastPauseTimestamp = 0L))
-                    }
+                    database.progressDao().applyUpdate(
+                        mediaId,
+                        ProgressUpdate(lastPauseTimestamp = 0L)
+                    )
 
                     if (rewindMs > 0 && isActive) {
                         withContext(Dispatchers.Main) {
@@ -287,6 +322,7 @@ class PlaybackService : MediaSessionService() {
             it.release()
         }
         player = null
+        (application as ApplicationClass).audioSessionId = -1
         mediaSession?.let {
             it.release()
             mediaSession = null
@@ -302,6 +338,7 @@ class PlaybackService : MediaSessionService() {
         val duration = p.duration
         val speed = p.playbackParameters.speed
         val pitch = p.playbackParameters.pitch
+        rememberCurrentSnapshot(p)
         
         // Defensive: reject obviously corrupt values before they poison the DB
         if (duration <= 0 || position < 0 || position > duration * 2) return
@@ -311,30 +348,30 @@ class PlaybackService : MediaSessionService() {
         
         serviceScope.launch(Dispatchers.IO) {
             try {
-                val currentProgress = database.progressDao().getProgress(currentMediaItem.mediaId)
-                val pauseToSave = if (isPausing) newPauseTimestamp else (currentProgress?.lastPauseTimestamp ?: 0L)
-                
                 // Auto-mark as read when progress reaches 99% or more
                 val progressPercent = if (duration > 0) position.toFloat() / duration.toFloat() else 0f
                 val shouldMarkAsRead = progressPercent >= 0.99f
-                val currentIsRead = currentProgress?.isRead ?: false
-                val finalIsRead = currentIsRead || shouldMarkAsRead
-
-                // Preserve per-book EQ preset if it exists; fall back to global prefs only when empty
-                val eqName = currentProgress?.eqPresetName?.takeIf { it.isNotEmpty() }
-                    ?: getSharedPreferences("eq_prefs", MODE_PRIVATE).getString("eq_preset", "").orEmpty()
-                database.progressDao().saveProgress(
-                    AudiobookProgress(
-                        mediaId = currentMediaItem.mediaId,
+                database.progressDao().applyUpdate(
+                    currentMediaItem.mediaId,
+                    ProgressUpdate(
                         lastPosition = position,
                         duration = duration,
-                        lastPauseTimestamp = pauseToSave,
+                        lastPauseTimestamp = if (isPausing) newPauseTimestamp else null,
                         playbackSpeed = speed,
                         pitch = pitch,
-                        eqPresetName = eqName,
-                        isRead = finalIsRead
+                        isRead = if (shouldMarkAsRead) true else null
                     )
                 )
+
+                if (currentMediaItem.mediaId.startsWith("abs_")) {
+                    val absRepo = com.raulburgosmurray.musicplayer.data.AudiobookshelfRepository(applicationContext)
+                    absRepo.syncPlaybackProgress(
+                        mediaId = currentMediaItem.mediaId,
+                        positionMs = position,
+                        durationMs = duration,
+                        isFinished = progressPercent >= 0.99f
+                    )
+                }
                 
                 // Si estamos pausando, notificamos a la app que debe sincronizar con la nube
                 if (isPausing) {
@@ -365,21 +402,16 @@ class PlaybackService : MediaSessionService() {
 
         runBlocking(Dispatchers.IO) {
             try {
-                val existing = database.progressDao().getProgress(currentMediaItem.mediaId)
                 val progressPercent = position.toFloat() / duration.toFloat()
-                // Preserve per-book EQ preset if it exists; fall back to global prefs only when empty
-                val eqName = existing?.eqPresetName?.takeIf { it.isNotEmpty() }
-                    ?: getSharedPreferences("eq_prefs", MODE_PRIVATE).getString("eq_preset", "").orEmpty()
-                database.progressDao().saveProgress(
-                    AudiobookProgress(
-                        mediaId = currentMediaItem.mediaId,
+                database.progressDao().applyUpdate(
+                    currentMediaItem.mediaId,
+                    ProgressUpdate(
                         lastPosition = position,
                         duration = duration,
                         lastPauseTimestamp = System.currentTimeMillis(),
                         playbackSpeed = speed,
                         pitch = pitch,
-                        eqPresetName = eqName,
-                        isRead = (existing?.isRead ?: false) || progressPercent >= 0.99f
+                        isRead = if (progressPercent >= 0.99f) true else null
                     )
                 )
             } catch (e: Exception) {
@@ -401,5 +433,46 @@ class PlaybackService : MediaSessionService() {
         saveCurrentProgressBlocking()
         releaseResources()
         super.onDestroy()
+    }
+
+    private fun saveOutgoingProgress(mediaId: String?, position: Long) {
+        if (mediaId == null || position < 0L) return
+        val snapshot = playbackSnapshots[mediaId] ?: return
+        if (snapshot.duration <= 0L) return
+        serviceScope.launch(Dispatchers.IO) {
+            database.progressDao().applyUpdate(
+                mediaId,
+                ProgressUpdate(
+                    lastPosition = position.coerceAtMost(snapshot.duration),
+                    duration = snapshot.duration,
+                    playbackSpeed = snapshot.speed,
+                    pitch = snapshot.pitch
+                )
+            )
+        }
+    }
+
+    private fun rememberCurrentSnapshot(currentPlayer: Player) {
+        val mediaId = currentPlayer.currentMediaItem?.mediaId ?: return
+        val duration = currentPlayer.duration.takeIf { it > 0L }
+            ?: playbackSnapshots[mediaId]?.duration
+            ?: 0L
+        playbackSnapshots[mediaId] = PlaybackSnapshot(
+            duration,
+            currentPlayer.playbackParameters.speed,
+            currentPlayer.playbackParameters.pitch
+        )
+    }
+
+    private fun applyStoredParameters(speed: Float, pitch: Float) {
+        val currentPlayer = player ?: return
+        isApplyingStoredParameters = true
+        try {
+            currentPlayer.setPlaybackParameters(
+                androidx.media3.common.PlaybackParameters(speed, pitch)
+            )
+        } finally {
+            isApplyingStoredParameters = false
+        }
     }
 }

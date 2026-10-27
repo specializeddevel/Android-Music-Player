@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 
 @Dao
 interface ProgressDao {
@@ -27,6 +28,17 @@ interface ProgressDao {
 
     @Query("UPDATE audiobook_progress SET isRead = :isRead, lastUpdated = :timestamp WHERE mediaId = :mediaId")
     suspend fun updateReadStatus(mediaId: String, isRead: Boolean, timestamp: Long = System.currentTimeMillis())
+
+    @Transaction
+    suspend fun applyUpdate(
+        mediaId: String,
+        update: ProgressUpdate,
+        timestamp: Long = System.currentTimeMillis()
+    ): AudiobookProgress {
+        val merged = mergeProgress(getProgress(mediaId), mediaId, update, timestamp)
+        saveProgress(merged)
+        return merged
+    }
 
     @Query("DELETE FROM audiobook_progress WHERE mediaId = :mediaId")
     suspend fun deleteProgress(mediaId: String)
