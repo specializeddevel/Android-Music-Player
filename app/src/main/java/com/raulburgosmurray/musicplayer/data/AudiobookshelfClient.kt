@@ -220,4 +220,15 @@ object AudiobookshelfClient {
             "$cleanUrl/api/items/$itemId/file/0?token=$token"
         }
     }
+
+    fun buildAudioStreamUrls(baseUrl: String, token: String, itemId: String, audioFiles: List<AbsAudioFile>?): List<String> {
+        val cleanUrl = normalizeUrl(baseUrl).removeSuffix("/login")
+        if (audioFiles.isNullOrEmpty()) {
+            return listOf("$cleanUrl/api/items/$itemId/file/0?token=$token")
+        }
+        return audioFiles.map { af ->
+            val ino = af.ino ?: "0"
+            "$cleanUrl/api/items/$itemId/file/$ino?token=$token"
+        }
+    }
 }

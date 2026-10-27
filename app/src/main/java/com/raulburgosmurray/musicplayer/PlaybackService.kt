@@ -346,13 +346,16 @@ class PlaybackService : MediaSessionService() {
         
         val newPauseTimestamp = if (isPausing) System.currentTimeMillis() else 0L
         
+        val rawMediaId = currentMediaItem.mediaId
+        val mainMediaId = rawMediaId.substringBefore("_part_")
+
         serviceScope.launch(Dispatchers.IO) {
             try {
                 // Auto-mark as read when progress reaches 99% or more
                 val progressPercent = if (duration > 0) position.toFloat() / duration.toFloat() else 0f
                 val shouldMarkAsRead = progressPercent >= 0.99f
                 database.progressDao().applyUpdate(
-                    currentMediaItem.mediaId,
+                    mainMediaId,
                     ProgressUpdate(
                         lastPosition = position,
                         duration = duration,
@@ -363,16 +366,16 @@ class PlaybackService : MediaSessionService() {
                     )
                 )
 
-                if (currentMediaItem.mediaId.startsWith("abs_")) {
+                if (mainMediaId.startsWith("abs_")) {
                     val absRepo = com.raulburgosmurray.musicplayer.data.AudiobookshelfRepository(applicationContext)
                     absRepo.syncPlaybackProgress(
-                        mediaId = currentMediaItem.mediaId,
+                        mediaId = mainMediaId,
                         positionMs = position,
                         durationMs = duration,
                         isFinished = progressPercent >= 0.99f
                     )
                 }
-                
+
                 // Si estamos pausando, notificamos a la app que debe sincronizar con la nube
                 if (isPausing) {
                     val syncIntent = Intent(SYNC_ACTION)

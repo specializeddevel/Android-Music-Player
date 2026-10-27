@@ -10,8 +10,18 @@ import kotlinx.coroutines.withContext
 private const val TAG = "AbsRepository"
 private const val ABS_PREFS_NAME = "abs_prefs"
 
+fun sanitizeUrlForLog(url: String?): String {
+    if (url.isNullOrBlank()) return ""
+    return url.replace(Regex("token=[^&]+"), "token=***")
+}
+
 sealed class StreamResolution {
-    data class Success(val streamUrl: String, val durationMs: Long, val synopsis: String?) : StreamResolution()
+    data class Success(val multiTrackInfo: MultiTrackInfo, val synopsis: String?) : StreamResolution() {
+        val primaryStreamUrl: String get() = multiTrackInfo.tracks.firstOrNull()?.streamUrl ?: ""
+        val streamUrls: List<String> get() = multiTrackInfo.tracks.map { it.streamUrl }
+        val streamUrl: String get() = primaryStreamUrl
+        val durationMs: Long get() = multiTrackInfo.totalDurationMs
+    }
     object NotFound : StreamResolution()
     object Unauthorized : StreamResolution()
     data class NetworkError(val message: String) : StreamResolution()
@@ -205,7 +215,19 @@ class AudiobookshelfRepository(private val context: Context) {
             val db = AppDatabase.getDatabase(context)
             val cached = db.cachedBookDao().getBookById(mediaId)
             return@withContext if (cached != null) {
-                StreamResolution.Success(cached.path, cached.duration, cached.description)
+                val singleTrack = BookTrack(
+                    index = 0,
+                    ino = "0",
+                    streamUrl = cached.path,
+                    startOffsetMs = 0L,
+                    durationMs = cached.duration
+                )
+                val trackInfo = MultiTrackInfo(
+                    bookId = mediaId,
+                    totalDurationMs = cached.duration,
+                    tracks = listOf(singleTrack)
+                )
+                StreamResolution.Success(trackInfo, cached.description)
             } else {
                 StreamResolution.NotFound
             }
@@ -218,7 +240,19 @@ class AudiobookshelfRepository(private val context: Context) {
         if (cached != null && !cached.path.startsWith("http://") && !cached.path.startsWith("https://")) {
             if (isLocalPathValid(cached.path)) {
                 Log.d(TAG, "Book $mediaId local path verified: ${cached.path}")
-                return@withContext StreamResolution.Success(cached.path, cached.duration, cached.description)
+                val singleTrack = BookTrack(
+                    index = 0,
+                    ino = "0",
+                    streamUrl = cached.path,
+                    startOffsetMs = 0L,
+                    durationMs = cached.duration
+                )
+                val trackInfo = MultiTrackInfo(
+                    bookId = mediaId,
+                    totalDurationMs = cached.duration,
+                    tracks = listOf(singleTrack)
+                )
+                return@withContext StreamResolution.Success(trackInfo, cached.description)
             } else {
                 Log.w(TAG, "Book $mediaId local path ${cached.path} is missing/deleted! Falling back to Audiobookshelf server stream.")
             }
@@ -246,26 +280,25 @@ class AudiobookshelfRepository(private val context: Context) {
         }
 
         val media = itemDetail.media
-        val audioFile = media?.audioFiles?.firstOrNull()
-        val ino = audioFile?.ino
-
-        val streamUrl = AudiobookshelfClient.buildAudioStreamUrl(serverUrl, token, absItemId, ino)
-        val durationMs = if ((media?.duration ?: 0.0) > 0) ((media?.duration ?: 0.0) * 1000).toLong() else (cached?.duration ?: 0L)
+        val audioFiles = media?.audioFiles
+        val multiTrackInfo = MultiTrackHelper.buildMultiTrackInfo(mediaId, audioFiles, serverUrl, token)
+        val primaryStreamUrl = multiTrackInfo.tracks.firstOrNull()?.streamUrl ?: ""
+        val durationMs = if (multiTrackInfo.totalDurationMs > 0) multiTrackInfo.totalDurationMs else (cached?.duration ?: 0L)
         val synopsis = media?.metadata?.description?.takeIf { it.isNotBlank() }
-            ?: audioFile?.metadata?.tagComment?.takeIf { it.isNotBlank() }
+            ?: audioFiles?.firstOrNull()?.metadata?.tagComment?.takeIf { it.isNotBlank() }
             ?: cached?.description
 
         if (cached != null) {
             val updated = cached.copy(
-                path = streamUrl,
+                path = primaryStreamUrl,
                 duration = durationMs,
                 description = synopsis
             )
             db.cachedBookDao().upsertAll(listOf(updated))
         }
 
-        Log.d(TAG, "Successfully resolved stream URL for $mediaId: $streamUrl (duration=${durationMs}ms)")
-        StreamResolution.Success(streamUrl, durationMs, synopsis)
+        Log.d(TAG, "Successfully resolved ${multiTrackInfo.tracks.size} stream tracks for $mediaId: ${sanitizeUrlForLog(primaryStreamUrl)} (duration=${durationMs}ms)")
+        StreamResolution.Success(multiTrackInfo, synopsis)
     }
 
     suspend fun resolveStreamUrl(mediaId: String): String? {
@@ -299,10 +332,8 @@ class AudiobookshelfRepository(private val context: Context) {
         prefs.edit().clear().apply()
         val db = AppDatabase.getDatabase(context)
         try {
-            db.cachedBookDao().convertDownloadedAbsBooksToLocal()
             db.cachedBookDao().deleteRemoteStreamingBooks()
-            db.cachedBookDao().deleteAllAbsBooks()
-            Log.d(TAG, "Successfully disconnected and cleaned all Audiobookshelf books from Room DB")
+            Log.d(TAG, "Successfully disconnected and cleaned remote streaming books from Room DB")
         } catch (e: Exception) {
             Log.e(TAG, "Error cleaning books during disconnect", e)
         }

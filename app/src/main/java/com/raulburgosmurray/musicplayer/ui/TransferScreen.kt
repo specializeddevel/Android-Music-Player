@@ -32,9 +32,11 @@ import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.BasicAlertDialog
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -49,7 +51,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -197,8 +198,8 @@ fun TransferScreen(
 ) {
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(if (isSending) R.string.send else R.string.receive)) },
+            CenterAlignedTopAppBar(
+                title = { Text(stringResource(if (isSending) R.string.send else R.string.receive), fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -361,7 +362,7 @@ private fun SenderContent(state: TransferUIState, onRetry: () -> Unit) {
 private fun ErrorContent(message: String, onRetry: () -> Unit) {
     Icon(Icons.Default.WarningAmber, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(40.dp))
     Text(message, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
-    Button(onClick = onRetry) { Text(stringResource(R.string.retry)) }
+    Button(onClick = onRetry, modifier = Modifier.heightIn(min = 52.dp), shape = MaterialTheme.shapes.large) { Text(stringResource(R.string.retry)) }
 }
 
 @Composable
@@ -382,7 +383,7 @@ private fun ManualReceiverContent(
         singleLine = true,
         shape = MaterialTheme.shapes.large
     )
-    Button(onClick = onConnect, enabled = targetAddress.isNotBlank(), modifier = Modifier.fillMaxWidth().height(52.dp)) {
+    Button(onClick = onConnect, enabled = targetAddress.isNotBlank(), modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), shape = MaterialTheme.shapes.large) {
         Text(stringResource(R.string.connect))
     }
     TextButton(onClick = onUseCamera) {
@@ -402,7 +403,7 @@ private fun CameraPermissionContent(onRequestPermission: () -> Unit, onUseManual
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         textAlign = TextAlign.Center
     )
-    Button(onClick = onRequestPermission, modifier = Modifier.fillMaxWidth().height(52.dp)) {
+    Button(onClick = onRequestPermission, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), shape = MaterialTheme.shapes.large) {
         Text(stringResource(R.string.grant_camera_permission))
     }
     TextButton(onClick = onUseManual) {

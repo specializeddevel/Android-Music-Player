@@ -635,10 +635,10 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
             }
 
             var description = cachedBook?.description
-            Log.d("PlaybackVM", "Book: ${cachedBook?.title}, path=${cachedBook?.path}, existing desc=${cachedBook?.description?.take(50)}")
+            Log.d("PlaybackVM", "Book: ${cachedBook?.title}, path=${com.raulburgosmurray.musicplayer.data.sanitizeUrlForLog(cachedBook?.path)}, existing desc=${cachedBook?.description?.take(50)}")
 
             if (!mediaId.startsWith("abs_") && description.isNullOrBlank() && DescriptionExtractor.isSupported() && !cachedBook?.path.isNullOrBlank()) {
-                Log.d("PlaybackVM", "Attempting lazy extraction for ${cachedBook!!.path}")
+                Log.d("PlaybackVM", "Attempting lazy extraction for ${com.raulburgosmurray.musicplayer.data.sanitizeUrlForLog(cachedBook!!.path)}")
                 val extracted = withContext(Dispatchers.IO) {
                     DescriptionExtractor.extract(getApplication(), cachedBook!!.path)
                 }
@@ -1118,6 +1118,64 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
         _uiState.value = _uiState.value.copy(sleepTimerMinutes = 0, isShakeWaiting = false)
     }
 
+    fun retryCurrentPlayback() {
+        val currentMediaItem = _uiState.value.currentMediaItem ?: return
+        val rawMediaId = currentMediaItem.mediaId ?: return
+        val mediaId = rawMediaId.substringBefore("_part_")
+
+        _uiState.value = _uiState.value.copy(playbackError = null, isBuffering = true)
+
+        viewModelScope.launch {
+            if (mediaId.startsWith("abs_")) {
+                val absRepo = com.raulburgosmurray.musicplayer.data.AudiobookshelfRepository(getApplication())
+                val resolution = withContext(Dispatchers.IO) {
+                    absRepo.resolveStreamDetails(mediaId)
+                }
+                when (resolution) {
+                    is com.raulburgosmurray.musicplayer.data.StreamResolution.Success -> {
+                        val trackItems = resolution.streamUrls.mapIndexed { idx, url ->
+                            currentMediaItem.buildUpon()
+                                .setUri(url)
+                                .setMediaId(if (resolution.streamUrls.size == 1) mediaId else "${mediaId}_part_$idx")
+                                .build()
+                        }
+                        val primaryItem = trackItems.first()
+                        _uiState.value = _uiState.value.copy(currentMediaItem = primaryItem)
+                        controller?.let { player ->
+                            player.stop()
+                            player.setMediaItems(trackItems, 0, _uiState.value.currentPosition)
+                            player.prepare()
+                            player.play()
+                        }
+                    }
+                    com.raulburgosmurray.musicplayer.data.StreamResolution.NotFound -> {
+                        _uiState.value = _uiState.value.copy(
+                            isBuffering = false,
+                            playbackError = "El servidor de Audiobookshelf no encuentra el archivo de audio."
+                        )
+                    }
+                    com.raulburgosmurray.musicplayer.data.StreamResolution.Unauthorized -> {
+                        _uiState.value = _uiState.value.copy(
+                            isBuffering = false,
+                            playbackError = "Sesión expirada. Vuelve a conectar tu cuenta de Audiobookshelf."
+                        )
+                    }
+                    is com.raulburgosmurray.musicplayer.data.StreamResolution.NetworkError -> {
+                        _uiState.value = _uiState.value.copy(
+                            isBuffering = false,
+                            playbackError = "No pudimos conectar con el servidor de Audiobookshelf."
+                        )
+                    }
+                }
+            } else {
+                controller?.let {
+                    it.prepare()
+                    it.play()
+                }
+            }
+        }
+    }
+
     fun returnToTimerStart() {
         val pos = _uiState.value.timerStartPosition ?: return
         seekTo(pos)
@@ -1162,9 +1220,15 @@ class PlaybackViewModel(application: Application) : androidx.lifecycle.AndroidVi
                     when (resolution) {
                         is com.raulburgosmurray.musicplayer.data.StreamResolution.Success -> {
                             if (targetItem != null) {
-                                val updatedItem = targetItem.buildUpon().setUri(resolution.streamUrl).build()
+                                val trackItems = resolution.streamUrls.mapIndexed { idx, url ->
+                                    targetItem.buildUpon()
+                                        .setUri(url)
+                                        .setMediaId(if (resolution.streamUrls.size == 1) targetItem.mediaId else "${targetItem.mediaId}_part_$idx")
+                                        .build()
+                                }
                                 preparedItems = mediaItems.toMutableList().apply {
-                                    set(startIndex, updatedItem)
+                                    removeAt(startIndex)
+                                    addAll(startIndex, trackItems)
                                 }
                             }
                         }

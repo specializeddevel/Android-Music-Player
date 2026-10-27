@@ -133,6 +133,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _absSyncError = MutableStateFlow<String?>(null)
     val absSyncError: StateFlow<String?> = _absSyncError.asStateFlow()
 
+    fun refreshAbsStatus() {
+        _isAbsConnected.value = absRepository.isConnected()
+        _absServerUrl.value = absRepository.getServerUrl() ?: ""
+        _absUsername.value = absRepository.getUsername() ?: ""
+        _absLibraryName.value = absRepository.getLibraryName() ?: ""
+        _absLastSyncTime.value = absRepository.getLastSyncTime()
+    }
+
     fun connectAudiobookshelf(url: String, user: String, pass: String, onComplete: (Boolean) -> Unit = {}) {
         viewModelScope.launch {
             _isAbsSyncing.value = true

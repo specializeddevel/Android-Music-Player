@@ -63,6 +63,19 @@ fun SettingsScreen(
     
     val userAccount by syncViewModel.userAccount.collectAsState()
     val isSyncing by syncViewModel.isSyncing.collectAsState()
+
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshAbsStatus()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
     val lastSyncTime by syncViewModel.lastSyncTime.collectAsState()
 
     val context = LocalContext.current

@@ -42,33 +42,31 @@ object BookDownloader {
         val primarySafUriString = libraryUris.firstOrNull()
 
         CoroutineScope(Dispatchers.IO).launch {
+            val notifId = NOTIFICATION_ID_BASE + book.id.hashCode()
+            var tempUri: Uri? = null
+
             try {
                 withContext(Dispatchers.Main) { onStarted() }
                 createNotificationChannel(context)
-                val notifId = NOTIFICATION_ID_BASE + book.id.hashCode()
                 showProgressNotification(context, notifId, book.title, "Iniciando descarga...", 0, 100)
 
                 val ext = book.fileName.substringAfterLast('.', "mp3").ifBlank { "mp3" }
                 val mimeType = if (ext.equals("m4a", ignoreCase = true) || ext.equals("m4b", ignoreCase = true)) "audio/mp4" else "audio/mpeg"
                 val sanitizedTitle = book.title.replace(Regex("[^a-zA-Z0-9._ -]"), "_").trim()
                 val fileName = "$sanitizedTitle.$ext"
+                val tempFileName = "${sanitizedTitle}_${Math.abs(book.id.hashCode())}.tmp"
 
-                var targetUri: Uri? = null
-
-                // 1. Download directly into user's configured SAF folder if available
+                // 1. Download into user's configured SAF folder if available
                 if (!primarySafUriString.isNullOrBlank()) {
                     try {
                         val treeUri = Uri.parse(primarySafUriString)
                         val rootDoc = DocumentFile.fromTreeUri(context, treeUri)
                         if (rootDoc != null && rootDoc.exists() && rootDoc.canWrite()) {
-                            val existingFile = rootDoc.findFile(fileName)
-                            if (existingFile != null && existingFile.exists()) {
-                                existingFile.delete()
-                            }
-                            val newFile = rootDoc.createFile(mimeType, fileName)
-                            if (newFile != null) {
-                                targetUri = newFile.uri
-                                Log.d(TAG, "Created SAF file in configured folder: $targetUri")
+                            // Delete any existing temp or final file to start fresh
+                            rootDoc.findFile(tempFileName)?.delete()
+                            val tempFile = rootDoc.createFile("application/octet-stream", tempFileName)
+                            if (tempFile != null) {
+                                tempUri = tempFile.uri
                             }
                         }
                     } catch (e: Exception) {
@@ -77,12 +75,12 @@ object BookDownloader {
                 }
 
                 // 2. Fallback: Download into public Music/Litera directory
-                if (targetUri == null) {
+                if (tempUri == null) {
                     val musicDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), "Litera")
                     if (!musicDir.exists()) musicDir.mkdirs()
-                    val targetFile = File(musicDir, fileName)
-                    targetUri = Uri.fromFile(targetFile)
-                    Log.d(TAG, "Created local file in Music/Litera: $targetUri")
+                    val tempFile = File(musicDir, tempFileName)
+                    if (tempFile.exists()) tempFile.delete()
+                    tempUri = Uri.fromFile(tempFile)
                 }
 
                 // Resolve latest stream URL and synopsis for ABS books
@@ -98,12 +96,14 @@ object BookDownloader {
                 val request = Request.Builder().url(downloadPath).get().build()
                 okHttpClient.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) {
+                        deleteFileAtUri(context, tempUri)
                         showCompletedNotification(context, notifId, book.title, "Error al descargar (HTTP ${response.code})", false)
                         return@launch
                     }
 
                     val responseBody = response.body
                         ?: run {
+                            deleteFileAtUri(context, tempUri)
                             showCompletedNotification(context, notifId, book.title, "Respuesta vacía del servidor", false)
                             return@launch
                         }
@@ -111,7 +111,7 @@ object BookDownloader {
                     val totalBytes = responseBody.contentLength().takeIf { it > 0 } ?: book.fileSize
                     var copiedBytes = 0L
 
-                    context.contentResolver.openOutputStream(targetUri!!, "wt")?.use { output ->
+                    context.contentResolver.openOutputStream(tempUri, "wt")?.use { output ->
                         responseBody.byteStream().use { input ->
                             val buffer = ByteArray(32768)
                             var read: Int
@@ -132,27 +132,102 @@ object BookDownloader {
                         }
                     }
 
-                    // Update Room Database with the downloaded local URI
+                    // Verify atomic completion
+                    if (copiedBytes <= 0) {
+                        deleteFileAtUri(context, tempUri)
+                        showCompletedNotification(context, notifId, book.title, "Error: Archivo descargado vacío", false)
+                        return@launch
+                    }
+
+                    // Publish file: Publish in SAF or rename local file
+                    val finalUri = publishDownloadedFile(context, primarySafUriString, tempUri, fileName)
+
+                    if (finalUri == null) {
+                        deleteFileAtUri(context, tempUri)
+                        showCompletedNotification(context, notifId, book.title, "Error al publicar archivo descargado", false)
+                        return@launch
+                    }
+
+                    // Update Room Database with the downloaded local URI (keeping same book.id!)
                     val db = AppDatabase.getDatabase(context)
                     val cachedBook = db.cachedBookDao().getBookById(book.id)
                     if (cachedBook != null) {
                         val updated = cachedBook.copy(
-                            path = targetUri.toString(),
-                            fileSize = if (copiedBytes > 0) copiedBytes else cachedBook.fileSize
+                            path = finalUri.toString(),
+                            fileSize = copiedBytes
                         )
                         db.cachedBookDao().upsertAll(listOf(updated))
-                        Log.d(TAG, "Updated book ${book.title} in DB with downloaded path: $targetUri")
+                        Log.d(TAG, "Updated book ${book.title} (ID: ${book.id}) in DB with final downloaded path: $finalUri")
                     }
 
                     showCompletedNotification(context, notifId, book.title, "Descarga completada con éxito", true)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error downloading book ${book.title}", e)
-                val notifId = NOTIFICATION_ID_BASE + book.id.hashCode()
+                deleteFileAtUri(context, tempUri)
                 showCompletedNotification(context, notifId, book.title, "Error en la descarga: ${e.localizedMessage}", false)
             }
         }
         return true
+    }
+
+    private fun publishDownloadedFile(
+        context: Context,
+        primarySafUriString: String?,
+        tempUri: Uri,
+        fileName: String
+    ): Uri? {
+        if (!primarySafUriString.isNullOrBlank()) {
+            try {
+                val treeUri = Uri.parse(primarySafUriString)
+                val rootDoc = DocumentFile.fromTreeUri(context, treeUri)
+                if (rootDoc != null && rootDoc.exists() && rootDoc.canWrite()) {
+                    val tempDoc = DocumentFile.fromSingleUri(context, tempUri)
+                    if (tempDoc != null) {
+                        if (tempDoc.renameTo(fileName)) {
+                            return tempDoc.uri
+                        }
+                        return tempUri
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Error renaming SAF temp file, falling back to tempUri", e)
+            }
+            return tempUri
+        }
+
+        // Local file rename
+        return try {
+            val tempFile = File(tempUri.path ?: "")
+            if (tempFile.exists()) {
+                val finalFile = File(tempFile.parentFile, fileName)
+                if (finalFile.exists()) finalFile.delete()
+                if (tempFile.renameTo(finalFile)) {
+                    Uri.fromFile(finalFile)
+                } else {
+                    tempUri
+                }
+            } else {
+                tempUri
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error renaming local temp file", e)
+            tempUri
+        }
+    }
+
+    private fun deleteFileAtUri(context: Context, uri: Uri?) {
+        if (uri == null) return
+        try {
+            if (uri.scheme == "content") {
+                DocumentFile.fromSingleUri(context, uri)?.delete()
+            } else {
+                val file = File(uri.path ?: "")
+                if (file.exists()) file.delete()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to clean up temp file $uri", e)
+        }
     }
 
     private fun createNotificationChannel(context: Context) {
