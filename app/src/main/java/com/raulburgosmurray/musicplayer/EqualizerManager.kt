@@ -12,7 +12,7 @@ enum class EqPreset(val displayName: String) {
     CLARITY("Clarity")
 }
 
-class EqualizerManager {
+class EqualizerManager(private val createEqualizer: (Int) -> Equalizer = { Equalizer(0, it) }) {
     private var equalizer: Equalizer? = null
     private var sessionId: Int = -1
 
@@ -22,14 +22,22 @@ class EqualizerManager {
         private set
 
     fun attach(audioSessionId: Int) {
-        if (audioSessionId == -1 || audioSessionId == sessionId) return
+        if (audioSessionId <= 0) {
+            release()
+            return
+        }
+        if (audioSessionId == sessionId) return
         release()
         try {
-            equalizer = Equalizer(0, audioSessionId)
+            equalizer = createEqualizer(audioSessionId)
+            check(equalizer!!.setEnabled(true) == android.media.audiofx.AudioEffect.SUCCESS) {
+                "Could not enable equalizer"
+            }
             sessionId = audioSessionId
             applyPreset(currentPreset)
             Log.d(TAG, "Equalizer attached to session $audioSessionId")
         } catch (e: Exception) {
+            release()
             Log.e(TAG, "Failed to attach equalizer", e)
         }
     }
@@ -53,10 +61,10 @@ class EqualizerManager {
                 EqPreset.VOICE_BOOST -> {
                     resetBands(eq)
                     // Boost mid-range frequencies for voice clarity (~1-4kHz)
-                    boostBand(eq, 1.0f)  // Band 1
-                    boostBand(eq, 1.5f)  // Band 2
-                    boostBand(eq, 2.0f)  // Band 3
-                    boostBand(eq, 1.5f)  // Band 4
+                    boostBand(eq, 1, 1.0f)
+                    boostBand(eq, 2, 1.5f)
+                    boostBand(eq, 3, 2.0f)
+                    boostBand(eq, 4, 1.5f)
                 }
                 EqPreset.BASS_CUT -> {
                     resetBands(eq)
@@ -67,9 +75,9 @@ class EqualizerManager {
                 EqPreset.CLARITY -> {
                     resetBands(eq)
                     // Boost high-mid frequencies (~4-8kHz)
-                    boostBand(eq, 2.0f)  // Band 3
-                    boostBand(eq, 2.5f)  // Band 4
-                    boostBand(eq, 1.5f)  // Band 5
+                    boostBand(eq, 3, 2.0f)
+                    boostBand(eq, 4, 2.5f)
+                    boostBand(eq, 5, 1.5f)
                 }
             }
             Log.d(TAG, "Applied preset: $preset")
@@ -85,12 +93,23 @@ class EqualizerManager {
         }
     }
 
-    private fun boostBand(eq: Equalizer, boostDb: Float) {
-        // Simplified: we don't know exact frequency mapping, so we distribute
-        // This is a best-effort approach since frequency per band varies by device
+    private fun boostBand(eq: Equalizer, band: Int, boostDb: Float) {
+        setBandLevel(eq, band, boostDb)
     }
 
     private fun cutBand(eq: Equalizer, band: Int, level: Float) {
-        eq.setBandLevel(band.toShort(), (level * 100).toInt().toShort())
+        setBandLevel(eq, band, level)
+    }
+
+    private fun setBandLevel(eq: Equalizer, band: Int, levelDb: Float) {
+        if (band !in 0 until eq.numberOfBands.toInt()) return
+
+        val supportedRange = eq.bandLevelRange
+        val requestedLevel = (levelDb * 100).toInt()
+        val safeLevel = requestedLevel.coerceIn(
+            supportedRange.first().toInt(),
+            supportedRange.last().toInt()
+        )
+        eq.setBandLevel(band.toShort(), safeLevel.toShort())
     }
 }

@@ -17,8 +17,9 @@
     <string name="share_btn">Compartir</string>
     <string name="previous_btn">Anterior</string>
     <string name="pause_play_btn">Pausa/Reproducir</string>
+    <string name="playback_error_retry">No se pudo leer el audio en este punto. Avanza 10 segundos o toca reproducir para reintentar.</string>
     <string name="next_btn">Siguiente</string>
-    <string name="open">Abrir</string>
+    <string name="open">Refrescar</string>
     <string name="close">Cerrar</string>
     <string name="app_icon">Icono</string>
     <string name="text_nav">Bienvenido a\nLitera Audiolibros</string>
@@ -171,6 +172,7 @@
     <string name="lock_screen">Bloquear pantalla</string>
     <string name="screen_locked">Pantalla bloqueada</string>
     <string name="unlock">Desbloquear</string>
+    <string name="hold_to_unlock">Mantén presionado para desbloquear</string>
     <string name="undo">Deshacer</string>
     <!-- Controles táctiles de portada -->
     <string name="rewind_30s">Retroceder 30s</string>
@@ -201,6 +203,8 @@
     <string name="no_explorer_found">No se encontró un explorador compatible</string>
     <!-- Editor de metadatos -->
     <string name="edit_metadata_title">Editar Metadatos</string>
+    <string name="metadata_information">Información del audiolibro</string>
+    <string name="metadata_required_hint">El título y el autor son obligatorios. Los demás datos son opcionales.</string>
     <string name="field_title">Título</string>
     <string name="field_title_placeholder">Título del audiolibro</string>
     <string name="field_author_label">Autor</string>
@@ -239,6 +243,7 @@
     <string name="delete_book">Eliminar</string>
     <string name="delete_confirmation_title">¿Eliminar audiolibro?</string>
     <string name="delete_confirmation_message">Esto eliminará permanentemente \"%1$s\" de tu dispositivo. Esta acción no se puede deshacer.</string>
+    <string name="delete_confirmation_body">Este audiolibro se eliminará permanentemente de tu dispositivo. Esta acción no se puede deshacer.</string>
     <string name="delete_success">Audiolibro eliminado</string>
     <string name="delete_error">Error al eliminar el audiolibro</string>
     <string name="delete_book_in_use_title">Audiolibro en uso</string>
@@ -271,6 +276,7 @@
     <string name="wifi_permission_denied_title">📡 Permiso de Wi-Fi Denegado</string>
     <string name="wifi_permission_denied_message">Sin este permiso, no podrás transferir audiolibros a dispositivos cercanos.\n\nPuedes activarlo en cualquier momento en Ajustes → Apps → Litera → Permisos.</string>
     <string name="equalizer_title">Ecualizador</string>
+    <string name="equalizer_preset_description">Elige un perfil de sonido para este audiolibro.</string>
     <string name="equalizer_not_available">El ecualizador no está disponible en este dispositivo</string>
     <string name="eq_preset_flat">Plano</string>
     <string name="eq_preset_voice_boost">Potenciar Voz</string>
@@ -323,4 +329,42 @@
     <string name="history_sleep_rewind">Retrocedido %1$s al punto de sueño</string>
     <string name="interval_minutes">%1$d min</string>
     <string name="now_playing">Reproduciendo</string>
+    <string name="transfer_protocol_not_confirmed">El emisor no confirmó la transferencia segura. Actualiza Litera en ambos dispositivos (o el servidor de escritorio), revisa el WiFi y vuelve a intentarlo.</string>
+    <string name="book_sent_without_verification">Libro enviado sin verificación SHA-256: el receptor usa un protocolo anterior. Actualiza ambas apps para verificar las transferencias.</string>
+    <string name="permission_continue">Continuar</string>
+    <string name="onboarding_folder_description">Elige la carpeta donde guardas tus audiolibros.</string>
+    <string name="about_open">Información de la aplicación</string>
+    <string name="about_version">Versión %1$s (%2$d)</string>
+    <string name="about_version_short">Versión %1$s</string>
+    <string name="about_description">Un reproductor de audiolibros diseñado para escuchar con comodidad y concentración.</string>
+    <string name="about_developer">Desarrollador</string>
+    <string name="about_developer_placeholder">Equipo Litera (información temporal)</string>
+    <string name="about_support_email">Correo de soporte</string>
+    <string name="about_support_email_placeholder">litera.support@gmail.com</string>
+    <string name="about_website">Sitio web</string>
+    <string name="about_website_placeholder">https://example.com (temporal)</string>
+    <string name="about_privacy_policy">Política de privacidad</string>
+    <string name="about_privacy_policy_placeholder">URL pública pendiente</string>
+    <string name="about_legal">Términos y avisos de código abierto</string>
+    <string name="about_legal_placeholder">Información legal pendiente</string>
+    <string name="about_temporary_notice">Importante: el sitio web, la política de privacidad y la información legal son temporales y deben completarse antes de publicar la aplicación.</string>
+    <string name="sync_progress_only_desc">Conserva el audiolibro de este dispositivo y actualiza únicamente su posición de reproducción.</string>
+    <string name="download_full_book_desc">Reemplaza la copia local recibiendo el audiolibro completo desde el otro dispositivo.</string>
+    <string name="transfer_send_title">Compartir con otro dispositivo</string>
+    <string name="transfer_receive_title">Recibir un audiolibro</string>
+    <string name="transfer_send_instructions">Mantén esta pantalla abierta y escanea el código desde el otro dispositivo.</string>
+    <string name="transfer_receive_instructions">Escanea el código que muestra el dispositivo emisor. Ambos dispositivos deben estar en la misma red Wi-Fi.</string>
+    <string name="receiving_transfer">Recibiendo audiolibro</string>
+    <string name="preparing_transfer">Preparando transferencia segura…</string>
+    <string name="transfer_qr_code">Código QR para transferir el audiolibro</string>
+    <string name="transfer_playback_progress">Progreso de reproducción: %1$s</string>
+    <string name="enter_address_manually">Ingresar dirección manualmente</string>
+    <string name="manual_connection">Conexión manual</string>
+    <string name="ip_port_label">Dirección IP y puerto</string>
+    <string name="ip_port_example">Ejemplo: 192.168.1.20:50001</string>
+    <string name="connect">Conectar</string>
+    <string name="use_camera">Usar cámara</string>
+    <string name="transfer_camera_explanation">La cámara se usa únicamente para escanear el código QR de transferencia. No se guardan fotos ni videos.</string>
+    <string name="grant_camera_permission">Permitir cámara</string>
+    <string name="align_qr_in_frame">Coloca el código QR dentro del marco</string>
 </resources>

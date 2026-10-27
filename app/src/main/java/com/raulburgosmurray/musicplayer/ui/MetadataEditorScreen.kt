@@ -4,33 +4,36 @@ import android.content.res.Configuration
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import com.raulburgosmurray.musicplayer.R
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
-import com.raulburgosmurray.musicplayer.Music
+
+internal fun isMetadataSaveEnabled(title: String, artist: String, isSaving: Boolean): Boolean =
+    title.isNotBlank() && artist.isNotBlank() && !isSaving
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,7 +41,6 @@ fun MetadataEditorScreen(
     viewModel: MetadataEditorViewModel,
     onBack: () -> Unit
 ) {
-    val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     val uiState by viewModel.uiState.collectAsState()
@@ -97,233 +99,97 @@ fun MetadataEditorScreen(
         viewModel.updateComment(comment)
     }
     
+    val canSave = isMetadataSaveEnabled(title, artist, uiState.isSaving)
+
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.edit_metadata_title), fontWeight = FontWeight.Bold) },
+            CenterAlignedTopAppBar(
+                title = {
+                    Text(
+                        text = stringResource(R.string.edit_metadata_title),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back_btn))
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.back_btn)
+                        )
                     }
                 },
-                actions = {
-                    if (!uiState.isSaving) {
-                        IconButton(
-                            onClick = { viewModel.saveMetadata() },
-                            enabled = title.isNotBlank() && artist.isNotBlank()
-                        ) {
-                            Icon(Icons.Default.Check, contentDescription = stringResource(R.string.save))
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            )
+        },
+        bottomBar = {
+            if (!uiState.isLoading && uiState.error == null) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainer,
+                    tonalElevation = 3.dp
+                ) {
+                    Button(
+                        onClick = { viewModel.saveMetadata() },
+                        enabled = canSave,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .imePadding()
+                            .padding(horizontal = 20.dp, vertical = 12.dp)
+                            .heightIn(min = 52.dp),
+                        shape = MaterialTheme.shapes.large
+                    ) {
+                        if (uiState.isSaving) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                        } else {
+                            Icon(Icons.Default.Save, contentDescription = null)
                         }
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.save))
                     }
                 }
-            )
+            }
         }
     ) { padding ->
-        if (uiState.isLoading) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
-        } else if (uiState.error != null) {
-            Box(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = uiState.error!!,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(onClick = onBack) {
-                        Text(stringResource(R.string.back_btn))
-                    }
-                }
-            }
-        } else if (isLandscape) {
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                CoverArtSection(
-                    currentArtUri = uiState.metadata?.artUri,
-                    newArtUri = uiState.newArtUri,
-                    bookTitle = title,
-                    onPickImage = { imagePickerLauncher.launch("image/*") },
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                )
-
-                Card(
-                    modifier = Modifier
-                        .weight(1.5f)
-                        .fillMaxHeight(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .padding(16.dp)
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        EditTextField(
-                            label = stringResource(R.string.field_title),
-                            value = title,
-                            onValueChange = { title = it },
-                            placeholder = stringResource(R.string.field_title_placeholder)
-                        )
-
-                        EditTextField(
-                            label = stringResource(R.string.field_author_label),
-                            value = artist,
-                            onValueChange = { artist = it },
-                            placeholder = stringResource(R.string.field_author_placeholder)
-                        )
-
-                        EditTextField(
-                            label = stringResource(R.string.detail_series),
-                            value = album,
-                            onValueChange = { album = it },
-                            placeholder = stringResource(R.string.field_series_placeholder)
-                        )
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            EditTextField(
-                                label = stringResource(R.string.detail_year),
-                                value = year,
-                                onValueChange = { year = it },
-                                placeholder = "2024",
-                                modifier = Modifier.weight(1f)
-                            )
-
-                            EditTextField(
-                                label = stringResource(R.string.detail_volume),
-                                value = trackNumber,
-                                onValueChange = { trackNumber = it },
-                                placeholder = "1",
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-
-                        GenreDropdown(
-                            selectedGenre = genre,
-                            onGenreSelected = { genre = it },
-                            genres = viewModel.getPredefinedGenres()
-                        )
-
-                        EditTextField(
-                            label = stringResource(R.string.field_comment),
-                            value = comment,
-                            onValueChange = { comment = it },
-                            placeholder = stringResource(R.string.field_comment_placeholder),
-                            singleLine = false,
-                            minLines = 3
-                        )
-                    }
-                }
-            }
-        } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                CoverArtSection(
-                    currentArtUri = uiState.metadata?.artUri,
-                    newArtUri = uiState.newArtUri,
-                    bookTitle = title,
-                    onPickImage = { imagePickerLauncher.launch("image/*") }
-                )
-
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        EditTextField(
-                            label = stringResource(R.string.field_title),
-                            value = title,
-                            onValueChange = { title = it },
-                            placeholder = stringResource(R.string.field_title_placeholder)
-                        )
-
-                        EditTextField(
-                            label = stringResource(R.string.field_author_label),
-                            value = artist,
-                            onValueChange = { artist = it },
-                            placeholder = stringResource(R.string.field_author_placeholder)
-                        )
-
-                        EditTextField(
-                            label = stringResource(R.string.detail_series),
-                            value = album,
-                            onValueChange = { album = it },
-                            placeholder = stringResource(R.string.field_series_placeholder)
-                        )
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            EditTextField(
-                                label = stringResource(R.string.detail_year),
-                                value = year,
-                                onValueChange = { year = it },
-                                placeholder = "2024",
-                                modifier = Modifier.weight(1f)
-                            )
-
-                            EditTextField(
-                                label = stringResource(R.string.detail_volume),
-                                value = trackNumber,
-                                onValueChange = { trackNumber = it },
-                                placeholder = "1",
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-
-                        GenreDropdown(
-                            selectedGenre = genre,
-                            onGenreSelected = { genre = it },
-                            genres = viewModel.getPredefinedGenres()
-                        )
-
-                        EditTextField(
-                            label = stringResource(R.string.field_comment),
-                            value = comment,
-                            onValueChange = { comment = it },
-                            placeholder = stringResource(R.string.field_comment_placeholder),
-                            singleLine = false,
-                            minLines = 3
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-            }
+        when {
+            uiState.isLoading -> MetadataEditorLoading(Modifier.padding(padding))
+            uiState.error != null -> MetadataEditorError(
+                message = uiState.error!!,
+                onBack = onBack,
+                modifier = Modifier.padding(padding)
+            )
+            else -> MetadataEditorContent(
+                isLandscape = isLandscape,
+                currentArtUri = uiState.metadata?.artUri,
+                newArtUri = uiState.newArtUri,
+                title = title,
+                onTitleChange = { title = it },
+                artist = artist,
+                onArtistChange = { artist = it },
+                album = album,
+                onAlbumChange = { album = it },
+                year = year,
+                onYearChange = { year = it },
+                genre = genre,
+                onGenreChange = { genre = it },
+                trackNumber = trackNumber,
+                onTrackNumberChange = { trackNumber = it },
+                comment = comment,
+                onCommentChange = { comment = it },
+                genres = viewModel.getPredefinedGenres(),
+                onPickImage = { imagePickerLauncher.launch("image/*") },
+                modifier = Modifier.padding(padding)
+            )
         }
     }
-    
+
     if (uiState.saveSuccess) {
         SuccessDialog(
             onDismiss = {
@@ -331,6 +197,292 @@ fun MetadataEditorScreen(
                 onBack()
             }
         )
+    }
+}
+
+@Composable
+private fun MetadataEditorLoading(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        CircularProgressIndicator()
+    }
+}
+
+@Composable
+private fun MetadataEditorError(
+    message: String,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        ElevatedCard(
+            modifier = Modifier.widthIn(max = 440.dp),
+            shape = MaterialTheme.shapes.extraLarge,
+            colors = CardDefaults.elevatedCardColors(
+                containerColor = MaterialTheme.colorScheme.errorContainer
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ErrorOutline,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.size(40.dp)
+                )
+                Text(
+                    text = message,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center
+                )
+                Button(
+                    onClick = onBack,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                ) {
+                    Text(stringResource(R.string.back_btn))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MetadataEditorContent(
+    isLandscape: Boolean,
+    currentArtUri: String?,
+    newArtUri: Uri?,
+    title: String,
+    onTitleChange: (String) -> Unit,
+    artist: String,
+    onArtistChange: (String) -> Unit,
+    album: String,
+    onAlbumChange: (String) -> Unit,
+    year: String,
+    onYearChange: (String) -> Unit,
+    genre: String,
+    onGenreChange: (String) -> Unit,
+    trackNumber: String,
+    onTrackNumberChange: (String) -> Unit,
+    comment: String,
+    onCommentChange: (String) -> Unit,
+    genres: List<String>,
+    onPickImage: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (isLandscape) {
+        Row(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(24.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            BoxWithConstraints(
+                modifier = Modifier
+                    .weight(0.8f)
+                    .fillMaxHeight(),
+                contentAlignment = Alignment.Center
+            ) {
+                val coverSize = minOf(maxWidth, maxHeight, 320.dp)
+                CoverArtSection(
+                    currentArtUri = currentArtUri,
+                    newArtUri = newArtUri,
+                    bookTitle = title,
+                    onPickImage = onPickImage,
+                    modifier = Modifier.size(coverSize)
+                )
+            }
+            Column(
+                modifier = Modifier
+                    .weight(1.5f)
+                    .fillMaxHeight()
+                    .verticalScroll(rememberScrollState())
+            ) {
+                MetadataFieldsCard(
+                    title = title,
+                    onTitleChange = onTitleChange,
+                    artist = artist,
+                    onArtistChange = onArtistChange,
+                    album = album,
+                    onAlbumChange = onAlbumChange,
+                    year = year,
+                    onYearChange = onYearChange,
+                    genre = genre,
+                    onGenreChange = onGenreChange,
+                    trackNumber = trackNumber,
+                    onTrackNumberChange = onTrackNumberChange,
+                    comment = comment,
+                    onCommentChange = onCommentChange,
+                    genres = genres
+                )
+                Spacer(Modifier.height(16.dp))
+            }
+        }
+    } else {
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            CoverArtSection(
+                currentArtUri = currentArtUri,
+                newArtUri = newArtUri,
+                bookTitle = title,
+                onPickImage = onPickImage,
+                modifier = Modifier
+                    .widthIn(max = 280.dp)
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+            )
+            MetadataFieldsCard(
+                title = title,
+                onTitleChange = onTitleChange,
+                artist = artist,
+                onArtistChange = onArtistChange,
+                album = album,
+                onAlbumChange = onAlbumChange,
+                year = year,
+                onYearChange = onYearChange,
+                genre = genre,
+                onGenreChange = onGenreChange,
+                trackNumber = trackNumber,
+                onTrackNumberChange = onTrackNumberChange,
+                comment = comment,
+                onCommentChange = onCommentChange,
+                genres = genres,
+                modifier = Modifier.widthIn(max = 720.dp)
+            )
+            Spacer(Modifier.height(4.dp))
+        }
+    }
+}
+
+@Composable
+private fun MetadataFieldsCard(
+    title: String,
+    onTitleChange: (String) -> Unit,
+    artist: String,
+    onArtistChange: (String) -> Unit,
+    album: String,
+    onAlbumChange: (String) -> Unit,
+    year: String,
+    onYearChange: (String) -> Unit,
+    genre: String,
+    onGenreChange: (String) -> Unit,
+    trackNumber: String,
+    onTrackNumberChange: (String) -> Unit,
+    comment: String,
+    onCommentChange: (String) -> Unit,
+    genres: List<String>,
+    modifier: Modifier = Modifier
+) {
+    ElevatedCard(
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(10.dp).size(22.dp)
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.metadata_information),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = stringResource(R.string.metadata_required_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            EditTextField(
+                label = stringResource(R.string.field_title),
+                value = title,
+                onValueChange = onTitleChange,
+                placeholder = stringResource(R.string.field_title_placeholder)
+            )
+            EditTextField(
+                label = stringResource(R.string.field_author_label),
+                value = artist,
+                onValueChange = onArtistChange,
+                placeholder = stringResource(R.string.field_author_placeholder)
+            )
+            EditTextField(
+                label = stringResource(R.string.detail_series),
+                value = album,
+                onValueChange = onAlbumChange,
+                placeholder = stringResource(R.string.field_series_placeholder)
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                EditTextField(
+                    label = stringResource(R.string.detail_year),
+                    value = year,
+                    onValueChange = onYearChange,
+                    placeholder = "2024",
+                    modifier = Modifier.weight(1f)
+                )
+                EditTextField(
+                    label = stringResource(R.string.detail_volume),
+                    value = trackNumber,
+                    onValueChange = onTrackNumberChange,
+                    placeholder = "1",
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            GenreDropdown(
+                selectedGenre = genre,
+                onGenreSelected = onGenreChange,
+                genres = genres
+            )
+            EditTextField(
+                label = stringResource(R.string.field_comment),
+                value = comment,
+                onValueChange = onCommentChange,
+                placeholder = stringResource(R.string.field_comment_placeholder),
+                singleLine = false,
+                minLines = 3
+            )
+        }
     }
 }
 
@@ -346,51 +498,61 @@ fun CoverArtSection(
 ) {
     val displayUri = newArtUri?.toString() ?: currentArtUri
 
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .clickable(onClick = onPickImage),
-        contentAlignment = Alignment.Center
+    Card(
+        modifier = modifier,
+        shape = MaterialTheme.shapes.extraLarge,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
+        )
     ) {
-        if (displayUri != null) {
-            AsyncImage(
-                model = displayUri,
-                contentDescription = stringResource(R.string.book_cover),
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
-            
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.3f))
-            )
-        } else {
-            BookPlaceholder(title = bookTitle, modifier = Modifier.fillMaxSize())
-        }
-        
-        Surface(
+        Box(
             modifier = Modifier
-                .padding(16.dp)
-                .clip(RoundedCornerShape(12.dp)),
-            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                .fillMaxSize()
+                .clickable(onClick = onPickImage),
+            contentAlignment = Alignment.Center
         ) {
-            Row(
-                modifier = Modifier.padding(12.dp, 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            if (displayUri != null) {
+                AsyncImage(
+                    model = displayUri,
+                    contentDescription = stringResource(R.string.book_cover),
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                BookPlaceholder(title = bookTitle, modifier = Modifier.fillMaxSize())
+            }
+
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(16.dp),
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.primaryContainer,
+                shadowElevation = 3.dp
             ) {
-                Icon(
-                    imageVector = Icons.Default.CameraAlt,
-                    contentDescription = stringResource(R.string.change_cover),
-                    tint = Color.White
-                )
-                Text(
-                    text = if (displayUri != null) stringResource(R.string.change_cover) else stringResource(R.string.add_cover),
-                    color = Color.White,
-                    style = MaterialTheme.typography.labelMedium
-                )
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CameraAlt,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Text(
+                        text = if (displayUri != null) {
+                            stringResource(R.string.change_cover)
+                        } else {
+                            stringResource(R.string.add_cover)
+                        },
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
         }
     }
@@ -414,7 +576,8 @@ fun EditTextField(
         modifier = modifier.fillMaxWidth(),
         singleLine = singleLine,
         minLines = minLines,
-        maxLines = if (singleLine) 1 else 5
+        maxLines = if (singleLine) 1 else 5,
+        shape = MaterialTheme.shapes.large
     )
 }
 
@@ -437,9 +600,10 @@ fun GenreDropdown(
             readOnly = true,
             label = { Text(stringResource(R.string.detail_genre)) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            shape = MaterialTheme.shapes.large,
             modifier = Modifier
                 .fillMaxWidth()
-                .menuAnchor()
+                .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
         )
         
         ExposedDropdownMenu(
@@ -471,40 +635,58 @@ fun GenreDropdown(
 fun SuccessDialog(onDismiss: () -> Unit) {
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)
+        properties = DialogProperties(
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false,
+            usePlatformDefaultWidth = false
+        )
     ) {
         Surface(
-            modifier = Modifier.padding(16.dp),
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surface
+            modifier = Modifier
+                .padding(horizontal = 24.dp, vertical = 16.dp)
+                .fillMaxWidth()
+                .widthIn(max = 420.dp),
+            shape = MaterialTheme.shapes.extraLarge,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 6.dp
         ) {
             Column(
-                modifier = Modifier.padding(24.dp),
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(48.dp)
-                )
-                
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(16.dp).size(32.dp)
+                    )
+                }
+
                 Text(
                     text = stringResource(R.string.metadata_saved),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center
                 )
-                
+
                 Text(
                     text = stringResource(R.string.changes_applied),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
                 )
-                
+
                 Button(
                     onClick = onDismiss,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                    shape = MaterialTheme.shapes.large
                 ) {
                     Text(stringResource(R.string.accept))
                 }

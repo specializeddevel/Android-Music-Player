@@ -78,19 +78,17 @@ function statusText() {
   return "off"
 }
 
-function startWithFile(showToast) {
-  var ret = appService.start({ file: SVC, reload: false, complete_func: function (i) {
+function startService() {
+  var ret = appService.start({ url: SVC, reload: true, complete_func: function (i) {
     starting = false
     logger.log("start file done: " + JSON.stringify(i))
     localStorage.setItem(START_RESULT, "ret " + ret + " cb " + (i && i.result ? "true" : "false"))
     if (i && i.result) {
       localStorage.setItem(KEY, "true")
       localStorage.setItem(STATUS, "start requested")
-      if (showToast) hmUI.showToast({ text: "Service starting" })
     } else {
       localStorage.setItem(KEY, "false")
       localStorage.setItem(STATUS, "start failed")
-      if (showToast) hmUI.showToast({ text: "Start failed" })
     }
   }})
   localStorage.setItem(START_RESULT, "ret " + ret + " cb pending")
@@ -99,12 +97,11 @@ function startWithFile(showToast) {
     starting = false
     localStorage.setItem(KEY, "false")
     localStorage.setItem(STATUS, "start ret " + ret)
-    if (showToast) hmUI.showToast({ text: "Start ret " + ret })
   }
 }
 
 function stopSvc(cb) {
-  var ret = appService.stop({ file: SVC, complete_func: function (i) {
+  var ret = appService.stop({ url: SVC, complete_func: function (i) {
     logger.log("stop file done: " + JSON.stringify(i))
     if (i && i.result) {
       if (cb) cb()
@@ -127,12 +124,11 @@ function clearServiceState(status) {
   localStorage.setItem(START_RESULT, "")
 }
 
-function doStartSvc(showToast) {
+function doStartSvc() {
   starting = true
   logger.log("starting service")
   localStorage.setItem(STATUS, "starting")
-  if (showToast) hmUI.showToast({ text: "Starting service..." })
-  startWithFile(showToast)
+  startService()
 }
 
 function scheduleStartAfterStop(showToast) {
@@ -147,7 +143,7 @@ function scheduleStartAfterStop(showToast) {
       stopTimer(pendingStartTimer)
       pendingStartTimer = null
     }
-    doStartSvc(showToast)
+    doStartSvc()
   })
 }
 
@@ -255,7 +251,6 @@ Page(BasePage({
           localStorage.setItem(STATUS, "stopped")
         })
         localStorage.setItem(KEY, "false")
-        hmUI.showToast({ text: "Service stopped" })
       }
     }
 

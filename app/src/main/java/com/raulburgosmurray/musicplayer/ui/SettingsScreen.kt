@@ -9,6 +9,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,9 +23,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import android.app.Application
+import android.content.Intent
 import android.net.Uri
 import androidx.compose.ui.res.stringResource
 import com.raulburgosmurray.musicplayer.EqPreset
+import com.raulburgosmurray.musicplayer.AboutActivity
 import com.raulburgosmurray.musicplayer.R
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -59,6 +63,19 @@ fun SettingsScreen(
     
     val userAccount by syncViewModel.userAccount.collectAsState()
     val isSyncing by syncViewModel.isSyncing.collectAsState()
+
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshAbsStatus()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
     val lastSyncTime by syncViewModel.lastSyncTime.collectAsState()
 
     val context = LocalContext.current
@@ -122,7 +139,7 @@ fun SettingsScreen(
                             GoogleSignIn.getClient(context, GoogleSignInOptions.DEFAULT_SIGN_IN).signOut()
                             syncViewModel.onLogout()
                         }) {
-                            Icon(Icons.Default.Logout, null, tint = MaterialTheme.colorScheme.error)
+                            Icon(Icons.AutoMirrored.Filled.Logout, null, tint = MaterialTheme.colorScheme.error)
                         }
                     }
 
@@ -151,9 +168,60 @@ fun SettingsScreen(
     }
 
     @Composable
+    fun AudiobookshelfSection() {
+        val isAbsConnected by viewModel.isAbsConnected.collectAsState()
+        val absServerUrl by viewModel.absServerUrl.collectAsState()
+        val absUsername by viewModel.absUsername.collectAsState()
+        val absLibraryName by viewModel.absLibraryName.collectAsState()
+
+        Text("Servidor Audiobookshelf", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 16.dp))
+        Card(
+            onClick = {
+                val intent = Intent(context, AudiobookshelfActivity::class.java).apply {
+                    playbackViewModel?.uiState?.value?.dominantColor?.let {
+                        putExtra(AboutActivity.EXTRA_SEED_COLOR, it)
+                    }
+                }
+                context.startActivity(intent)
+            },
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+            shape = MaterialTheme.shapes.extraLarge
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Icon(
+                    imageVector = if (isAbsConnected) Icons.Default.CloudDone else Icons.Default.Cloud,
+                    contentDescription = null,
+                    tint = if (isAbsConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (isAbsConnected) "Audiobookshelf (${absLibraryName.ifBlank { "Conectado" }})" else "Conectar Audiobookshelf",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = if (isAbsConnected) "Usuario: $absUsername • $absServerUrl" else "Transmite y sincroniza tus audiolibros desde tu servidor",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+    }
+
+    @Composable
     fun AppearanceSection() {
         Text(stringResource(R.string.appearance), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 16.dp))
-        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
+        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow), shape = MaterialTheme.shapes.extraLarge) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(stringResource(R.string.theme_mode), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
                 SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
@@ -189,7 +257,7 @@ fun SettingsScreen(
     fun LibrarySection() {
         Text(stringResource(R.string.library), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 16.dp))
         if (com.raulburgosmurray.musicplayer.FeatureFlags.SCAN_ALL_MEMORY) {
-            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
+            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow), shape = MaterialTheme.shapes.extraLarge) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                         Column(modifier = Modifier.weight(1f)) {
@@ -205,7 +273,7 @@ fun SettingsScreen(
             }
             Spacer(Modifier.height(12.dp))
         }
-        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
+        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow), shape = MaterialTheme.shapes.extraLarge) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(stringResource(R.string.folders_to_scan), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
@@ -261,7 +329,7 @@ fun SettingsScreen(
     @Composable
     fun SleepDetectionSection() {
         Text(stringResource(R.string.sleep_detection_title), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 16.dp))
-        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
+        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow), shape = MaterialTheme.shapes.extraLarge) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                     Column(modifier = Modifier.weight(1f)) {
@@ -333,7 +401,7 @@ fun SettingsScreen(
     @Composable
     fun SleepTimerSection() {
         Text(stringResource(R.string.sleep_timer_title), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 16.dp))
-        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
+        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow), shape = MaterialTheme.shapes.extraLarge) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                     Column(modifier = Modifier.weight(1f)) {
@@ -366,7 +434,7 @@ fun SettingsScreen(
     @Composable
     fun TimeAnnouncementSection() {
         Text(stringResource(R.string.time_announcement_title), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 16.dp))
-        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
+        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow), shape = MaterialTheme.shapes.extraLarge) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                     Column(modifier = Modifier.weight(1f)) {
@@ -405,7 +473,7 @@ fun SettingsScreen(
     @Composable
     fun ActivityHistorySection() {
         Text(stringResource(R.string.activity_history), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 16.dp))
-        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
+        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow), shape = MaterialTheme.shapes.extraLarge) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(stringResource(R.string.entry_limit), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
                 Text(stringResource(R.string.entry_limit_desc), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 12.dp))
@@ -421,7 +489,7 @@ fun SettingsScreen(
     @Composable
     fun DefaultEqualizerSection() {
         Text(stringResource(R.string.default_equalizer), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 16.dp))
-        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
+        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow), shape = MaterialTheme.shapes.extraLarge) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(stringResource(R.string.default_equalizer_desc), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 12.dp))
                 val presetsRow1 = listOf(EqPreset.FLAT, EqPreset.VOICE_BOOST)
@@ -467,7 +535,36 @@ fun SettingsScreen(
     @Composable
     fun AboutSection() {
         Text(stringResource(R.string.about_app), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 16.dp))
-        Text("Version ${com.raulburgosmurray.musicplayer.BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 8.dp))
+        Card(
+            onClick = {
+                context.startActivity(Intent(context, AboutActivity::class.java).apply {
+                    playbackViewModel?.uiState?.value?.dominantColor?.let {
+                        putExtra(AboutActivity.EXTRA_SEED_COLOR, it)
+                    }
+                })
+            },
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+            shape = MaterialTheme.shapes.extraLarge
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.about_open), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                    Text(
+                        stringResource(R.string.about_version_short, com.raulburgosmurray.musicplayer.BuildConfig.VERSION_NAME),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
+            }
+        }
+        Spacer(Modifier.height(24.dp))
     }
 
     Scaffold(
@@ -498,6 +595,7 @@ fun SettingsScreen(
                     if (com.raulburgosmurray.musicplayer.FeatureFlags.CLOUD_SYNC) {
                         CloudSyncSection()
                     }
+                    AudiobookshelfSection()
                     AppearanceSection()
                     LibrarySection()
                 }
@@ -527,6 +625,7 @@ fun SettingsScreen(
                 if (com.raulburgosmurray.musicplayer.FeatureFlags.CLOUD_SYNC) {
                     CloudSyncSection()
                 }
+                AudiobookshelfSection()
                 AppearanceSection()
                 LibrarySection()
                 if (com.raulburgosmurray.musicplayer.FeatureFlags.SLEEP_DETECTION) {

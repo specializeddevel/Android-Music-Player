@@ -8,12 +8,19 @@ import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.raulburgosmurray.musicplayer.data.AppDatabase
 import com.raulburgosmurray.musicplayer.data.AudiobookProgress
+import com.raulburgosmurray.musicplayer.data.BookRepository
+import com.raulburgosmurray.musicplayer.data.CachedBook
+import com.raulburgosmurray.musicplayer.data.CloudProgress
 import com.raulburgosmurray.musicplayer.data.GoogleDriveService
 import com.raulburgosmurray.musicplayer.data.ProgressRepository
+import com.raulburgosmurray.musicplayer.data.portableBookKey
+import com.raulburgosmurray.musicplayer.data.toCloudProgress
+import com.raulburgosmurray.musicplayer.data.toLocalProgress
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -22,7 +29,9 @@ import androidx.annotation.VisibleForTesting
 
 class SyncViewModel(application: Application) : AndroidViewModel(application) {
     companion object { private const val TAG = "SyncViewModel" }
-    private val progressRepository = ProgressRepository(AppDatabase.getDatabase(application).progressDao())
+    private val database = AppDatabase.getDatabase(application)
+    private val progressRepository = ProgressRepository(database.progressDao())
+    private val bookRepository = BookRepository(database.cachedBookDao())
     private val prefs = application.getSharedPreferences("sync_prefs", Context.MODE_PRIVATE)
 
     private val _userAccount = MutableStateFlow<GoogleSignInAccount?>(
@@ -61,18 +70,21 @@ class SyncViewModel(application: Application) : AndroidViewModel(application) {
                 val cloudProgress = driveService.downloadProgress()
                 
                 // 2. Obtener local
-                val localProgress = withContext(Dispatchers.IO) {
-                    progressRepository.getAllProgress()
+                val (localProgress, localBooks) = withContext(Dispatchers.IO) {
+                    progressRepository.getAllProgress() to bookRepository.getAllBooks().first()
                 }
 
                 // 3. Mezclar inteligentemente (Merge)
                 if (cloudProgress != null) {
-                    mergeProgress(localProgress, cloudProgress)
+                    mergePortableProgress(localProgress, cloudProgress, localBooks)
                 }
 
                 // 4. Subir la versión definitiva a la nube
                 val finalProgress = withContext(Dispatchers.IO) {
-                    progressRepository.getAllProgress()
+                    val booksById = bookRepository.getAllBooks().first().associateBy { it.id }
+                    progressRepository.getAllProgress().mapNotNull { progress ->
+                        booksById[progress.mediaId]?.let(progress::toCloudProgress)
+                    }
                 }
                 val success = driveService.uploadProgress(finalProgress)
                 
@@ -98,7 +110,10 @@ class SyncViewModel(application: Application) : AndroidViewModel(application) {
                 val email = account.email ?: return@launch
                 val driveService = GoogleDriveService(context, email)
                 val localProgress = withContext(Dispatchers.IO) {
-                    progressRepository.getAllProgress()
+                    val booksById = bookRepository.getAllBooks().first().associateBy { it.id }
+                    progressRepository.getAllProgress().mapNotNull { progress ->
+                        booksById[progress.mediaId]?.let(progress::toCloudProgress)
+                    }
                 }
                 driveService.uploadProgress(localProgress)
             } catch (e: Exception) {
@@ -134,5 +149,19 @@ class SyncViewModel(application: Application) : AndroidViewModel(application) {
         if (merged.isNotEmpty()) {
             progressRepository.saveAllProgress(merged)
         }
+    }
+
+    @VisibleForTesting
+    internal suspend fun mergePortableProgress(
+        local: List<AudiobookProgress>,
+        cloud: List<CloudProgress>,
+        localBooks: List<CachedBook>
+    ) {
+        val booksByPortableKey = localBooks.associateBy(::portableBookKey)
+        val resolvedCloud = cloud.mapNotNull { cloudProgress ->
+            booksByPortableKey[cloudProgress.bookKey]
+                ?.let { book -> cloudProgress.toLocalProgress(book.id) }
+        }
+        mergeProgress(local, resolvedCloud)
     }
 }

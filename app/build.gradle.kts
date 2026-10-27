@@ -9,19 +9,17 @@ plugins {
 
 android {
     namespace = "com.raulburgosmurray.musicplayer"
-    compileSdk = 35
+    compileSdk = 36
 
-    // Versionado manual - cambiar estos valores para actualizar la versión
-    val versionMajor = 1
-    val versionMinor = 0
-    val versionPatch = 260609001
-    val versionCode = versionMajor * 10000 + versionMinor * 100 + versionPatch
-    val versionName = "$versionMajor.$versionMinor.$versionPatch"
+    // versionCode debe aumentar en uno para cada publicación en Google Play.
+    // versionName es la versión legible que se muestra a los usuarios.
+    val versionCode = 2609001
+    val versionName = "1.0.0"
 
 defaultConfig {
-        applicationId = "com.raulburgosmurray.musicplayer"
+        applicationId = "com.raulburgosmurray.litera"
         minSdk = 24
-        targetSdk = 35
+        targetSdk = 36
         this.versionCode = versionCode
         this.versionName = versionName
 
@@ -37,7 +35,7 @@ defaultConfig {
             buildConfigField("boolean", "FEATURE_P2P_TRANSFER", "true")
             buildConfigField("boolean", "FEATURE_CLOUD_SYNC", "false")
             buildConfigField("boolean", "FEATURE_SCAN_ALL_MEMORY", "true")
-            buildConfigField("boolean", "FEATURE_SLEEP_DETECTION", "true")
+            buildConfigField("boolean", "FEATURE_SLEEP_DETECTION", "false")
         }
         release {
             isMinifyEnabled = false
@@ -48,7 +46,7 @@ defaultConfig {
             buildConfigField("boolean", "FEATURE_P2P_TRANSFER", "true")
             buildConfigField("boolean", "FEATURE_CLOUD_SYNC", "false")
             buildConfigField("boolean", "FEATURE_SCAN_ALL_MEMORY", "true")
-            buildConfigField("boolean", "FEATURE_SLEEP_DETECTION", "true")
+            buildConfigField("boolean", "FEATURE_SLEEP_DETECTION", "false")
         }
     }
     compileOptions {
@@ -60,7 +58,6 @@ defaultConfig {
     }
 
     buildFeatures {
-        viewBinding = true
         buildConfig = true
     }
 
@@ -81,10 +78,8 @@ defaultConfig {
 dependencies {
     // AndroidX & UI
     implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.appcompat)
     implementation(libs.material)
     implementation(libs.androidx.activity)
-    implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.ui.graphics.android)
 
     // Jetpack Compose
@@ -120,7 +115,6 @@ dependencies {
     implementation("com.github.bumptech.glide:glide:5.0.0-rc01")
     implementation("net.jthink:jaudiotagger:3.0.1")
     implementation("com.google.code.gson:gson:2.9.0")
-    implementation("io.github.ParkSangGwon:tedpermission-normal:3.4.2")
     implementation("androidx.documentfile:documentfile:1.0.1")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
     

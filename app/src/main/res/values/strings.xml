@@ -13,12 +13,13 @@
     <string name="start_tv">00:00</string>
     <string name="repeat_btn">Repeat</string>
     <string name="equalizer_btn">Equalizer</string>
-    <string name="timer_btn">Timer</string>
+    <string name="timer_btn">Timer</string>s
     <string name="share_btn">Share</string>
     <string name="previous_btn">Previous</string>
     <string name="pause_play_btn">Pause/Play</string>
+    <string name="playback_error_retry">The audio could not be read here. Skip forward 10 seconds or tap play to retry.</string>
     <string name="next_btn">Next</string>
-    <string name="open">Open</string>
+    <string name="open">Refresh</string>
     <string name="close">Close</string>
     <string name="app_icon">Icon</string>
     <string name="text_nav">Welcome to\nLitera Audiobooks</string>
@@ -170,6 +171,7 @@
     <string name="lock_screen">Lock screen</string>
     <string name="screen_locked">Screen locked</string>
     <string name="unlock">Unlock</string>
+    <string name="hold_to_unlock">Press and hold to unlock</string>
     <string name="undo">Undo</string>
     <!-- Cover touch controls -->
     <string name="rewind_30s">Rewind 30s</string>
@@ -200,6 +202,8 @@
     <string name="no_explorer_found">No compatible explorer found</string>
     <!-- Metadata editor -->
     <string name="edit_metadata_title">Edit Metadata</string>
+    <string name="metadata_information">Audiobook information</string>
+    <string name="metadata_required_hint">Title and author are required. Other details are optional.</string>
     <string name="field_title">Title</string>
     <string name="field_title_placeholder">Audiobook title</string>
     <string name="field_author_label">Author</string>
@@ -241,6 +245,7 @@
     <string name="delete_book">Delete</string>
     <string name="delete_confirmation_title">Delete audiobook?</string>
     <string name="delete_confirmation_message">This will permanently delete \"%1$s\" from your device. This action cannot be undone.</string>
+    <string name="delete_confirmation_body">This audiobook will be permanently removed from your device. This action cannot be undone.</string>
     <string name="delete_success">Audiobook deleted</string>
     <string name="delete_error">Failed to delete audiobook</string>
     <string name="delete_book_in_use_title">Audiobook in use</string>
@@ -276,6 +281,7 @@
     <string name="wifi_permission_denied_title">📡 Wi-Fi Permission Denied</string>
     <string name="wifi_permission_denied_message">Without this permission, you won\'t be able to transfer audiobooks to nearby devices. You can enable it anytime in Settings.</string>
     <string name="equalizer_title">Equalizer</string>
+    <string name="equalizer_preset_description">Choose a sound profile for this audiobook.</string>
     <string name="equalizer_not_available">Equalizer is not available on this device</string>
     <string name="eq_preset_flat">Flat</string>
     <string name="eq_preset_voice_boost">Voice Boost</string>
@@ -327,4 +333,42 @@
     <string name="expand">Expand</string>
     <string name="collapse">Collapse</string>
     <string name="now_playing">Now playing</string>
+    <string name="transfer_protocol_not_confirmed">The sender did not confirm secure transfer support. Update Litera on both devices (or the desktop server), check Wi-Fi, and try again.</string>
+    <string name="book_sent_without_verification">Book sent without SHA-256 verification: the receiver uses an older protocol. Update both apps for verified transfers.</string>
+    <string name="permission_continue">Continue</string>
+    <string name="onboarding_folder_description">Choose the folder where you keep your audiobooks.</string>
+    <string name="about_open">App information</string>
+    <string name="about_version">Version %1$s (%2$d)</string>
+    <string name="about_version_short">Version %1$s</string>
+    <string name="about_description">An audiobook player designed for comfortable, focused listening.</string>
+    <string name="about_developer">Developer</string>
+    <string name="about_developer_placeholder">Litera Team (temporary information)</string>
+    <string name="about_support_email">Support email</string>
+    <string name="about_support_email_placeholder">litera.support@gmail.com</string>
+    <string name="about_website">Website</string>
+    <string name="about_website_placeholder">https://example.com (temporary)</string>
+    <string name="about_privacy_policy">Privacy policy</string>
+    <string name="about_privacy_policy_placeholder">Public URL pending</string>
+    <string name="about_legal">Terms and open-source notices</string>
+    <string name="about_legal_placeholder">Legal information pending</string>
+    <string name="about_temporary_notice">Important: the website, privacy policy and legal information shown here are temporary and must be completed before publishing the app.</string>
+    <string name="sync_progress_only_desc">Keep the audiobook already on this device and update only its playback position.</string>
+    <string name="download_full_book_desc">Replace the local copy by receiving the complete audiobook from the other device.</string>
+    <string name="transfer_send_title">Share with another device</string>
+    <string name="transfer_receive_title">Receive an audiobook</string>
+    <string name="transfer_send_instructions">Keep this screen open and scan the code from the other device.</string>
+    <string name="transfer_receive_instructions">Scan the code shown on the sending device. Both devices must be on the same Wi-Fi network.</string>
+    <string name="receiving_transfer">Receiving audiobook</string>
+    <string name="preparing_transfer">Preparing secure transfer…</string>
+    <string name="transfer_qr_code">Audiobook transfer QR code</string>
+    <string name="transfer_playback_progress">Playback progress: %1$s</string>
+    <string name="enter_address_manually">Enter address manually</string>
+    <string name="manual_connection">Manual connection</string>
+    <string name="ip_port_label">IP address and port</string>
+    <string name="ip_port_example">Example: 192.168.1.20:50001</string>
+    <string name="connect">Connect</string>
+    <string name="use_camera">Use camera</string>
+    <string name="transfer_camera_explanation">Camera access is needed only to scan the transfer QR code. No photos or videos are saved.</string>
+    <string name="grant_camera_permission">Allow camera</string>
+    <string name="align_qr_in_frame">Place the QR code inside the frame</string>
 </resources>

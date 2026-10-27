@@ -16,6 +16,7 @@ import com.raulburgosmurray.musicplayer.data.MusicScanner
 import com.raulburgosmurray.musicplayer.data.MetadataJsonHelper
 import com.raulburgosmurray.musicplayer.data.toMusic
 import com.raulburgosmurray.musicplayer.data.toCachedBook
+import com.raulburgosmurray.musicplayer.data.withEditedMetadata
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -25,7 +26,7 @@ import java.io.File
 import android.os.Environment
 
 enum class SortOrder { TITLE, ARTIST, PROGRESS, RECENT }
-enum class BookFilter { ALL, COMPLETED, IN_PROGRESS }
+enum class BookFilter { ALL, LOCAL_ONLY, SERVER_ONLY, IN_PROGRESS, COMPLETED }
 
 private data class FilterData(val filter: BookFilter, val readStatus: Map<String, Boolean>)
 
@@ -45,10 +46,8 @@ class MainViewModel(application: Application, settingsViewModel: SettingsViewMod
         .map { list ->
             val context = getApplication<Application>()
             list.map { cached ->
-                val editedTitle = MetadataJsonHelper.loadMetadata(context, cached.id)
-                    ?.title?.takeIf { it.isNotBlank() }
-                val music = cached.toMusic()
-                if (editedTitle != null) music.copy(title = editedTitle) else music
+                val editedMetadata = MetadataJsonHelper.loadMetadata(context, cached.id)
+                cached.withEditedMetadata(editedMetadata).toMusic()
             }
         }
         .flowOn(Dispatchers.IO)
@@ -71,12 +70,39 @@ class MainViewModel(application: Application, settingsViewModel: SettingsViewMod
         Pair(filter, readStatus) 
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(Constants.STATEFLOW_STOP_TIMEOUT_MS), Pair(BookFilter.ALL, emptyMap()))
 
-    val books: StateFlow<List<Music>> = combine(_books, sortOrder, _bookProgress, _bookActivityTimestamps, filterAndReadStatus) { books, order, progress, timestamps, filterData ->
+    private fun deduplicateBooks(list: List<Music>): List<Music> {
+        val localBooks = list.filter { !it.path.startsWith("http://") && !it.path.startsWith("https://") }
+        val remoteBooks = list.filter { it.path.startsWith("http://") || it.path.startsWith("https://") }
+
+        val localKeys = localBooks.map { normalizeBookKey(it.title, it.artist) }.toSet()
+
+        val uniqueRemoteBooks = remoteBooks.filter { remote ->
+            val remoteKey = normalizeBookKey(remote.title, remote.artist)
+            !localKeys.contains(remoteKey)
+        }
+
+        return localBooks + uniqueRemoteBooks
+    }
+
+    private fun normalizeBookKey(title: String, artist: String): String {
+        val cleanTitle = title.lowercase().replace(Regex("[^a-z0-9]"), "")
+        val cleanArtist = artist.lowercase().replace(Regex("[^a-z0-9]"), "")
+        return "$cleanTitle|$cleanArtist"
+    }
+
+    val allBooksUnfiltered: StateFlow<List<Music>> = _books
+        .map { deduplicateBooks(it) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(Constants.STATEFLOW_STOP_TIMEOUT_MS), emptyList())
+
+    val books: StateFlow<List<Music>> = combine(_books, sortOrder, _bookProgress, _bookActivityTimestamps, filterAndReadStatus) { booksList, order, progress, timestamps, filterData ->
+        val deduplicated = deduplicateBooks(booksList)
         val (filter, readStatus) = filterData
         val filtered = when (filter) {
-            BookFilter.ALL -> books
-            BookFilter.COMPLETED -> books.filter { readStatus[it.id] == true }
-            BookFilter.IN_PROGRESS -> books.filter { readStatus[it.id] != true }
+            BookFilter.ALL -> deduplicated
+            BookFilter.LOCAL_ONLY -> deduplicated.filter { !it.path.startsWith("http://") && !it.path.startsWith("https://") }
+            BookFilter.SERVER_ONLY -> deduplicated.filter { it.path.startsWith("http://") || it.path.startsWith("https://") || it.id.startsWith("abs_") }
+            BookFilter.IN_PROGRESS -> deduplicated.filter { (progress[it.id] ?: 0f) > 0f && readStatus[it.id] != true }
+            BookFilter.COMPLETED -> deduplicated.filter { readStatus[it.id] == true }
         }
         val sorted = when (order) {
             SortOrder.TITLE -> filtered.sortedBy { it.title.lowercase() }
@@ -89,7 +115,10 @@ class MainViewModel(application: Application, settingsViewModel: SettingsViewMod
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(Constants.STATEFLOW_STOP_TIMEOUT_MS), emptyList())
 
-    val favoriteBooks = combine(books, _favoriteIds) { b, f -> b.filter { f.contains(it.id) } }
+    val favoriteBooks = combine(_books, _favoriteIds) { allBooksList, favIdsSet ->
+        val deduplicated = deduplicateBooks(allBooksList)
+        deduplicated.filter { favIdsSet.contains(it.id) }
+    }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(Constants.STATEFLOW_STOP_TIMEOUT_MS), emptyList())
 
@@ -178,11 +207,14 @@ class MainViewModel(application: Application, settingsViewModel: SettingsViewMod
                 }
             }
 
-            val cachedIds = withContext(Dispatchers.IO) {
-                bookRepository.getAllBooks().first().map { it.id }.toSet()
+            val cachedLocalIds = withContext(Dispatchers.IO) {
+                bookRepository.getAllBooks().first()
+                    .filter { !it.path.startsWith("http://") && !it.path.startsWith("https://") }
+                    .map { it.id }
+                    .toSet()
             }
 
-            if (currentIds != cachedIds) {
+            if (currentIds != cachedLocalIds) {
                 // Files added or removed -> full scan
                 loadBooks(libraryRootUris, scanAllMemory)
             } else {
@@ -215,8 +247,28 @@ class MainViewModel(application: Application, settingsViewModel: SettingsViewMod
                 }
             }
             withContext(Dispatchers.IO) {
-                bookRepository.clearCache()
-                bookRepository.saveBooks(audioFiles.map { it.toCachedBook() })
+                val existingMapByPath = bookRepository.getAllBooks().first().associateBy { it.path }
+                val scannedCachedBooks = audioFiles.map { music ->
+                    val existing = existingMapByPath[music.path]
+                    if (existing != null) {
+                        music.toCachedBook().copy(
+                            id = existing.id,
+                            description = music.description ?: existing.description
+                        )
+                    } else {
+                        music.toCachedBook()
+                    }
+                }
+
+                val absRepo = com.raulburgosmurray.musicplayer.data.AudiobookshelfRepository(getApplication())
+                if (absRepo.isConnected()) {
+                    bookRepository.clearLocalCache()
+                    bookRepository.saveBooks(scannedCachedBooks)
+                    absRepo.resync()
+                } else {
+                    bookRepository.clearCache()
+                    bookRepository.saveBooks(scannedCachedBooks)
+                }
             }
             _isLoading.value = false
         }
@@ -235,7 +287,8 @@ class MainViewModel(application: Application, settingsViewModel: SettingsViewMod
                 }
             }
             withContext(Dispatchers.IO) {
-                bookRepository.clearCache()
+                // Inbox scanning is additive. Clearing here also removed every book
+                // discovered through MediaStore or the user's SAF folders.
                 bookRepository.saveBooks(audioFiles.map { it.toCachedBook() })
             }
             _isLoading.value = false

@@ -2,16 +2,17 @@ package com.raulburgosmurray.musicplayer.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
+// Litera fallback palette. Dynamic and artwork colors still take precedence.
+val LiteraBlue = Color(0xFF365F8D)
+val LiteraBlueContainer = Color(0xFFD4E4FF)
+val LiteraSlate = Color(0xFF536170)
+val LiteraSlateContainer = Color(0xFFD7E5F5)
+val LiteraAmber = Color(0xFF775A00)
+val LiteraAmberContainer = Color(0xFFFFE17B)
 
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
-
-// Audiolibros Palette (Colores más sobrios)
-val DarkBlue = Color(0xFF1B263B)
-val LightBlue = Color(0xFF415A77)
-val AccentBlue = Color(0xFF778DA9)
-val Cream = Color(0xFFE0E1DD)
+val LiteraBlueDark = Color(0xFFA5C8F8)
+val LiteraBlueContainerDark = Color(0xFF17466F)
+val LiteraSlateDark = Color(0xFFBBC7D7)
+val LiteraSlateContainerDark = Color(0xFF3C4856)
+val LiteraAmberDark = Color(0xFFF2C94C)
+val LiteraAmberContainerDark = Color(0xFF584400)

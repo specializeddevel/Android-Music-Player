@@ -5,14 +5,15 @@ import android.util.Log
 import android.widget.Toast
 import android.Manifest
 import android.os.Build
-import android.graphics.Bitmap
+import android.provider.Settings
 import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.res.Configuration
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.util.Base64
+import androidx.annotation.StringRes
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.BackHandler
@@ -24,30 +25,19 @@ import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Keyboard
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.SavedStateViewModelFactory
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
@@ -59,18 +49,12 @@ import androidx.navigation.NavType
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
 import com.raulburgosmurray.musicplayer.ui.*
 import com.raulburgosmurray.musicplayer.ui.theme.MusicPlayerTheme
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
-import com.google.zxing.BarcodeFormat
-import com.google.zxing.EncodeHintType
-import com.google.zxing.qrcode.QRCodeWriter
-import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
-import java.util.concurrent.Executors
 
 class MainViewModelFactory(private val application: android.app.Application, private val settingsViewModel: SettingsViewModel) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -82,6 +66,15 @@ class MainViewModelFactory(private val application: android.app.Application, pri
     }
 }
 
+private data class PermissionPrompt(
+    val permission: String,
+    @StringRes val titleRes: Int,
+    @StringRes val rationaleRes: Int,
+    @StringRes val deniedTitleRes: Int,
+    @StringRes val deniedMessageRes: Int,
+    val onGranted: () -> Unit = {}
+)
+
 @OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
 @Suppress("UnsafeOptInUsageError")
 class MainActivity : ComponentActivity() {
@@ -92,18 +85,24 @@ class MainActivity : ComponentActivity() {
     private lateinit var syncViewModel: SyncViewModel
     private lateinit var transferViewModel: LiteraTransferViewModel
     private var sleepDetectionReceiver: com.raulburgosmurray.musicplayer.sleep.SleepDetectionReceiver? = null
+    private var isSyncReceiverRegistered = false
     private var backPressedTime = 0L
 
+    private val permissionRequests = PermissionRequestQueue<PermissionPrompt>()
+    private var permissionPrompt by mutableStateOf<PermissionPrompt?>(null)
+    private var deniedPermissionPrompt by mutableStateOf<PermissionPrompt?>(null)
+    private var activePermissionRequest: PermissionPrompt? = null
+
     private val permissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        val storagePerm = getStoragePermission()
-        if (permissions[storagePerm] == true) {
-            lifecycleScope.launch {
-                val uris = settingsViewModel.libraryRootUris.first()
-                val scanAll = settingsViewModel.scanAllMemory.first()
-                mainViewModel.smartLoadBooks(if (scanAll) emptyList() else uris, scanAll)
-            }
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        val request = activePermissionRequest ?: return@registerForActivityResult
+        activePermissionRequest = null
+        if (granted) {
+            request.onGranted()
+            completePermissionRequest()
+        } else {
+            deniedPermissionPrompt = request
         }
     }
 
@@ -115,6 +114,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        applyScreenOrientationPolicy()
         enableEdgeToEdge()
         settingsViewModel = ViewModelProvider(this)[SettingsViewModel::class.java]
         syncViewModel = ViewModelProvider(this)[SyncViewModel::class.java]
@@ -122,6 +122,7 @@ class MainActivity : ComponentActivity() {
         if (FeatureFlags.CLOUD_SYNC) {
             val filter = IntentFilter(PlaybackService.SYNC_ACTION)
             ContextCompat.registerReceiver(this, syncReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+            isSyncReceiverRegistered = true
         }
         val mainViewModelFactory = MainViewModelFactory(application, settingsViewModel)
         mainViewModel = ViewModelProvider(this, mainViewModelFactory)[MainViewModel::class.java]
@@ -170,13 +171,22 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        try {
-            unregisterReceiver(syncReceiver)
-        } catch (e: Exception) {
-            Log.w("MainActivity", "Failed to unregister syncReceiver", e)
+        if (isSyncReceiverRegistered) {
+            try {
+                unregisterReceiver(syncReceiver)
+            } catch (e: IllegalArgumentException) {
+                Log.w("MainActivity", "syncReceiver was already unregistered", e)
+            } finally {
+                isSyncReceiverRegistered = false
+            }
         }
         sleepDetectionReceiver?.stopListening()
         super.onDestroy()
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        applyScreenOrientationPolicy()
     }
 
     private fun getStoragePermission(): String {
@@ -188,22 +198,83 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun checkPermissions() {
-        val permissionsToRequest = mutableListOf<String>()
         val storagePermission = getStoragePermission()
 
         if (ContextCompat.checkSelfPermission(this, storagePermission) != PackageManager.PERMISSION_GRANTED) {
-            permissionsToRequest.add(storagePermission)
+            requestPermissionWithExplanation(audioPermissionPrompt(::loadBooksAfterAudioPermission))
+        } else {
+            loadBooksAfterAudioPermission()
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
-            permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
+            requestPermissionWithExplanation(
+                PermissionPrompt(
+                    permission = Manifest.permission.POST_NOTIFICATIONS,
+                    titleRes = R.string.notification_permission_title,
+                    rationaleRes = R.string.notification_permission_rationale,
+                    deniedTitleRes = R.string.notification_permission_denied_title,
+                    deniedMessageRes = R.string.notification_permission_denied_message
+                )
+            )
+        }
+    }
+
+    private fun loadBooksAfterAudioPermission() {
+        lifecycleScope.launch {
+            val uris = settingsViewModel.libraryRootUris.first()
+            val scanAll = settingsViewModel.scanAllMemory.first()
+            mainViewModel.smartLoadBooks(if (scanAll) emptyList() else uris, scanAll)
+        }
+    }
+
+    private fun audioPermissionPrompt(onGranted: () -> Unit): PermissionPrompt = PermissionPrompt(
+        permission = getStoragePermission(),
+        titleRes = R.string.storage_permission_title,
+        rationaleRes = R.string.storage_permission_rationale,
+        deniedTitleRes = R.string.storage_permission_denied_title,
+        deniedMessageRes = R.string.storage_permission_denied_message,
+        onGranted = onGranted
+    )
+
+    private fun cameraPermissionPrompt(onGranted: () -> Unit): PermissionPrompt = PermissionPrompt(
+        permission = Manifest.permission.CAMERA,
+        titleRes = R.string.camera_permission_title,
+        rationaleRes = R.string.camera_permission_rationale,
+        deniedTitleRes = R.string.camera_permission_denied_title,
+        deniedMessageRes = R.string.camera_permission_denied_message,
+        onGranted = onGranted
+    )
+
+    private fun requestPermissionWithExplanation(request: PermissionPrompt) {
+        if (ContextCompat.checkSelfPermission(this, request.permission) == PackageManager.PERMISSION_GRANTED) {
+            request.onGranted()
+            return
         }
 
-        if (permissionsToRequest.isNotEmpty()) {
-            permissionLauncher.launch(permissionsToRequest.toTypedArray())
+        permissionRequests.enqueue(request)
+        if (permissionPrompt == null && activePermissionRequest == null && deniedPermissionPrompt == null) {
+            permissionPrompt = permissionRequests.current
         }
+    }
+
+    private fun launchCurrentPermissionRequest() {
+        val request = permissionPrompt ?: return
+        permissionPrompt = null
+        activePermissionRequest = request
+        permissionLauncher.launch(request.permission)
+    }
+
+    private fun completePermissionRequest() {
+        deniedPermissionPrompt = null
+        permissionPrompt = permissionRequests.advance()
+    }
+
+    private fun openAppPermissionSettings() {
+        startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.fromParts("package", packageName, null)
+        })
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -213,6 +284,7 @@ class MainActivity : ComponentActivity() {
             val isDynamicEnabled by settingsViewModel.isDynamicThemingEnabled.collectAsState()
             val libraryRootUris by settingsViewModel.libraryRootUris.collectAsState()
             val scanAllMemory by settingsViewModel.scanAllMemory.collectAsState()
+            val hasCompletedOnboarding by settingsViewModel.hasCompletedOnboarding.collectAsState()
             val themeMode by settingsViewModel.themeMode.collectAsState()
             val isDark = when (themeMode) {
                 com.raulburgosmurray.musicplayer.ui.ThemeMode.DARK   -> true
@@ -234,28 +306,31 @@ class MainActivity : ComponentActivity() {
                     val navController = rememberNavController()
                     val navBackStackEntry by navController.currentBackStackEntryAsState()
                     val currentRoute = navBackStackEntry?.destination?.route
-                    
-                    var showCameraRationale by remember { mutableStateOf(false) }
-                    val cameraPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-                        if (granted) {
-                            navController.navigate("transfer?fromOnboarding=true")
-                        }
+
+                    permissionPrompt?.let { request ->
+                        PermissionExplanationDialog(
+                            permission = request.permission,
+                            title = stringResource(request.titleRes),
+                            message = stringResource(request.rationaleRes),
+                            confirmLabel = stringResource(R.string.permission_continue),
+                            dismissLabel = stringResource(R.string.not_now),
+                            onConfirm = ::launchCurrentPermissionRequest,
+                            onDismiss = ::completePermissionRequest
+                        )
                     }
-                    
-                    if (showCameraRationale) {
-                        AlertDialog(
-                            onDismissRequest = { showCameraRationale = false },
-                            title = { Text(stringResource(R.string.camera_permission_title)) },
-                            text = { Text(stringResource(R.string.camera_permission_rationale)) },
-                            confirmButton = {
-                                TextButton(onClick = {
-                                    showCameraRationale = false
-                                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                                }) { Text(stringResource(R.string.yes)) }
+
+                    deniedPermissionPrompt?.let { request ->
+                        PermissionExplanationDialog(
+                            permission = request.permission,
+                            title = stringResource(request.deniedTitleRes),
+                            message = stringResource(request.deniedMessageRes),
+                            confirmLabel = stringResource(R.string.settings),
+                            dismissLabel = stringResource(R.string.not_now),
+                            onConfirm = {
+                                completePermissionRequest()
+                                openAppPermissionSettings()
                             },
-                            dismissButton = {
-                                TextButton(onClick = { showCameraRationale = false }) { Text(stringResource(R.string.cancel)) }
-                            }
+                            onDismiss = ::completePermissionRequest
                         )
                     }
                     
@@ -281,43 +356,67 @@ class MainActivity : ComponentActivity() {
                     androidx.compose.animation.SharedTransitionLayout {
                         NavHost(
                             navController = navController, 
-                            startDestination = if (libraryRootUris.isEmpty() && !scanAllMemory) "onboarding" else "main"
+                            startDestination = if (!hasCompletedOnboarding) "onboarding" else "main"
                         ) {
                             composable("onboarding") {
                                 OnboardingScreen(
                                     onSelectFolder = { folderLauncher.launch(null) },
                                     onScanAllMemory = {
-                                        settingsViewModel.setScanAllMemory(true)
-                                        mainViewModel.loadBooks(emptyList(), true)
-                                        navController.navigate("main") { popUpTo("onboarding") { inclusive = true } }
+                                        requestPermissionWithExplanation(audioPermissionPrompt {
+                                            settingsViewModel.setScanAllMemory(true)
+                                            mainViewModel.loadBooks(emptyList(), true)
+                                            navController.navigate("main") { popUpTo("onboarding") { inclusive = true } }
+                                        })
                                     },
                                     onTransferByQr = if (FeatureFlags.P2P_TRANSFER) {
                                         {
-                                            if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                                            requestPermissionWithExplanation(cameraPermissionPrompt {
                                                 navController.navigate("transfer?fromOnboarding=true")
-                                            } else {
-                                                showCameraRationale = true
-                                            }
+                                            })
                                         }
                                     } else null
                                 )
                             }
 
-                            composable("main") { MainScreen(mainViewModel, settingsViewModel, playbackViewModel, this@SharedTransitionLayout, this@composable, onBookClick = { handleBookClick(it, playbackViewModel, navController, "list") }, onMiniPlayerClick = { navController.navigate("player/mini") }, onFavoritesClick = { navController.navigate("favorites") }, onSettingsClick = { navController.navigate("settings") }, onReceiveClick = { navController.navigate("transfer") }, onSelectFolder = { folderLauncher.launch(null) }, navController = navController) }
+                            composable("main") {
+                                // A NavHost keeps its initial route. If preferences are
+                                // restored after that decision, avoid exposing the old
+                                // empty-library screen when no folder has been selected.
+                                if (libraryRootUris.isEmpty() && !scanAllMemory) {
+                                    OnboardingScreen(
+                                        onSelectFolder = { folderLauncher.launch(null) },
+                                        onScanAllMemory = {
+                                            requestPermissionWithExplanation(audioPermissionPrompt {
+                                                settingsViewModel.setScanAllMemory(true)
+                                                mainViewModel.loadBooks(emptyList(), true)
+                                            })
+                                        },
+                                        onTransferByQr = if (FeatureFlags.P2P_TRANSFER) {
+                                            {
+                                                requestPermissionWithExplanation(cameraPermissionPrompt {
+                                                    navController.navigate("transfer?fromOnboarding=true")
+                                                })
+                                            }
+                                        } else null
+                                    )
+                                } else {
+                                    MainScreen(mainViewModel, settingsViewModel, playbackViewModel, this@SharedTransitionLayout, this@composable, onBookClick = { handleBookClick(it, playbackViewModel, navController, "list") }, onMiniPlayerClick = { navController.navigate("player/mini") }, onFavoritesClick = { navController.navigate("favorites") }, onSettingsClick = { navController.navigate("settings") }, onReceiveClick = { navController.navigate("transfer") }, onSelectFolder = { folderLauncher.launch(null) }, navController = navController)
+                                }
+                            }
                             composable("favorites") { FavoritesScreen(mainViewModel, playbackViewModel, this@SharedTransitionLayout, this@composable, onBack = { navController.popBackStack() }, onBookClick = { handleBookClick(it, playbackViewModel, navController, "fav") }, onMiniPlayerClick = { navController.navigate("player/mini") }, navController = navController) }
                             composable("settings") { SettingsScreen(settingsViewModel, mainViewModel, syncViewModel, playbackViewModel, onBack = { navController.popBackStack() }) }
                             composable(route = "transfer?bookId={bookId}&fromOnboarding={fromOnboarding}", arguments = listOf(navArgument("bookId") { type = NavType.StringType; nullable = true; defaultValue = null }, navArgument("fromOnboarding") { type = NavType.BoolType; defaultValue = false })) { backStackEntry ->
                                 val bookId = backStackEntry.arguments?.getString("bookId")
                                 val fromOnboarding = backStackEntry.arguments?.getBoolean("fromOnboarding") ?: false
                                 val state by transferViewModel.uiState.collectAsState()
+                                var transferScreenInitialized by remember(backStackEntry.id) { mutableStateOf(false) }
                                 val context = LocalContext.current
                                 var isManualEntry by remember { mutableStateOf(false) }
                                 var targetIpText by remember { mutableStateOf("") }
                                 var hasCameraPermission by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) }
-                                val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { hasCameraPermission = it }
                                 
-                                LaunchedEffect(state.receiveSuccess) {
-                                    if (state.receiveSuccess) {
+                                LaunchedEffect(state.receiveSuccess, transferScreenInitialized) {
+                                    if (transferScreenInitialized && transferViewModel.uiState.value.receiveSuccess) {
                                         transferViewModel.clearReceiveSuccess()
                                         if (fromOnboarding) {
                                             navController.navigate("main") { popUpTo("onboarding") { inclusive = true } }
@@ -329,80 +428,52 @@ class MainActivity : ComponentActivity() {
                                         }
                                     }
                                 }
-                                LaunchedEffect(bookId) { if (bookId != null) transferViewModel.startServer(bookId) else { if (!hasCameraPermission) launcher.launch(Manifest.permission.CAMERA); transferViewModel.refreshLocalIp() } }
-                                
-                                if (state.showConflictDialog) {
-                                    val firstUri = libraryRootUris.firstOrNull()
-                                    AlertDialog(
-                                        onDismissRequest = { transferViewModel.handleUserDecision("CANCEL", firstUri) },
-                                        title = { Text(stringResource(R.string.book_detected)) },
-                                        text = { Text(stringResource(R.string.existing_book_msg, state.pendingBookTitle ?: "")) },
-                                        confirmButton = {
-                                            Column {
-                                                Button(onClick = { transferViewModel.handleUserDecision("PROGRESS", firstUri) }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.sync_progress_only)) }
-                                                Spacer(Modifier.height(8.dp))
-                                                Button(onClick = { transferViewModel.handleUserDecision("FILE", firstUri) }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.download_full_book)) }
-                                            }
-                                        },
-                                        dismissButton = {
-                                            TextButton(onClick = { transferViewModel.handleUserDecision("CANCEL", firstUri) }) { Text(stringResource(R.string.cancel)) }
+                                LaunchedEffect(backStackEntry.id, bookId) {
+                                    if (bookId != null) transferViewModel.startServer(bookId)
+                                    else {
+                                        transferViewModel.prepareReceiverScreen()
+                                        if (!hasCameraPermission) {
+                                            requestPermissionWithExplanation(cameraPermissionPrompt {
+                                                hasCameraPermission = true
+                                            })
                                         }
+                                    }
+                                    transferScreenInitialized = true
+                                }
+                                
+                                if (transferScreenInitialized && state.showConflictDialog) {
+                                    val firstUri = libraryRootUris.firstOrNull()
+                                    TransferConflictDialog(
+                                        bookTitle = state.pendingBookTitle.orEmpty(),
+                                        onSyncProgress = { transferViewModel.handleUserDecision("PROGRESS", firstUri) },
+                                        onDownloadBook = { transferViewModel.handleUserDecision("FILE", firstUri) },
+                                        onDismiss = { transferViewModel.handleUserDecision("CANCEL", firstUri) }
                                     )
                                 }
 
-                                Scaffold(topBar = { TopAppBar(title = { Text(if (bookId != null) stringResource(R.string.send) else stringResource(R.string.receive)) }, navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } }) }) { padding ->
-                                    Column(modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                                        if (state.isDownloading) {
-                                            LinearProgressIndicator(progress = { state.downloadProgress }, modifier = Modifier.fillMaxWidth().height(12.dp))
-                                            Text("${(state.downloadProgress * 100).toInt()}%")
-                                        } else if (bookId != null) {
-                                            if (state.error != null) {
-                                                Text(state.error!!, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center); Button(onClick = { transferViewModel.startServer(bookId) }) { Text(stringResource(R.string.retry)) }
-                                            } else if (state.isServerRunning) {
-                                                state.qrData?.let { data ->
-                                                    val qrBitmap = remember(data) {
-                                                        try {
-                                                            // CONFIGURACION ULTRA-ROBUSTA DE QR
-                                                            val hints = mapOf(
-                                                                EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.Q,
-                                                                EncodeHintType.CHARACTER_SET to "UTF-8",
-                                                                EncodeHintType.MARGIN to 2
-                                                            )
-                                                            val bitMatrix = QRCodeWriter().encode(data, BarcodeFormat.QR_CODE, 512, 512, hints)
-                                                            val width = bitMatrix.width
-                                                            val height = bitMatrix.height
-                                                            val pixels = IntArray(width * height)
-                                                            for (y in 0 until height) {
-                                                                val offset = y * width
-                                                                for (x in 0 until width) {
-                                                                    pixels[offset + x] = if (bitMatrix.get(x, y)) android.graphics.Color.BLACK else android.graphics.Color.WHITE
-                                                                }
-                                                            }
-                                                            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                                                            bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
-                                                            bitmap
-                                                        } catch (e: Exception) { null }
-                                                    }
-                                                    qrBitmap?.let { Image(bitmap = it.asImageBitmap(), contentDescription = "QR", modifier = Modifier.size(300.dp)) }
-                                                    if (state.qrPositionMs > 0 && state.qrDurationMs > 0) {
-                                                        Spacer(Modifier.height(8.dp))
-                                                        val posSec = state.qrPositionMs / 1000
-                                                        val durSec = state.qrDurationMs / 1000
-                                                        Text(
-                                                            "${posSec / 60}:${String.format("%02d", posSec % 60)} / ${durSec / 60}:${String.format("%02d", durSec % 60)}",
-                                                            style = MaterialTheme.typography.bodyMedium,
-                                                            color = MaterialTheme.colorScheme.primary
-                                                        )
-                                                    }
-                                                }
-                                                Text(stringResource(R.string.qr_generated))
-                                            } else { CircularProgressIndicator() }
-                                        } else if (isManualEntry) {
-                                            OutlinedTextField(value = targetIpText, onValueChange = { targetIpText = it }, label = { Text("IP:Puerto") }, modifier = Modifier.fillMaxWidth())
-                                            Button(onClick = { transferViewModel.receiveFromIp(targetIpText, libraryRootUris.firstOrNull()) }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.connecting)) }
-                                            TextButton(onClick = { isManualEntry = false }) { Text(stringResource(R.string.camera)) }
-                                        } else {
-                                            if (hasCameraPermission) {
+                                TransferScreen(
+                                    state = state,
+                                    isSending = bookId != null,
+                                    isInitialized = transferScreenInitialized,
+                                    isManualEntry = isManualEntry,
+                                    targetAddress = targetIpText,
+                                    hasCameraPermission = hasCameraPermission,
+                                    onBack = { navController.popBackStack() },
+                                    onFinish = {
+                                        transferViewModel.stopServer()
+                                        navController.popBackStack()
+                                    },
+                                    onRetry = { bookId?.let(transferViewModel::startServer) },
+                                    onManualEntryChange = { isManualEntry = it },
+                                    onTargetAddressChange = { targetIpText = it },
+                                    onConnect = { transferViewModel.receiveFromIp(targetIpText, libraryRootUris.firstOrNull()) },
+                                    onRequestCameraPermission = {
+                                        requestPermissionWithExplanation(cameraPermissionPrompt {
+                                            hasCameraPermission = true
+                                        })
+                                    },
+                                    cameraContent = {
+                                        if (hasCameraPermission && !state.isDownloading && bookId == null) {
                                                 val lifecycleOwner = LocalLifecycleOwner.current
                                                 val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
                                                 var processCameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
@@ -433,56 +504,37 @@ class MainActivity : ComponentActivity() {
                                                     }
                                                 }
 
-                                                Box(modifier = Modifier.size(320.dp).padding(8.dp)) {
-                                                    AndroidView(
-                                                        factory = { ctx ->
-                                                            val previewView = PreviewView(ctx).apply {
-                                                                implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                                            AndroidView(
+                                                factory = { ctx ->
+                                                    val previewView = PreviewView(ctx).apply {
+                                                        implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                                                    }
+                                                    cameraProviderFuture.addListener({
+                                                        try {
+                                                            val provider = cameraProviderFuture.get()
+                                                            processCameraProvider = provider
+                                                            val preview = Preview.Builder().build().also { it.surfaceProvider = previewView.surfaceProvider }
+                                                            val scanner = BarcodeScanning.getClient(BarcodeScannerOptions.Builder().setBarcodeFormats(Barcode.FORMAT_QR_CODE).build())
+                                                            val imageAnalysis = ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build()
+                                                            imageAnalysis.setAnalyzer(executor) { imageProxy ->
+                                                                val mediaImage = imageProxy.image
+                                                                if (mediaImage != null) {
+                                                                    scanner.process(InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)).addOnSuccessListener { barcodes -> barcodes.forEach { it.rawValue?.let { transferViewModel.processScannedData(it, libraryRootUris.firstOrNull()) } } }.addOnCompleteListener { imageProxy.close() }
+                                                                } else { imageProxy.close() }
                                                             }
-                                                            cameraProviderFuture.addListener({
-                                                                try {
-                                                                    val provider = cameraProviderFuture.get()
-                                                                    processCameraProvider = provider
-                                                                    val preview = Preview.Builder().build().also { it.surfaceProvider = previewView.surfaceProvider }
-                                                                    val scanner = BarcodeScanning.getClient(BarcodeScannerOptions.Builder().setBarcodeFormats(Barcode.FORMAT_QR_CODE).build())
-                                                                    val imageAnalysis = ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build()
-                                                                    imageAnalysis.setAnalyzer(executor) { imageProxy ->
-                                                                        val mediaImage = imageProxy.image
-                                                                        if (mediaImage != null) {
-                                                                            scanner.process(InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)).addOnSuccessListener { barcodes -> barcodes.forEach { it.rawValue?.let { transferViewModel.processScannedData(it, libraryRootUris.firstOrNull()) } } }.addOnCompleteListener { imageProxy.close() }
-                                                                        } else { imageProxy.close() }
-                                                                    }
-                                                                    provider.unbindAll()
-                                                                    provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageAnalysis)
-                                                                } catch (e: Exception) {
-                                                                    Log.e("MainActivity", "Error al inicializar cámara QR", e)
-                                                                }
-                                                            }, ContextCompat.getMainExecutor(ctx))
-                                                            previewView
-                                                        },
-                                                        modifier = Modifier.fillMaxSize()
-                                                    )
-                                                }
-                                                Button(onClick = { isManualEntry = true }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.manual)) }
-                                            } else { Button(onClick = { launcher.launch(Manifest.permission.CAMERA) }) { Text(stringResource(R.string.permission)) } }
-                                        }
-                                        Spacer(Modifier.height(24.dp))
-                                        Text(stringResource(R.string.your_ip, state.localIp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
-                                        state.transferStatus?.let { Text(it, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) }
-                                        state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                                        Spacer(Modifier.height(32.dp))
-                                        Button(
-                                            onClick = { transferViewModel.stopServer(); navController.popBackStack() },
-                                            modifier = Modifier.fillMaxWidth().height(56.dp),
-                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error, contentColor = MaterialTheme.colorScheme.onError),
-                                            shape = RoundedCornerShape(16.dp)
-                                        ) {
-                                            Icon(Icons.Default.Close, null)
-                                            Spacer(Modifier.width(8.dp))
-                                            Text(stringResource(R.string.finish_and_exit), fontWeight = FontWeight.Bold)
+                                                            provider.unbindAll()
+                                                            provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageAnalysis)
+                                                        } catch (e: Exception) {
+                                                            Log.e("MainActivity", "Error al inicializar cámara QR", e)
+                                                        }
+                                                    }, ContextCompat.getMainExecutor(ctx))
+                                                    previewView
+                                                },
+                                                modifier = Modifier.fillMaxSize()
+                                            )
                                         }
                                     }
-                                }
+                                )
                             }
 composable(route = "player/{from}", arguments = listOf(navArgument("from") { type = NavType.StringType })) { backStackEntry ->
                                 val sScope = this@SharedTransitionLayout

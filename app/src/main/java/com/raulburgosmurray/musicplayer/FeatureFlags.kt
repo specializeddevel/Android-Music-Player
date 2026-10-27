@@ -10,6 +10,7 @@ object FeatureFlags {
 object Constants {
     const val PROGRESS_UPDATE_INTERVAL_MS = 1000L
     const val POSITION_SAVE_INTERVAL_MS = 10000L
+    const val LOCAL_PLAYBACK_BUFFERING_TIMEOUT_MS = 15000L
     const val SLEEP_TIMER_WARNING_MS = 30000L
     const val SKIP_BACKWARD_MS = 30000L
     const val SKIP_FORWARD_MS = 10000L

@@ -1,7 +1,6 @@
 package com.raulburgosmurray.musicplayer.data
 
 import android.content.Context
-import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
@@ -16,28 +15,39 @@ private const val TAG = "DescriptionExtractor"
 object DescriptionExtractor {
 
     fun isSupported(): Boolean =
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
-        Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
 
     fun extract(context: Context, uriString: String): String? {
         if (!isSupported()) return null
         val uri = Uri.parse(uriString)
         Log.d(TAG, "Extracting from: $uriString (scheme=${uri.scheme})")
 
+        // 1. Try local path resolution (file://, MediaStore DATA column, etc.)
         val localPath = resolveLocalPath(context, uri)
         if (localPath != null) {
             Log.d(TAG, "Resolved local path: $localPath")
             val desc = extractFromLocalFile(localPath)
             if (!desc.isNullOrBlank()) return desc
-        } else {
-            Log.d(TAG, "Could not resolve local path, trying via retriever")
-            val descFromRetriever = extractViaRetriever(context, uri)
-            if (!descFromRetriever.isNullOrBlank()) return descFromRetriever
-
-            Log.d(TAG, "Trying partial file copy for SAF URI")
-            val descFromPartialCopy = extractViaPartialCopy(context, uri)
-            if (!descFromPartialCopy.isNullOrBlank()) return descFromPartialCopy
         }
+
+        // 2. Try /proc/self/fd direct access via ParcelFileDescriptor (zero-copy seeking)
+        try {
+            context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
+                val fdPath = "/proc/self/fd/${pfd.fd}"
+                val desc = extractFromLocalFile(fdPath)
+                if (!desc.isNullOrBlank()) {
+                    Log.d(TAG, "Extracted description via /proc/self/fd")
+                    return desc
+                }
+            }
+        } catch (e: Exception) {
+            Log.d(TAG, "Failed /proc/self/fd extraction for $uri", e)
+        }
+
+        // 3. Fallback: Copy file to cacheDir so JAudiotagger can read head/tail atoms (e.g. moov at end of M4A)
+        Log.d(TAG, "Trying file copy for SAF URI")
+        val descFromCopy = extractViaCopy(context, uri)
+        if (!descFromCopy.isNullOrBlank()) return descFromCopy
 
         Log.d(TAG, "No description found for $uriString")
         return null
@@ -52,74 +62,75 @@ object DescriptionExtractor {
             }
 
             val audioFile = AudioFileIO.read(file)
-            val tag = audioFile.tagOrCreateDefault
+            val tag = audioFile.tag ?: return null
 
+            // 1. Explicit candidates
             val candidates = listOf(
                 tag.getFirst(FieldKey.COMMENT),
                 tag.getFirst(FieldKey.SUBTITLE),
                 tag.getFirst("DESCRIPTION"),
                 tag.getFirst("LONG DESCRIPTION"),
                 tag.getFirst("LDES"),
+                tag.getFirst("ldes"), // mutagen MP4 uses 'ldes'
+                tag.getFirst("desc"), // MP4 'desc' atom
+                tag.getFirst("©cmt"),
                 tag.getFirst("©des"),
             )
 
-            val result = candidates.firstOrNull { it.isNotBlank() }
-            Log.d(TAG, "JAudiotagger: comment='${tag.getFirst(FieldKey.COMMENT)?.take(30)}', subtitle='${tag.getFirst(FieldKey.SUBTITLE)?.take(30)}'")
-            result
+            val firstHit = candidates.firstOrNull { it.isNotBlank() }
+            if (!firstHit.isNullOrBlank()) {
+                Log.d(TAG, "Found candidate description: '${firstHit.take(30)}...'")
+                return firstHit
+            }
+
+            // 2. Fallback: inspect all non-binary fields in tag for matching IDs
+            val fields = tag.fields
+            while (fields.hasNext()) {
+                val field = fields.next()
+                if (!field.isBinary) {
+                    val id = field.id.uppercase()
+                    val text = field.toString().trim()
+                    if (text.isNotBlank() && (
+                        id.contains("DES") || id.contains("CMT") ||
+                        id.contains("COMM") || id.contains("LDES") ||
+                        id.contains("COMMENT") || id.contains("SUBTITLE")
+                    )) {
+                        Log.d(TAG, "Found field by ID ($id): '${text.take(30)}...'")
+                        return text
+                    }
+                }
+            }
+
+            Log.d(TAG, "No description candidates found in $path")
+            null
         } catch (e: Exception) {
             Log.d(TAG, "JAudiotagger failed for $path", e)
             null
         }
     }
 
-    private fun extractViaPartialCopy(context: Context, uri: Uri): String? {
+    private fun extractViaCopy(context: Context, uri: Uri): String? {
         var tempFile: File? = null
         return try {
-            // Usar la extensión del archivo original para que JAudiotagger lo reconozca
             val originalName = uri.lastPathSegment?.substringAfterLast('/') ?: "audio"
             val ext = originalName.substringAfterLast('.', "tmp")
             tempFile = File(context.cacheDir, "synopsis_${uri.hashCode()}.$ext")
             context.contentResolver.openInputStream(uri)?.use { input ->
-                val buffer = ByteArray(8192)
-                var copied = 0L
-                val maxBytes = 512L * 1024
-                var read: Int
-                val out = FileOutputStream(tempFile)
-                while (input.read(buffer).also { read = it } != -1 && copied < maxBytes) {
-                    val toWrite = if (copied + read > maxBytes) (maxBytes - copied).toInt() else read
-                    out.write(buffer, 0, toWrite)
-                    copied += toWrite
+                FileOutputStream(tempFile).use { out ->
+                    input.copyTo(out)
                 }
-                out.close()
             }
-            Log.d(TAG, "Partial copy: ${tempFile.length()} bytes, ext=.$ext, path=${tempFile.absolutePath}")
+            Log.d(TAG, "Copy: ${tempFile.length()} bytes, ext=.$ext, path=${tempFile.absolutePath}")
             extractFromLocalFile(tempFile.absolutePath)
         } catch (e: Exception) {
-            Log.e(TAG, "Partial copy failed for $uri", e)
+            Log.e(TAG, "Copy failed for $uri", e)
             null
         } finally {
             tempFile?.let { file ->
-                if (!file.delete()) {
+                if (file.exists() && !file.delete()) {
                     Log.w(TAG, "Failed to delete temp file: ${file.absolutePath}")
                 }
             }
-        }
-    }
-
-    private fun extractViaRetriever(context: Context, uri: Uri): String? {
-        val retriever = MediaMetadataRetriever()
-        return try {
-            context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
-                retriever.setDataSource(pfd.fileDescriptor)
-                val comment = retriever.extractMetadata(25)
-                Log.d(TAG, "Retriever: comment='${comment?.take(50)}'")
-                comment?.takeIf { it.isNotBlank() }
-            }
-        } catch (e: Exception) {
-            Log.d(TAG, "Retriever failed for $uri", e)
-            null
-        } finally {
-            try { retriever.release() } catch (_: Exception) {}
         }
     }
 

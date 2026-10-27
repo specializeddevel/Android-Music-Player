@@ -41,7 +41,7 @@ data class Music(
             .build()
         
         val uri = try {
-            if (path.startsWith("content://")) {
+            if (path.startsWith("content://") || path.startsWith("http://") || path.startsWith("https://")) {
                 android.net.Uri.parse(path)
             } else {
                 android.net.Uri.fromFile(File(path))

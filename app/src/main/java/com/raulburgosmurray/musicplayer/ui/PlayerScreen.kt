@@ -3,10 +3,14 @@ package com.raulburgosmurray.musicplayer.ui
 import android.net.Uri
 import android.content.res.Configuration
 import android.util.Base64
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
@@ -16,9 +20,14 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -38,6 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -50,6 +60,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.raulburgosmurray.musicplayer.Music
@@ -60,6 +72,44 @@ import com.raulburgosmurray.musicplayer.encodeBookId
 import com.raulburgosmurray.musicplayer.ui.PlaybackUiState
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+
+internal fun parseSeekTimeMs(
+    hoursText: String,
+    minutesText: String,
+    secondsText: String,
+    duration: Long
+): Long? {
+    if (duration < 0L) return null
+    fun parsePart(value: String): Long? = if (value.isBlank()) 0L else value.toLongOrNull()
+    val hours = parsePart(hoursText) ?: return null
+    val minutes = parsePart(minutesText) ?: return null
+    val seconds = parsePart(secondsText) ?: return null
+    if (hours < 0L || minutes !in 0L..59L || seconds !in 0L..59L) return null
+
+    val positionMs = runCatching {
+        val hoursInSeconds = Math.multiplyExact(hours, 3_600L)
+        val withMinutes = Math.addExact(hoursInSeconds, Math.multiplyExact(minutes, 60L))
+        Math.multiplyExact(Math.addExact(withMinutes, seconds), 1_000L)
+    }.getOrNull() ?: return null
+
+    return positionMs.takeIf { it in 0L..duration }
+}
+
+internal fun validatedSkipAmountMs(
+    currentPosition: Long,
+    duration: Long,
+    amount: Long,
+    unitMultiplier: Long,
+    isForward: Boolean
+): Long? {
+    if (amount <= 0L || unitMultiplier <= 0L || currentPosition !in 0L..duration) return null
+    val amountMs = runCatching { Math.multiplyExact(amount, unitMultiplier) }.getOrNull() ?: return null
+    val targetPosition = runCatching {
+        if (isForward) Math.addExact(currentPosition, amountMs)
+        else Math.subtractExact(currentPosition, amountMs)
+    }.getOrNull() ?: return null
+    return amountMs.takeIf { targetPosition in 0L..duration }
+}
 
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
@@ -131,44 +181,10 @@ fun PlayerScreen(
                     onLock = { isLocked = true }
                 )
             }
-            if (isLocked) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    // Capa de fondo: absorbe todos los toques excepto los que van al botón de encima
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.55f))
-                            .pointerInput(Unit) {
-                                awaitPointerEventScope {
-                                    while (true) {
-                                        awaitPointerEvent(PointerEventPass.Initial)
-                                            .changes.forEach { it.consume() }
-                                    }
-                                }
-                            }
-                    )
-                    // Contenido de desbloqueo: renderizado encima, recibe los eventos primero
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Icon(Icons.Default.Lock, null, Modifier.size(48.dp), tint = Color.White)
-                        Text(stringResource(R.string.screen_locked), color = Color.White, style = MaterialTheme.typography.titleMedium)
-                        OutlinedButton(
-                            onClick = { isLocked = false },
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                            border = BorderStroke(1.dp, Color.White)
-                        ) {
-                            Icon(Icons.Default.LockOpen, null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(stringResource(R.string.unlock))
-                        }
-                    }
-                }
-            }
+            LockOverlay(
+                isLocked = isLocked,
+                onUnlock = { isLocked = false }
+            )
         }
     }
 
@@ -183,17 +199,149 @@ fun PlayerScreen(
     if (showSeekToTimeDialog) { SeekToTimeDialog(duration = state.duration, onDismiss = { showSeekToTimeDialog = false }, onConfirm = { pos -> viewModel.seekTo(pos); showSeekToTimeDialog = false }) }
     if (showSkipByAmountDialog) { SkipByAmountDialog(currentPosition = state.currentPosition, duration = state.duration, onDismiss = { showSkipByAmountDialog = false }, onConfirm = { amountMs, isForward -> viewModel.skipByAmount(amountMs, isForward); showSkipByAmountDialog = false }) }
     if (showShareFileConfirmation) {
-        AlertDialog(onDismissRequest = { showShareFileConfirmation = false }, title = { Text(stringResource(R.string.share_file_warning_title)) }, text = { Text(stringResource(R.string.share_file_warning_message)) }, confirmButton = { Button(onClick = { showShareFileConfirmation = false; viewModel.shareFile(context) }) { Text(stringResource(R.string.confirm)) } }, dismissButton = { TextButton(onClick = { showShareFileConfirmation = false }) { Text(stringResource(R.string.cancel)) } })
+        ShareFileConfirmationDialog(
+            onDismiss = { showShareFileConfirmation = false },
+            onConfirm = {
+                showShareFileConfirmation = false
+                viewModel.shareFile(context)
+            }
+        )
     }
 }
 
 @Composable
-fun SynopsisAccordion(description: String) {
-    var expanded by remember { mutableStateOf(false) }
+fun LockOverlay(
+    isLocked: Boolean,
+    onUnlock: () -> Unit
+) {
+    if (!isLocked) return
+
+    BackHandler(enabled = true) {
+        // Intercept system back gestures while screen is locked
+    }
+
+    val haptic = LocalHapticFeedback.current
+    var isHolding by remember { mutableStateOf(false) }
+    var holdProgress by remember { mutableFloatStateOf(0f) }
+
+    val animatedProgress by animateFloatAsState(
+        targetValue = if (isHolding) holdProgress else 0f,
+        animationSpec = if (isHolding) tween(durationMillis = 16, easing = LinearEasing) else spring(),
+        label = "holdProgress"
+    )
+
+    LaunchedEffect(isHolding) {
+        if (isHolding) {
+            val startTime = System.currentTimeMillis()
+            val requiredHoldMs = 1200L
+            while (isHolding) {
+                val elapsed = System.currentTimeMillis() - startTime
+                holdProgress = (elapsed.toFloat() / requiredHoldMs).coerceAtMost(1f)
+                if (holdProgress >= 1f) {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onUnlock()
+                    isHolding = false
+                    holdProgress = 0f
+                    break
+                }
+                delay(16L)
+            }
+        } else {
+            holdProgress = 0f
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.82f))
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        event.changes.forEach { it.consume() }
+                    }
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+            modifier = Modifier.padding(24.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(110.dp)
+                    .pointerInput(Unit) {
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false)
+                            isHolding = true
+                            do {
+                                val event = awaitPointerEvent()
+                                val isReleased = event.changes.all { !it.pressed }
+                            } while (!isReleased)
+                            isHolding = false
+                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.85f),
+                    shadowElevation = 8.dp
+                ) {}
+
+                if (animatedProgress > 0f) {
+                    CircularProgressIndicator(
+                        progress = { animatedProgress },
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.primary,
+                        strokeWidth = 6.dp,
+                        trackColor = Color.Transparent
+                    )
+                }
+
+                Icon(
+                    imageVector = if (animatedProgress > 0.5f) Icons.Default.LockOpen else Icons.Default.Lock,
+                    contentDescription = null,
+                    modifier = Modifier.size(44.dp),
+                    tint = if (animatedProgress > 0f) MaterialTheme.colorScheme.primary else Color.White
+                )
+            }
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.screen_locked),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Text(
+                    text = stringResource(R.string.hold_to_unlock),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.75f),
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun SynopsisAccordion(
+    description: String,
+    initiallyExpanded: Boolean = false
+) {
+    var expanded by remember { mutableStateOf(initiallyExpanded) }
     val chevronRotation by animateFloatAsState(targetValue = if (expanded) 180f else 0f, label = "chevron")
     Card(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.animateContentSize()) {
@@ -206,7 +354,7 @@ fun SynopsisAccordion(description: String) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Icon(
-                    Icons.Default.Subject,
+                    Icons.AutoMirrored.Filled.Subject,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(20.dp)
@@ -466,7 +614,17 @@ fun PlayerControls(state: PlaybackUiState, viewModel: PlaybackViewModel, onShowS
     val isPlaying = state.playWhenReady
     val progress = if (state.duration > 0) state.currentPosition.toFloat() / state.duration.toFloat() else 0f
     val duration = state.duration
-    val position = state.currentPosition
+    var isSeeking by rememberSaveable(mediaId) { mutableStateOf(false) }
+    var pendingSeekFraction by rememberSaveable(mediaId) { mutableFloatStateOf(progress.coerceIn(0f, 1f)) }
+    LaunchedEffect(progress, isSeeking) {
+        if (!isSeeking) pendingSeekFraction = progress.coerceIn(0f, 1f)
+    }
+    val displayedProgress = if (isSeeking) pendingSeekFraction else progress.coerceIn(0f, 1f)
+    val position = if (isSeeking) {
+        seekPositionForFraction(displayedProgress, duration)
+    } else {
+        state.currentPosition
+    }
     val activeTimerMinutes = state.sleepTimerMinutes
     val showUndoButton = state.lastPositionBeforeSeek != null
 
@@ -474,7 +632,19 @@ fun PlayerControls(state: PlaybackUiState, viewModel: PlaybackViewModel, onShowS
         Text(text = displayTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
         Text(text = currentMediaItemArtist(currentItem), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(8.dp))
-        Slider(value = progress.coerceIn(0f, 1f), onValueChange = { viewModel.seekTo((it * duration).toLong()) }, modifier = Modifier.fillMaxWidth())
+        Slider(
+            value = displayedProgress,
+            onValueChange = {
+                isSeeking = true
+                pendingSeekFraction = it.coerceIn(0f, 1f)
+            },
+            onValueChangeFinished = {
+                seekPositionForFractionOrNull(pendingSeekFraction, duration)?.let(viewModel::seekTo)
+                isSeeking = false
+            },
+            enabled = duration > 0L,
+            modifier = Modifier.fillMaxWidth()
+        )
         Row(modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text(text = formatDuration(position), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (showUndoButton) {
@@ -492,8 +662,41 @@ fun PlayerControls(state: PlaybackUiState, viewModel: PlaybackViewModel, onShowS
         Spacer(Modifier.height(4.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { viewModel.skipBackward(Constants.SKIP_FORWARD_MS) }) { Icon(Icons.Default.Replay10, stringResource(R.string.history_skip_backward, Constants.SKIP_FORWARD_MS / 1000), modifier = Modifier.size(40.dp)) }
-            FilledIconButton(onClick = { viewModel.togglePlayPause() }, modifier = Modifier.size(64.dp), shape = RoundedCornerShape(20.dp)) { Icon(if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, stringResource(R.string.pause_play_btn), modifier = Modifier.size(32.dp)) }
+            FilledIconButton(onClick = { viewModel.togglePlayPause() }, modifier = Modifier.size(64.dp), shape = RoundedCornerShape(20.dp)) {
+                if (state.isBuffering && state.playWhenReady) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(28.dp),
+                        strokeWidth = 3.dp,
+                        color = LocalContentColor.current
+                    )
+                } else {
+                    Icon(if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, stringResource(R.string.pause_play_btn), modifier = Modifier.size(32.dp))
+                }
+            }
             IconButton(onClick = { viewModel.skipForward(Constants.SKIP_FORWARD_MS) }) { Icon(Icons.Default.Forward10, stringResource(R.string.history_skip_forward, Constants.SKIP_FORWARD_MS / 1000), modifier = Modifier.size(40.dp)) }
+        }
+        if (state.playbackError != null) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = state.playbackError,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    textAlign = TextAlign.Center
+                )
+                OutlinedButton(
+                    onClick = { viewModel.retryCurrentPlayback() },
+                    shape = MaterialTheme.shapes.medium,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Reintentar")
+                }
+            }
         }
         Spacer(Modifier.height(16.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -518,27 +721,70 @@ fun currentMediaItemArtist(item: androidx.media3.common.MediaItem?): String {
 }
 
 @Composable
+private fun PlayerSheetHeader(icon: ImageVector, title: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.padding(11.dp).size(26.dp)
+            )
+        }
+        Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun PlayerSheetEmptyState(icon: ImageVector, message: String) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(16.dp).size(30.dp)
+            )
+        }
+        Text(
+            message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
 fun SpeedSelectorContent(currentSpeed: Float, currentPitch: Float, onSpeedSelected: (Float) -> Unit, onPitchSelected: (Float) -> Unit) {
     val speeds = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.25f)
     val pitches = listOf(0.8f, 0.9f, 1.0f, 1.1f, 1.2f)
-    Column(modifier = Modifier.fillMaxWidth().padding(24.dp).padding(bottom = 32.dp)) {
-        Text(stringResource(R.string.playback_speed_selector), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(16.dp))
+    Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(24.dp).padding(bottom = 16.dp)) {
+        PlayerSheetHeader(Icons.Default.Speed, stringResource(R.string.playback_speed_selector))
+        Spacer(Modifier.height(24.dp))
         LazyVerticalGrid(columns = GridCells.Fixed(4), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             items(speeds) { speed ->
                 val isSelected = speed == currentSpeed
-                Surface(onClick = { onSpeedSelected(speed) }, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer, contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.height(48.dp)) {
+                Surface(onClick = { onSpeedSelected(speed) }, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh, contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface, shape = MaterialTheme.shapes.medium, modifier = Modifier.height(48.dp)) {
                     Box(contentAlignment = Alignment.Center) { Text("${speed}x", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium) }
                 }
             }
         }
         Spacer(Modifier.height(24.dp))
-        Text(stringResource(R.string.pitch_selector), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.pitch_selector), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(16.dp))
         LazyVerticalGrid(columns = GridCells.Fixed(5), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             items(pitches) { pitch ->
                 val isSelected = pitch == currentPitch
-                Surface(onClick = { onPitchSelected(pitch) }, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer, contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.height(44.dp)) {
+                Surface(onClick = { onPitchSelected(pitch) }, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh, contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface, shape = MaterialTheme.shapes.medium, modifier = Modifier.height(44.dp)) {
                     Box(contentAlignment = Alignment.Center) { Text("${pitch}x", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium) }
                 }
             }
@@ -549,34 +795,34 @@ fun SpeedSelectorContent(currentSpeed: Float, currentPitch: Float, onSpeedSelect
 @Composable
 fun TimerSelectorContent(activeTimerMinutes: Int, onTimerSelected: (Int) -> Unit, onCancelTimer: () -> Unit) {
     val options = listOf(5, 10, 15, 30, 45, 60)
-    Column(modifier = Modifier.fillMaxWidth().padding(24.dp).padding(bottom = 32.dp)) {
-        Text(stringResource(R.string.sleep_timer_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+    Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(24.dp).padding(bottom = 16.dp)) {
+        PlayerSheetHeader(Icons.Default.Bedtime, stringResource(R.string.sleep_timer_title))
         Spacer(Modifier.height(24.dp))
         LazyVerticalGrid(columns = GridCells.Fixed(3), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
             items(options) { mins ->
                 val isSelected = mins == activeTimerMinutes
-                Surface(onClick = { onTimerSelected(mins) }, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant, contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant, shape = RoundedCornerShape(16.dp), modifier = Modifier.height(60.dp)) {
+                Surface(onClick = { onTimerSelected(mins) }, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh, contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface, shape = MaterialTheme.shapes.large, modifier = Modifier.height(60.dp)) {
                     Box(contentAlignment = Alignment.Center) { Text("${mins}m", fontWeight = FontWeight.Bold) }
                 }
             }
         }
         if (activeTimerMinutes > 0) {
             Spacer(Modifier.height(24.dp))
-            Button(onClick = onCancelTimer, modifier = Modifier.fillMaxWidth().height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error, contentColor = MaterialTheme.colorScheme.onError), shape = RoundedCornerShape(16.dp)) { Text(stringResource(R.string.stop_sleep_timer), fontWeight = FontWeight.Bold) }
+            OutlinedButton(onClick = onCancelTimer, modifier = Modifier.fillMaxWidth().height(52.dp), colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error), shape = MaterialTheme.shapes.large) { Text(stringResource(R.string.stop_sleep_timer), fontWeight = FontWeight.SemiBold) }
         }
     }
 }
 
 @Composable
 fun HistorySelectorContent(history: List<com.raulburgosmurray.musicplayer.HistoryAction>, onActionSelected: (com.raulburgosmurray.musicplayer.HistoryAction) -> Unit) {
-    Column(modifier = Modifier.fillMaxWidth().padding(24.dp).padding(bottom = 32.dp)) {
-        Text(stringResource(R.string.activity_history_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+    Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(24.dp).padding(bottom = 16.dp)) {
+        PlayerSheetHeader(Icons.Default.History, stringResource(R.string.activity_history_title))
         Spacer(Modifier.height(16.dp))
-        if (history.isEmpty()) { Text(stringResource(R.string.no_activity_yet), color = MaterialTheme.colorScheme.secondary) }
+        if (history.isEmpty()) { PlayerSheetEmptyState(Icons.Default.History, stringResource(R.string.no_activity_yet)) }
         else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(history) { action ->
-                    Card(onClick = { onActionSelected(action) }, shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
+                    Card(onClick = { onActionSelected(action) }, shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
                         Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(modifier = Modifier.weight(1f)) { Text(action.label, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge); Text(formatDuration(action.audioPositionMs), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary) }
                             Icon(Icons.AutoMirrored.Filled.Undo, null, tint = MaterialTheme.colorScheme.primary)
@@ -591,10 +837,12 @@ fun HistorySelectorContent(history: List<com.raulburgosmurray.musicplayer.Histor
 @Composable
 fun QueueSelectorContent(playlist: List<androidx.media3.common.MediaItem>, currentIndex: Int, onItemClicked: (Int) -> Unit, onRemoveItem: (Int) -> Unit, onShowDetails: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    Column(modifier = Modifier.fillMaxWidth().padding(24.dp).padding(bottom = 32.dp)) {
-        Text(stringResource(R.string.playback_queue_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+    Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(24.dp).padding(bottom = 16.dp)) {
+        PlayerSheetHeader(Icons.AutoMirrored.Filled.QueueMusic, stringResource(R.string.playback_queue_title))
         Spacer(Modifier.height(16.dp))
-        LazyColumn(modifier = Modifier.weight(1f, false).heightIn(max = 400.dp)) {
+        if (playlist.isEmpty()) {
+            PlayerSheetEmptyState(Icons.AutoMirrored.Filled.QueueMusic, stringResource(R.string.empty_queue))
+        } else LazyColumn(modifier = Modifier.weight(1f, false).heightIn(max = 400.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(playlist.size) { index ->
                 val item = playlist[index]
                 val itemMetadata by produceState<com.raulburgosmurray.musicplayer.data.AudioMetadata?>(initialValue = null, key1 = item.mediaId) {
@@ -603,11 +851,14 @@ fun QueueSelectorContent(playlist: List<androidx.media3.common.MediaItem>, curre
                     }
                 }
                 val itemTitle = capitalizeWords(itemMetadata?.title?.takeIf { it.isNotBlank() } ?: item.mediaMetadata.title?.toString() ?: stringResource(R.string.unknown_title))
-                Surface(onClick = { onItemClicked(index) }, color = if (index == currentIndex) MaterialTheme.colorScheme.primaryContainer else Color.Transparent, shape = RoundedCornerShape(12.dp)) {
-                    Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("${index + 1}", modifier = Modifier.width(24.dp), style = MaterialTheme.typography.labelSmall)
-                        Column(modifier = Modifier.weight(1f)) { Text(itemTitle, fontWeight = if (index == currentIndex) FontWeight.Bold else FontWeight.Normal); Text(capitalizeWords(item.mediaMetadata.artist?.toString() ?: stringResource(R.string.unknown_artist)), style = MaterialTheme.typography.bodySmall) }
-                        IconButton(onClick = { onRemoveItem(index) }) { Icon(Icons.Default.RemoveCircleOutline, null, tint = MaterialTheme.colorScheme.error) }
+                Surface(onClick = { onItemClicked(index) }, color = if (index == currentIndex) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh, shape = MaterialTheme.shapes.large) {
+                    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Surface(shape = CircleShape, color = if (index == currentIndex) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest) {
+                            Text("${index + 1}", modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), style = MaterialTheme.typography.labelMedium, color = if (index == currentIndex) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) { Text(itemTitle, fontWeight = if (index == currentIndex) FontWeight.Bold else FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis); Text(capitalizeWords(item.mediaMetadata.artist?.toString() ?: stringResource(R.string.unknown_artist)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                        IconButton(onClick = { onRemoveItem(index) }) { Icon(Icons.Default.RemoveCircleOutline, contentDescription = stringResource(R.string.delete_book), tint = MaterialTheme.colorScheme.error) }
                     }
                 }
             }
@@ -617,19 +868,21 @@ fun QueueSelectorContent(playlist: List<androidx.media3.common.MediaItem>, curre
 
 @Composable
 fun BookmarkSelectorContent(bookmarks: List<com.raulburgosmurray.musicplayer.data.Bookmark>, onBookmarkSelected: (com.raulburgosmurray.musicplayer.data.Bookmark) -> Unit, onDeleteBookmark: (Int) -> Unit, onAddBookmark: () -> Unit) {
-    Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(24.dp).padding(bottom = 16.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(R.string.manual_bookmarks), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            FilledIconButton(onClick = onAddBookmark) { Icon(Icons.Default.Add, null) }
+            Box(Modifier.weight(1f)) { PlayerSheetHeader(Icons.Default.Bookmark, stringResource(R.string.manual_bookmarks)) }
+            FilledIconButton(onClick = onAddBookmark) { Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_bookmark)) }
         }
         Spacer(Modifier.height(16.dp))
-        if (bookmarks.isEmpty()) { Text(stringResource(R.string.no_bookmarks_yet), color = MaterialTheme.colorScheme.secondary) }
+        if (bookmarks.isEmpty()) { PlayerSheetEmptyState(Icons.Default.BookmarkBorder, stringResource(R.string.no_bookmarks_yet)) }
         else {
-            LazyColumn { items(bookmarks) { bookmark ->
-                Surface(onClick = { onBookmarkSelected(bookmark) }, shape = RoundedCornerShape(12.dp)) {
-                    Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Column(modifier = Modifier.weight(1f)) { Text(formatDuration(bookmark.position), fontWeight = FontWeight.Bold); if (bookmark.note.isNotEmpty()) Text(bookmark.note) }
-                        IconButton(onClick = { onDeleteBookmark(bookmark.id) }) { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) }
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) { items(bookmarks) { bookmark ->
+                Surface(onClick = { onBookmarkSelected(bookmark) }, color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = MaterialTheme.shapes.large) {
+                    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Bookmark, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) { Text(formatDuration(bookmark.position), fontWeight = FontWeight.SemiBold); if (bookmark.note.isNotEmpty()) Text(bookmark.note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        IconButton(onClick = { onDeleteBookmark(bookmark.id) }) { Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete_book), tint = MaterialTheme.colorScheme.error) }
                     }
                 }
             } }
@@ -639,15 +892,21 @@ fun BookmarkSelectorContent(bookmarks: List<com.raulburgosmurray.musicplayer.dat
 
 @Composable
 fun ChapterSelectorContent(chapters: List<com.raulburgosmurray.musicplayer.Chapter>, currentPosition: Long, onChapterSelected: (com.raulburgosmurray.musicplayer.Chapter) -> Unit) {
-    Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
-        Text(stringResource(R.string.chapters), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+    Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(24.dp).padding(bottom = 16.dp)) {
+        PlayerSheetHeader(Icons.AutoMirrored.Filled.MenuBook, stringResource(R.string.chapters))
         Spacer(Modifier.height(16.dp))
-        if (chapters.isEmpty()) { Text(stringResource(R.string.no_chapters_detected), color = MaterialTheme.colorScheme.secondary) }
+        if (chapters.isEmpty()) { PlayerSheetEmptyState(Icons.AutoMirrored.Filled.MenuBook, stringResource(R.string.no_chapters_detected)) }
         else {
-            LazyColumn { items(chapters) { chapter ->
-                Surface(onClick = { onChapterSelected(chapter) }, shape = RoundedCornerShape(12.dp)) {
-                    Row(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                        Column { Text(chapter.title, fontWeight = FontWeight.Bold); Text(formatDuration(chapter.startMs)) }
+            val currentChapter = chapters.lastOrNull { it.startMs <= currentPosition }
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) { items(chapters) { chapter ->
+                val isCurrent = chapter == currentChapter
+                Surface(onClick = { onChapterSelected(chapter) }, color = if (isCurrent) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh, shape = MaterialTheme.shapes.large) {
+                    Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (isCurrent) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.width(12.dp))
+                        }
+                        Column(Modifier.weight(1f)) { Text(chapter.title, fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium); Text(formatDuration(chapter.startMs), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     }
                 }
             } }
@@ -663,123 +922,342 @@ fun eqPresetDisplayName(preset: EqPreset): String = when (preset) {
     EqPreset.CLARITY -> stringResource(R.string.eq_preset_clarity)
 }
 
+private fun eqPresetIcon(preset: EqPreset): ImageVector = when (preset) {
+    EqPreset.FLAT -> Icons.Default.Tune
+    EqPreset.VOICE_BOOST -> Icons.Default.RecordVoiceOver
+    EqPreset.BASS_CUT -> Icons.Default.GraphicEq
+    EqPreset.CLARITY -> Icons.Default.Hearing
+}
+
 @Composable
 fun EqualizerSelectorContent(currentPreset: EqPreset, isAvailable: Boolean, onPresetSelected: (EqPreset) -> Unit) {
-    Column(modifier = Modifier.fillMaxWidth().padding(24.dp).padding(bottom = 32.dp)) {
-        Text(stringResource(R.string.equalizer_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(16.dp))
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(horizontal = 24.dp)
+            .padding(bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Equalizer,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(12.dp).size(26.dp)
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    stringResource(R.string.equalizer_title),
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    stringResource(R.string.equalizer_preset_description),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
         if (!isAvailable) {
-            Text(stringResource(R.string.equalizer_not_available), color = MaterialTheme.colorScheme.secondary)
-        } else {
-            EqPreset.values().forEach { preset ->
-                Surface(
-                    onClick = { onPresetSelected(preset) },
-                    shape = RoundedCornerShape(12.dp),
-                    color = if (preset == currentPreset) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+            ElevatedCard(
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
+                ),
+                shape = MaterialTheme.shapes.extraLarge
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(eqPresetDisplayName(preset), fontWeight = if (preset == currentPreset) FontWeight.Bold else FontWeight.Normal)
+                    Icon(
+                        Icons.Default.ErrorOutline,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                    Text(
+                        stringResource(R.string.equalizer_not_available),
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+            }
+        } else {
+            EqPreset.entries.chunked(2).forEach { rowPresets ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    rowPresets.forEach { preset ->
+                        val selected = preset == currentPreset
+                        Card(
+                            onClick = { onPresetSelected(preset) },
+                            modifier = Modifier.weight(1f).heightIn(min = 104.dp),
+                            shape = MaterialTheme.shapes.extraLarge,
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (selected) {
+                                    MaterialTheme.colorScheme.primaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceContainerHigh
+                                }
+                            ),
+                            border = BorderStroke(
+                                width = if (selected) 2.dp else 1.dp,
+                                color = if (selected) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.outlineVariant
+                                }
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = eqPresetIcon(preset),
+                                        contentDescription = null,
+                                        tint = if (selected) {
+                                            MaterialTheme.colorScheme.onPrimaryContainer
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        }
+                                    )
+                                    if (selected) {
+                                        Icon(
+                                            Icons.Default.CheckCircle,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                                Text(
+                                    eqPresetDisplayName(preset),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+                    if (rowPresets.size == 1) {
+                        Spacer(Modifier.weight(1f))
                     }
                 }
-                Spacer(Modifier.height(8.dp))
             }
         }
     }
 }
 
 @Composable
+private fun PlayerActionDialog(
+    icon: ImageVector,
+    title: String,
+    description: String,
+    primaryLabel: String,
+    primaryIcon: ImageVector,
+    onPrimary: () -> Unit,
+    onDismiss: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit = {}
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .padding(horizontal = 24.dp, vertical = 16.dp)
+                .fillMaxWidth()
+                .widthIn(max = 440.dp),
+            shape = MaterialTheme.shapes.extraLarge,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 6.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(16.dp).size(30.dp)
+                    )
+                }
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+
+                content()
+
+                Button(
+                    onClick = onPrimary,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                    shape = MaterialTheme.shapes.large
+                ) {
+                    Icon(primaryIcon, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(primaryLabel)
+                }
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                ) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ShareFileConfirmationDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
+    PlayerActionDialog(
+        icon = Icons.Default.Share,
+        title = stringResource(R.string.share_file_warning_title),
+        description = stringResource(R.string.share_file_warning_message),
+        primaryLabel = stringResource(R.string.confirm),
+        primaryIcon = Icons.Default.Share,
+        onPrimary = onConfirm,
+        onDismiss = onDismiss
+    )
+}
+
+@Composable
 fun AddBookmarkDialog(currentPosition: Long, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
     var note by remember { mutableStateOf("") }
-    AlertDialog(onDismissRequest = onDismiss, title = { Text(stringResource(R.string.add_bookmark)) },
-        text = { Column { Text(stringResource(R.string.save_position_label, formatDuration(currentPosition))); Spacer(Modifier.height(8.dp)); OutlinedTextField(value = note, onValueChange = { note = it }, label = { Text(stringResource(R.string.note_label)) }, modifier = Modifier.fillMaxWidth()) } },
-        confirmButton = { Button(onClick = { onConfirm(note) }) { Text(stringResource(R.string.save)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } })
+    PlayerActionDialog(
+        icon = Icons.Default.BookmarkAdd,
+        title = stringResource(R.string.add_bookmark),
+        description = stringResource(R.string.save_position_label, formatDuration(currentPosition)),
+        primaryLabel = stringResource(R.string.save),
+        primaryIcon = Icons.Default.Save,
+        onPrimary = { onConfirm(note) },
+        onDismiss = onDismiss
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.secondaryContainer
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    Icons.Default.Schedule,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    formatDuration(currentPosition),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+        }
+        OutlinedTextField(
+            value = note,
+            onValueChange = { note = it },
+            label = { Text(stringResource(R.string.note_label)) },
+            modifier = Modifier.fillMaxWidth(),
+            minLines = 3,
+            maxLines = 5,
+            shape = MaterialTheme.shapes.large
+        )
+    }
 }
 
 @Composable
 fun SeekToTimeDialog(duration: Long, onDismiss: () -> Unit, onConfirm: (Long) -> Unit) {
-    val maxHours = (duration / 3600000).toInt()
-    val maxMinutes = 59
-    val maxSeconds = 59
-
     var hoursText by remember { mutableStateOf("") }
     var minutesText by remember { mutableStateOf("") }
     var secondsText by remember { mutableStateOf("") }
     var error by remember { mutableStateOf(false) }
 
-    val hours = hoursText.toIntOrNull() ?: 0
-    val minutes = minutesText.toIntOrNull() ?: 0
-    val seconds = secondsText.toIntOrNull() ?: 0
-    val inputMs = (hours * 3600L + minutes * 60L + seconds) * 1000L
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.go_to_time)) },
-        text = {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(stringResource(R.string.go_to_time_desc), color = MaterialTheme.colorScheme.secondary)
-                Spacer(Modifier.height(16.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        OutlinedTextField(
-                            value = hoursText,
-                            onValueChange = { if (it.isEmpty() || it.toIntOrNull() != null) hoursText = it },
-                            label = { Text(stringResource(R.string.hours_hint)) },
-                            modifier = Modifier.width(72.dp),
-                            singleLine = true,
-                            isError = error,
-                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
-                        )
-                    }
-                    Text(":", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        OutlinedTextField(
-                            value = minutesText,
-                            onValueChange = { v ->
-                                val n = v.toIntOrNull()
-                                if (v.isEmpty() || (n != null && n >= 0 && n <= maxMinutes)) minutesText = v
-                            },
-                            label = { Text(stringResource(R.string.minutes_hint)) },
-                            modifier = Modifier.width(72.dp),
-                            singleLine = true,
-                            isError = error,
-                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
-                        )
-                    }
-                    Text(":", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        OutlinedTextField(
-                            value = secondsText,
-                            onValueChange = { v ->
-                                val n = v.toIntOrNull()
-                                if (v.isEmpty() || (n != null && n >= 0 && n <= maxSeconds)) secondsText = v
-                            },
-                            label = { Text(stringResource(R.string.seconds_hint)) },
-                            modifier = Modifier.width(72.dp),
-                            singleLine = true,
-                            isError = error,
-                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
-                        )
-                    }
-                }
-                if (error) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(stringResource(R.string.invalid_time), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelMedium)
-                }
+    PlayerActionDialog(
+        icon = Icons.Default.Schedule,
+        title = stringResource(R.string.go_to_time),
+        description = stringResource(R.string.go_to_time_desc),
+        primaryLabel = stringResource(R.string.go_to_time),
+        primaryIcon = Icons.Default.SkipNext,
+        onPrimary = {
+            val inputMs = parseSeekTimeMs(hoursText, minutesText, secondsText, duration)
+            if (inputMs != null) {
+                error = false
+                onConfirm(inputMs)
+            } else {
+                error = true
             }
         },
-        confirmButton = {
-            Button(onClick = {
-                if (inputMs in 0..duration) {
-                    error = false
-                    onConfirm(inputMs)
-                } else {
-                    error = true
-                }
-            }) { Text(stringResource(R.string.go_to_time)) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } }
-    )
+        onDismiss = onDismiss
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            TimePartField(
+                value = hoursText,
+                onValueChange = { hoursText = it; error = false },
+                label = stringResource(R.string.hours_hint),
+                isError = error,
+                modifier = Modifier.weight(1f)
+            )
+            TimePartField(
+                value = minutesText,
+                onValueChange = { minutesText = it; error = false },
+                label = stringResource(R.string.minutes_hint),
+                isError = error,
+                maxValue = 59L,
+                modifier = Modifier.weight(1f)
+            )
+            TimePartField(
+                value = secondsText,
+                onValueChange = { secondsText = it; error = false },
+                label = stringResource(R.string.seconds_hint),
+                isError = error,
+                maxValue = 59L,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        if (error) {
+            DialogErrorMessage(stringResource(R.string.invalid_time))
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -790,10 +1268,8 @@ fun SkipByAmountDialog(
     onDismiss: () -> Unit,
     onConfirm: (amountMs: Long, isForward: Boolean) -> Unit
 ) {
-    val context = LocalContext.current
     var amountText by remember { mutableStateOf("") }
     var error by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf("") }
 
     val units = listOf(
         stringResource(R.string.unit_minutes) to 60_000L,
@@ -806,112 +1282,170 @@ fun SkipByAmountDialog(
 
     val amount = amountText.toLongOrNull()
     val unitMultiplier = units[selectedUnitIndex].second
-    val amountMs = (amount ?: 0L) * unitMultiplier
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.skip_by_amount)) },
-        text = {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(stringResource(R.string.skip_by_amount_desc), color = MaterialTheme.colorScheme.secondary)
-                Spacer(Modifier.height(16.dp))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedTextField(
-                        value = amountText,
-                        onValueChange = { v ->
-                            if (v.isEmpty() || (v.toLongOrNull() != null && v.toLongOrNull()!! >= 0)) {
-                                amountText = v
-                                error = false
-                            }
-                        },
-                        modifier = Modifier.width(100.dp),
-                        singleLine = true,
-                        isError = error,
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
-                        )
-                    )
-                    ExposedDropdownMenuBox(
-                        expanded = unitMenuExpanded,
-                        onExpandedChange = { unitMenuExpanded = it }
-                    ) {
-                        OutlinedTextField(
-                            value = units[selectedUnitIndex].first,
-                            onValueChange = {},
-                            readOnly = true,
-                            modifier = Modifier
-                                .menuAnchor()
-                                .width(140.dp),
-                            trailingIcon = {
-                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = unitMenuExpanded)
-                            }
-                        )
-                        ExposedDropdownMenu(
-                            expanded = unitMenuExpanded,
-                            onDismissRequest = { unitMenuExpanded = false }
-                        ) {
-                            units.forEachIndexed { index, pair ->
-                                DropdownMenuItem(
-                                    text = { Text(pair.first) },
-                                    onClick = {
-                                        selectedUnitIndex = index
-                                        unitMenuExpanded = false
-                                        error = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-                Spacer(Modifier.height(16.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(
-                        onClick = { isForward = false },
-                        modifier = Modifier.weight(1f),
-                        colors = if (!isForward) ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer) else ButtonDefaults.outlinedButtonColors()
-                    ) { Text(stringResource(R.string.direction_backward)) }
-                    OutlinedButton(
-                        onClick = { isForward = true },
-                        modifier = Modifier.weight(1f),
-                        colors = if (isForward) ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer) else ButtonDefaults.outlinedButtonColors()
-                    ) { Text(stringResource(R.string.direction_forward)) }
-                }
-                if (error) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        errorMessage,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                }
+    PlayerActionDialog(
+        icon = if (isForward) Icons.Default.FastForward else Icons.Default.FastRewind,
+        title = stringResource(R.string.skip_by_amount),
+        description = stringResource(R.string.skip_by_amount_desc),
+        primaryLabel = stringResource(R.string.confirm),
+        primaryIcon = if (isForward) Icons.Default.FastForward else Icons.Default.FastRewind,
+        onPrimary = {
+            val validAmountMs = amount?.let {
+                validatedSkipAmountMs(
+                    currentPosition = currentPosition,
+                    duration = duration,
+                    amount = it,
+                    unitMultiplier = unitMultiplier,
+                    isForward = isForward
+                )
+            }
+            if (validAmountMs != null) {
+                error = false
+                onConfirm(validAmountMs, isForward)
+            } else {
+                error = true
             }
         },
-        confirmButton = {
-            Button(onClick = {
-                if (amount == null || amount <= 0) {
-                    error = true
-                    errorMessage = context.getString(R.string.invalid_skip_amount)
-                    return@Button
+        onDismiss = onDismiss
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = amountText,
+                onValueChange = { value ->
+                    if (value.isEmpty() || value.toLongOrNull() != null) {
+                        amountText = value
+                        error = false
+                    }
+                },
+                modifier = Modifier.weight(0.8f),
+                singleLine = true,
+                isError = error,
+                shape = MaterialTheme.shapes.large,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                )
+            )
+            ExposedDropdownMenuBox(
+                expanded = unitMenuExpanded,
+                onExpandedChange = { unitMenuExpanded = it },
+                modifier = Modifier.weight(1.2f)
+            ) {
+                OutlinedTextField(
+                    value = units[selectedUnitIndex].first,
+                    onValueChange = {},
+                    readOnly = true,
+                    modifier = Modifier
+                        .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
+                        .fillMaxWidth(),
+                    shape = MaterialTheme.shapes.large,
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = unitMenuExpanded)
+                    }
+                )
+                ExposedDropdownMenu(
+                    expanded = unitMenuExpanded,
+                    onDismissRequest = { unitMenuExpanded = false }
+                ) {
+                    units.forEachIndexed { index, pair ->
+                        DropdownMenuItem(
+                            text = { Text(pair.first) },
+                            leadingIcon = {
+                                Icon(
+                                    if (index == 0) Icons.Default.Timer else Icons.Default.Schedule,
+                                    contentDescription = null
+                                )
+                            },
+                            onClick = {
+                                selectedUnitIndex = index
+                                unitMenuExpanded = false
+                                error = false
+                            }
+                        )
+                    }
                 }
-                val targetPos = if (isForward) {
-                    currentPosition + amountMs
-                } else {
-                    currentPosition - amountMs
-                }
-                if (targetPos < 0 || targetPos > duration) {
-                    error = true
-                    errorMessage = context.getString(R.string.invalid_skip_amount)
-                    return@Button
-                }
-                error = false
-                onConfirm(amountMs, isForward)
-            }) { Text(stringResource(R.string.confirm)) }
+            }
+        }
+
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            SegmentedButton(
+                selected = !isForward,
+                onClick = { isForward = false; error = false },
+                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                icon = { Icon(Icons.Default.FastRewind, contentDescription = null) },
+                label = { Text(stringResource(R.string.direction_backward)) }
+            )
+            SegmentedButton(
+                selected = isForward,
+                onClick = { isForward = true; error = false },
+                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                icon = { Icon(Icons.Default.FastForward, contentDescription = null) },
+                label = { Text(stringResource(R.string.direction_forward)) }
+            )
+        }
+
+        if (error) {
+            DialogErrorMessage(stringResource(R.string.invalid_skip_amount))
+        }
+    }
+}
+
+@Composable
+private fun TimePartField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    isError: Boolean,
+    modifier: Modifier = Modifier,
+    maxValue: Long? = null
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = { candidate ->
+            val parsed = candidate.toLongOrNull()
+            if (candidate.isEmpty() || (parsed != null && parsed >= 0L && (maxValue == null || parsed <= maxValue))) {
+                onValueChange(candidate)
+            }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } }
+        label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        modifier = modifier,
+        singleLine = true,
+        isError = isError,
+        shape = MaterialTheme.shapes.large,
+        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+            keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+        )
     )
+}
+
+@Composable
+private fun DialogErrorMessage(message: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.errorContainer
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                Icons.Default.ErrorOutline,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.size(20.dp)
+            )
+            Text(
+                message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onErrorContainer
+            )
+        }
+    }
 }
 
 enum class CoverTapArea { LEFT, CENTER, RIGHT }
